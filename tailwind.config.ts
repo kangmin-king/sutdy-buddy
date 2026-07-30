@@ -1,0 +1,58 @@
+import type { Config } from 'tailwindcss';
+
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        surface: '#f7f9fb',
+        'surface-dim': '#d8dadc',
+        'surface-bright': '#f7f9fb',
+        'surface-container-lowest': '#ffffff',
+        'surface-container-low': '#f2f4f6',
+        'surface-container': '#eceef0',
+        'surface-container-high': '#e6e8ea',
+        'surface-container-highest': '#e0e3e5',
+        'on-surface': '#191c1e',
+        'on-surface-variant': '#42474f',
+        outline: '#737780',
+        'outline-variant': '#c3c6d1',
+        primary: '#366095',
+        'on-primary': '#ffffff',
+        'primary-container': '#6e96cf',
+        'on-primary-container': '#002d58',
+        secondary: '#196b50',
+        'on-secondary': '#ffffff',
+        'secondary-container': '#a2efcd',
+        'on-secondary-container': '#1f6f54',
+        tertiary: '#63568e',
+        'on-tertiary': '#ffffff',
+        'tertiary-container': '#9a8cc8',
+        'on-tertiary-container': '#302459',
+        error: '#ba1a1a',
+        'on-error': '#ffffff',
+        'error-container': '#ffdad6',
+        'on-error-container': '#93000a',
+        background: '#f7f9fb',
+        'on-background': '#191c1e',
+      },
+      borderRadius: {
+        sm: '0.25rem',
+        DEFAULT: '0.5rem',
+        md: '0.75rem',
+        lg: '1rem',
+        xl: '1.5rem',
+        full: '9999px',
+      },
+      fontFamily: {
+        sans: ['Plus Jakarta Sans', 'sans-serif'],
+      },
+      boxShadow: {
+        soft: '0 4px 20px -4px rgba(54,96,149,0.12)',
+        card: '0 2px 12px -2px rgba(54,96,149,0.10)',
+      },
+    },
+  },
+  plugins: [],
+} satisfies Config;
