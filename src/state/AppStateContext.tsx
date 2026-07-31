@@ -188,11 +188,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async updatePlannerItem(date, id, patch) {
-        const list = state.plannerItems[date] ?? [];
-        setState((s) => ({
-          ...s,
-          plannerItems: { ...s.plannerItems, [date]: list.map((i) => (i.id === id ? { ...i, ...patch } : i)) },
-        }));
+        setState((s) => {
+          const list = s.plannerItems[date] ?? [];
+          return {
+            ...s,
+            plannerItems: { ...s.plannerItems, [date]: list.map((i) => (i.id === id ? { ...i, ...patch } : i)) },
+          };
+        });
 
         const dbPatch: Partial<SbPlannerItemRow> = {};
         if ('order' in patch) dbPatch.order = patch.order;

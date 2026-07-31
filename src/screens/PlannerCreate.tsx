@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
-import { todayKey, uid, resolveQuickTimeChip } from '../lib';
+import { todayKey, resolveQuickTimeChip } from '../lib';
 import { SUBJECTS, QUICK_TIME_CHIPS, getSubject } from '../constants';
 import { TopAppBar, Card, SectionTitle, ChipGroup, Button, Icon } from '../primitives';
 import PlannerItemDetailScreen from './PlannerItemDetail';
