@@ -3,6 +3,17 @@ import type { Config } from 'tailwindcss';
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   darkMode: 'class',
+  safelist: [
+    'bg-primary-container/10',
+    'bg-secondary-container/10',
+    'bg-tertiary-container/10',
+    'bg-primary-container/40',
+    'bg-secondary-container/40',
+    'bg-tertiary-container/40',
+    'text-primary',
+    'text-secondary',
+    'text-tertiary',
+  ],
   theme: {
     extend: {
       colors: {
