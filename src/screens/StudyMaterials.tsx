@@ -122,6 +122,14 @@ export default function StudyMaterialsScreen({ onBack }: { onBack: () => void })
                   {material.totalScope * material.targetPasses}p 중 {material.currentProgress}p · {material.sessionIntervalDays}일에 1번
                 </p>
                 <ProgressBar percent={donePercent} className="mb-2" />
+                <div className="w-24 mb-2">
+                  <TextField
+                    label="지금까지"
+                    value={String(material.currentProgress)}
+                    onChange={(v) => actions.updateStudyMaterial(material.id, { currentProgress: Number(v) || 0 })}
+                    type="number"
+                  />
+                </div>
                 {!pace.isOverdue && pace.remainingScope > 0 && (
                   <p className="text-xs text-primary font-semibold">→ 다음 세션({pace.remainingSessions}번 남음): {pace.scopePerSession}p씩</p>
                 )}

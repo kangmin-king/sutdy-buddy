@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
 
 class SBErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -29,10 +28,20 @@ class SBErrorBoundary extends React.Component<
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <SBErrorBoundary>
-      <App />
-    </SBErrorBoundary>
-  </React.StrictMode>
-);
+async function bootstrap() {
+  try {
+    const { default: App } = await import('./App');
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <React.StrictMode>
+        <SBErrorBoundary>
+          <App />
+        </SBErrorBoundary>
+      </React.StrictMode>
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    document.getElementById('root')!.innerHTML = `<pre style="padding:16px;white-space:pre-wrap;font-size:12px;color:#ba1a1a">${message}</pre>`;
+  }
+}
+
+bootstrap();

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
-import { BottomNav } from './primitives';
+import { BottomNav, Card, Button } from './primitives';
 import type { TabId } from './primitives';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/Onboarding';
@@ -17,7 +17,7 @@ import type { PlannerItem } from './types';
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
 
 function AppShell() {
-  const { state } = useAppState();
+  const { state, actions } = useAppState();
   const [activeTab, setActiveTab] = React.useState<TabId>('home');
   const [overlay, setOverlay] = React.useState<Overlay>(null);
   const [studyLogItem, setStudyLogItem] = React.useState<PlannerItem | null>(null);
@@ -63,6 +63,14 @@ function AppShell() {
 
   return (
     <div id="app-shell">
+      {state.error && (
+        <Card className="mx-5 mt-4 flex items-center justify-between gap-3 border border-error/40">
+          <p className="text-sm text-error">{state.error}</p>
+          <Button variant="error" onClick={actions.dismissError} className="!px-3 !py-1.5 shrink-0">
+            닫기
+          </Button>
+        </Card>
+      )}
       {overlayScreen ?? (
         <>
           {activeTab === 'home' && <HomeScreen onNavigate={setActiveTab} onOpenOverlay={setOverlay} />}

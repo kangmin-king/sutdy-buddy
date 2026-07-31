@@ -31,6 +31,7 @@ interface AppState {
   studyLogs: Record<DateKey, StudyLogEntry[]>;
   studyMaterials: StudyMaterial[];
   loading: boolean;
+  error: string | null;
 }
 
 const EMPTY_STATE: AppState = {
@@ -41,7 +42,10 @@ const EMPTY_STATE: AppState = {
   studyLogs: {},
   studyMaterials: [],
   loading: true,
+  error: null,
 };
+
+const WRITE_FAILURE_MESSAGE = '저장하지 못했어요. 다시 시도해주세요.';
 
 interface AppStateActions {
   saveProfile: (profile: Profile) => Promise<void>;
@@ -57,6 +61,7 @@ interface AppStateActions {
   updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
   deleteStudyMaterial: (id: string) => Promise<void>;
   applyTomorrowRecommendation: (date: DateKey, items: TomorrowRecommendationItem[]) => Promise<void>;
+  dismissError: () => void;
 }
 
 const AppStateContext = React.createContext<{ state: AppState; actions: AppStateActions } | null>(null);
@@ -83,6 +88,7 @@ async function loadAll(userId: string): Promise<AppState> {
     studyLogs: groupByDate((logsRes.data ?? []).map(studyLogFromRow)),
     studyMaterials: (materialsRes.data ?? []).map(studyMaterialFromRow),
     loading: false,
+    error: null,
   };
 }
 
@@ -114,7 +120,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           workbooks: profile.workbooks,
           onboarded_at: profile.onboardedAt,
         });
-        if (error) console.error('saveProfile failed:', error.message);
+        if (error) {
+          console.error('saveProfile failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async saveCondition(date, condition) {
@@ -131,7 +140,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           },
           { onConflict: 'user_id,date' }
         );
-        if (error) console.error('saveCondition failed:', error.message);
+        if (error) {
+          console.error('saveCondition failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async upsertScheduleBlock(date, block) {
@@ -143,7 +155,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         const row = { id: block.id, user_id: userId, date, type: block.type, label: block.label, start_time: block.startTime, end_time: block.endTime };
         const { error } = await supabase.from('sb_schedule_blocks').upsert(row);
-        if (error) console.error('upsertScheduleBlock failed:', error.message);
+        if (error) {
+          console.error('upsertScheduleBlock failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async deleteScheduleBlock(date, id) {
@@ -152,14 +167,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.from('sb_schedule_blocks').delete().eq('id', id);
         if (error) {
           console.error('deleteScheduleBlock failed:', error.message);
-          setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: previous } }));
+          setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: previous }, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 
       async addPlannerItem(date, item) {
         const list = state.plannerItems[date] ?? [];
         const id = uid();
-        const order = list.length + 1;
+        const order = list.length === 0 ? 1 : Math.max(...list.map((i) => i.order)) + 1;
         const fullItem: PlannerItem = { ...item, id, order };
         setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...list, fullItem] } }));
 
@@ -184,7 +199,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           partial_reason: fullItem.partialReason,
           incomplete_reason: fullItem.incompleteReason,
         });
-        if (error) console.error('addPlannerItem failed:', error.message);
+        if (error) {
+          console.error('addPlannerItem failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async updatePlannerItem(date, id, patch) {
@@ -215,7 +233,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if ('incompleteReason' in patch) dbPatch.incomplete_reason = patch.incompleteReason;
 
         const { error } = await supabase.from('sb_planner_items').update(dbPatch).eq('id', id);
-        if (error) console.error('updatePlannerItem failed:', error.message);
+        if (error) {
+          console.error('updatePlannerItem failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async deletePlannerItem(date, id) {
@@ -224,7 +245,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.from('sb_planner_items').delete().eq('id', id);
         if (error) {
           console.error('deletePlannerItem failed:', error.message);
-          setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: previous } }));
+          setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: previous }, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 
@@ -255,7 +276,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }));
 
         const { error: updateError } = await supabase.from('sb_planner_items').update({ status: 'carried_over' }).eq('id', id);
-        if (updateError) console.error('carryOverPlannerItem (update) failed:', updateError.message);
+        if (updateError) {
+          console.error('carryOverPlannerItem (update) failed:', updateError.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
 
         const { error: insertError } = await supabase.from('sb_planner_items').insert({
           id: cloneId,
@@ -278,7 +302,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           partial_reason: null,
           incomplete_reason: null,
         });
-        if (insertError) console.error('carryOverPlannerItem (insert) failed:', insertError.message);
+        if (insertError) {
+          console.error('carryOverPlannerItem (insert) failed:', insertError.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async addStudyLog(date, entry) {
@@ -298,7 +325,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           detail_note: fullEntry.detailNote,
           self_message: fullEntry.selfMessage,
         });
-        if (error) console.error('addStudyLog failed:', error.message);
+        if (error) {
+          console.error('addStudyLog failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async addStudyMaterial(material) {
@@ -318,7 +348,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           target_date: fullMaterial.targetDate,
           session_interval_days: fullMaterial.sessionIntervalDays,
         });
-        if (error) console.error('addStudyMaterial failed:', error.message);
+        if (error) {
+          console.error('addStudyMaterial failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async updateStudyMaterial(id, patch) {
@@ -333,7 +366,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if ('sessionIntervalDays' in patch) dbPatch.session_interval_days = patch.sessionIntervalDays;
 
         const { error } = await supabase.from('sb_study_materials').update(dbPatch).eq('id', id);
-        if (error) console.error('updateStudyMaterial failed:', error.message);
+        if (error) {
+          console.error('updateStudyMaterial failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
       },
 
       async deleteStudyMaterial(id) {
@@ -342,16 +378,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.from('sb_study_materials').delete().eq('id', id);
         if (error) {
           console.error('deleteStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, studyMaterials: previous }));
+          setState((s) => ({ ...s, studyMaterials: previous, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 
       async applyTomorrowRecommendation(date, items) {
         const existing = state.plannerItems[date] ?? [];
+        const baseOrder = existing.length === 0 ? 1 : Math.max(...existing.map((i) => i.order)) + 1;
         const newItems: PlannerItem[] = items.map((it, idx) => ({
           id: uid(),
           date,
-          order: existing.length + idx + 1,
+          order: baseOrder + idx,
           subjectId: it.subjectId,
           startTime: it.startTime,
           studyType: it.studyType,
@@ -393,7 +430,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             incomplete_reason: it.incompleteReason,
           }))
         );
-        if (error) console.error('applyTomorrowRecommendation failed:', error.message);
+        if (error) {
+          console.error('applyTomorrowRecommendation failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      dismissError() {
+        setState((s) => ({ ...s, error: null }));
       },
     }),
     [userId, state]
