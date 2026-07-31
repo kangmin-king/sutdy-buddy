@@ -1,0 +1,58 @@
+import React from 'react';
+import { useAppState } from '../state/AppStateContext';
+import { GRADES, SUBJECTS } from '../constants';
+import { Button, ChipGroup, TextField, SelectField } from '../primitives';
+import type { Grade, SubjectId } from '../types';
+
+export default function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
+  const { actions } = useAppState();
+  const [grade, setGrade] = React.useState<Grade>(GRADES[2]);
+  const [mainSubjects, setMainSubjects] = React.useState<SubjectId[]>(['math']);
+  const [goal, setGoal] = React.useState('');
+  const [examDate, setExamDate] = React.useState('');
+  const [workbooks, setWorkbooks] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    await actions.saveProfile({
+      grade,
+      mainSubjects,
+      goal,
+      examDate: examDate || null,
+      workbooks,
+      onboardedAt: new Date().toISOString(),
+    });
+    setSubmitting(false);
+    onComplete();
+  };
+
+  return (
+    <div className="px-5 pt-8 pb-10">
+      <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 버디</h1>
+
+      <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
+        <div className="text-5xl mb-3">🤖📚</div>
+        <h2 className="text-2xl font-extrabold text-on-surface mb-1">나를 가장 잘 아는 학습 파트너</h2>
+        <p className="text-sm text-on-surface-variant">나에게 맞는 학습 루틴을 함께 만들어볼게요.</p>
+      </div>
+
+      <div className="space-y-5">
+        <SelectField label="학년" value={grade} onChange={(v) => setGrade(v as Grade)} options={GRADES.map((g) => ({ id: g, label: g }))} />
+
+        <div>
+          <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">주요 과목</label>
+          <ChipGroup options={SUBJECTS} value={mainSubjects} onChange={setMainSubjects} multi />
+        </div>
+
+        <TextField label="학습 목표" value={goal} onChange={setGoal} placeholder='예: "내신 수학 2등급 목표"' />
+        <TextField label="시험 일정" value={examDate} onChange={setExamDate} type="date" />
+        <TextField label="사용하는 문제집" value={workbooks} onChange={setWorkbooks} placeholder="예: 쎈 수학, 자이스토리 영어" />
+      </div>
+
+      <Button className="w-full mt-8" onClick={handleSubmit} disabled={submitting}>
+        {submitting ? '시작하는 중...' : '시작하기'}
+      </Button>
+    </div>
+  );
+}
