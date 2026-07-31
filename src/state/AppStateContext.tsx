@@ -236,7 +236,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const tomorrowList = state.plannerItems[tomorrowKey] ?? [];
         const cloneId = uid();
         const order = tomorrowList.length + 1;
-        const clone: PlannerItem = { ...source, id: cloneId, order, status: 'planned', actualMinutes: null, understanding: null };
+        const clone: PlannerItem = {
+          ...source,
+          id: cloneId,
+          order,
+          status: 'planned',
+          actualMinutes: null,
+          understanding: null,
+          partialReason: null,
+          incompleteReason: null,
+        };
 
         setState((s) => ({
           ...s,
