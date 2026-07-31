@@ -4,6 +4,7 @@ import { todayKey, resolveQuickTimeChip } from '../lib';
 import { SUBJECTS, QUICK_TIME_CHIPS, getSubject } from '../constants';
 import { TopAppBar, Card, SectionTitle, ChipGroup, Button, Icon } from '../primitives';
 import PlannerItemDetailScreen from './PlannerItemDetail';
+import StudyMaterialsScreen from './StudyMaterials';
 import type { SubjectId } from '../types';
 import type { QuickTimeChipId } from '../constants';
 
@@ -17,6 +18,7 @@ export default function PlannerCreateScreen() {
   const [showForm, setShowForm] = React.useState(false);
   const [subjectId, setSubjectId] = React.useState<SubjectId>('math');
   const [chipId, setChipId] = React.useState<QuickTimeChipId>('now');
+  const [showMaterials, setShowMaterials] = React.useState(false);
 
   if (selectedItemId) {
     const item = items.find((i) => i.id === selectedItemId);
@@ -24,6 +26,10 @@ export default function PlannerCreateScreen() {
       return <PlannerItemDetailScreen item={item} allItemsToday={items} onBack={() => setSelectedItemId(null)} />;
     }
     setSelectedItemId(null);
+  }
+
+  if (showMaterials) {
+    return <StudyMaterialsScreen onBack={() => setShowMaterials(false)} />;
   }
 
   const nowTime = new Date().toTimeString().slice(0, 5);
@@ -54,6 +60,9 @@ export default function PlannerCreateScreen() {
   return (
     <div className="px-5 pt-4 pb-28">
       <TopAppBar />
+      <button onClick={() => setShowMaterials(true)} className="flex items-center gap-1 text-xs font-semibold text-primary mb-2">
+        <Icon name="target" className="!text-[16px]" /> 학습 자료 목표
+      </button>
       <h1 className="text-xl font-bold mt-2 mb-1">오늘의 학습</h1>
       <p className="text-sm text-on-surface-variant mb-4">과목 + 시작 시간만 입력하면 끝. 나머지는 눌러서 원할 때 채워요.</p>
 
