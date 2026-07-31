@@ -36,9 +36,7 @@ export function recommendedDifficultyFor(condition: DailyCondition | null): Diff
 export function getFreeTimeAndSuggestion(blocks: ScheduleBlock[], condition: DailyCondition | null, mostPostponedSubjectLabel?: string) {
   const gaps = computeFreeGaps(blocks);
   const totalFreeMinutes = sumFreeMinutes(gaps);
-  // Filter out gaps that are too small to be practically useful (less than 10 minutes)
-  const usefulGaps = gaps.filter((g) => g.minutes >= 10);
-  const bestGap = getBestGap(usefulGaps);
+  const bestGap = getBestGap(gaps);
   const recommendedDifficulty = recommendedDifficultyFor(condition);
 
   let suggestionText: string;

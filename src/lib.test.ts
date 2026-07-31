@@ -63,6 +63,14 @@ describe('computeFreeGaps', () => {
     const gaps = computeFreeGaps(blocks, '07:00', '23:00');
     expect(gaps).toEqual([]);
   });
+
+  it('drops trailing gap if it is shorter than 10 minutes', () => {
+    // Block ends at 23:51, window end is 24:00, leaving only 9 minutes (too small)
+    const blocks = [block({ startTime: '08:00', endTime: '23:51' })];
+    const gaps = computeFreeGaps(blocks, '07:00', '24:00');
+    // Should have gap from 07:00-08:00 (60 min) but NO trailing gap since 9 minutes < 10
+    expect(gaps).toEqual([{ start: '07:00', end: '08:00', minutes: 60 }]);
+  });
 });
 
 describe('sumFreeMinutes / getBestGap', () => {

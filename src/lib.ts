@@ -115,7 +115,7 @@ export function computeFreeGaps(blocks: ScheduleBlock[], windowStart = '07:00', 
     }
     cursor = Math.max(cursor, e);
   }
-  if (cursor < end) {
+  if (cursor < end && end - cursor >= 10) {
     gaps.push({ start: minutesToTime(cursor), end: minutesToTime(end === 1440 ? 1439 : end), minutes: end - cursor });
   }
   return gaps;
