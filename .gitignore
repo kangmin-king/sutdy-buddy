@@ -3,3 +3,5 @@ dist
 .env
 .env.local
 .superpowers
+*.tsbuildinfo
+vite.config.js
