@@ -61,9 +61,9 @@ export const REVIEW_NEEDS: { id: ReviewNeedId; label: string }[] = [
 export const GRADES: Grade[] = ['중1', '중2', '중3', '고1', '고2', '고3'];
 
 export const NAV_TABS = [
-  { id: 'home', label: '홈', icon: 'home' },
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
   { id: 'planner', label: '플래너', icon: 'edit_note' },
+  { id: 'home', label: '홈', icon: 'home' },
   { id: 'check', label: '체크', icon: 'task_alt' },
   { id: 'ai', label: 'AI 분석', icon: 'auto_awesome' },
 ] as const;

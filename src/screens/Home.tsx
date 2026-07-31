@@ -78,7 +78,7 @@ export default function HomeScreen({
         <ProgressRing percent={progress.percent} />
       </Card>
 
-      {urgent && (
+      {urgent ? (
         <Card className="mb-4">
           <p className="text-xs font-bold text-on-surface-variant mb-1">📐 오늘의 시험 대비 목표</p>
           <p className="text-sm font-bold text-on-surface mb-1">
@@ -95,6 +95,21 @@ export default function HomeScreen({
             플래너에 반영하기
           </Button>
         </Card>
+      ) : (
+        <button onClick={() => onNavigate('planner')} className="w-full text-left mb-4">
+          <div className="rounded-2xl bg-primary-container/20 border border-primary-container/60 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                <Icon name="target" className="!text-[20px] text-on-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-on-surface">학습 자료 목표</p>
+                <p className="text-xs text-on-surface-variant">시험 범위를 등록하면 오늘 할 분량을 알려드려요</p>
+              </div>
+            </div>
+            <Icon name="chevron_right" className="text-primary shrink-0" />
+          </div>
+        </button>
       )}
 
       <SectionTitle action={<button onClick={() => onNavigate('check')} className="text-xs font-semibold text-primary">전체보기</button>}>

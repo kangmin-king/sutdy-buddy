@@ -60,9 +60,24 @@ export default function PlannerCreateScreen() {
   return (
     <div className="px-5 pt-4 pb-28">
       <TopAppBar />
-      <button onClick={() => setShowMaterials(true)} className="flex items-center gap-1 text-xs font-semibold text-primary mb-2">
-        <Icon name="target" className="!text-[16px]" /> 학습 자료 목표
+
+      <button onClick={() => setShowMaterials(true)} className="w-full text-left mb-4">
+        <div className="rounded-2xl bg-primary-container/20 border border-primary-container/60 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+              <Icon name="target" className="!text-[20px] text-on-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-on-surface">학습 자료 목표</p>
+              <p className="text-xs text-on-surface-variant">
+                {state.studyMaterials.length > 0 ? `${state.studyMaterials.length}개 등록됨 · 오늘 목표 확인` : '시험 범위를 등록하면 오늘 할 분량을 알려드려요'}
+              </p>
+            </div>
+          </div>
+          <Icon name="chevron_right" className="text-primary shrink-0" />
+        </div>
       </button>
+
       <h1 className="text-xl font-bold mt-2 mb-1">오늘의 학습</h1>
       <p className="text-sm text-on-surface-variant mb-4">과목 + 시작 시간만 입력하면 끝. 나머지는 눌러서 원할 때 채워요.</p>
 
@@ -105,7 +120,10 @@ export default function PlannerCreateScreen() {
                   </p>
                 </div>
               </div>
-              <Icon name="chevron_right" className="text-outline-variant" />
+              <div className="flex items-center gap-0.5 text-outline-variant shrink-0">
+                <span className="text-xs">상세</span>
+                <Icon name="chevron_right" />
+              </div>
             </Card>
           </button>
         ))}
