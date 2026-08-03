@@ -46,6 +46,35 @@ export function formatDateKorean(dateKey: DateKey): string {
   return `${y}년 ${m}월 ${d}일 ${days[dt.getDay()]}요일`;
 }
 
+export function addMonthsToKey(dateKey: DateKey, months: number): DateKey {
+  const [y, m] = dateKey.split('-').map(Number);
+  const dt = new Date(y, m - 1 + months, 1);
+  return toDateKey(dt);
+}
+
+export interface MonthDay {
+  key: DateKey;
+  date: number;
+  inCurrentMonth: boolean;
+}
+
+// dateKey는 보고 싶은 달의 아무 날짜나 넘기면 된다(보통 1일). 항상 월~일 6주(42일) 그리드를 반환해
+// 달력 UI가 매달 같은 행 수로 렌더링되게 한다.
+export function monthGrid(dateKey: DateKey): MonthDay[] {
+  const [y, m] = dateKey.split('-').map(Number);
+  const firstOfMonth = new Date(y, m - 1, 1);
+  const startDow = (firstOfMonth.getDay() + 6) % 7; // Monday=0
+  const gridStart = new Date(firstOfMonth);
+  gridStart.setDate(firstOfMonth.getDate() - startDow);
+  const days: MonthDay[] = [];
+  for (let i = 0; i < 42; i++) {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + i);
+    days.push({ key: toDateKey(day), date: day.getDate(), inCurrentMonth: day.getMonth() === m - 1 });
+  }
+  return days;
+}
+
 export function weekStrip(dateKey: DateKey) {
   const [y, m, d] = dateKey.split('-').map(Number);
   const dt = new Date(y, m - 1, d);

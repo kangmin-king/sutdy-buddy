@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
-import { todayKey, formatDateKorean, formatMinutes, getPlannerProgress, computeMaterialPace } from '../lib';
-import { getHomeTip, getFreeTimeAndSuggestion } from '../ai';
+import { todayKey, formatDateKorean, getPlannerProgress, computeMaterialPace } from '../lib';
+import { getHomeTip } from '../ai';
 import { getSubject, getStudyType, MOODS } from '../constants';
 import { Icon, TopAppBar, Card, ProgressRing, SectionTitle, AiTipCard, Button } from '../primitives';
 import type { TabId } from '../primitives';
@@ -25,11 +25,10 @@ export default function HomeScreen({
   const { state } = useAppState();
   const date = todayKey();
   const condition = state.conditions[date] ?? null;
-  const blocks = state.scheduleBlocks[date] ?? [];
   const items = state.plannerItems[date] ?? [];
   const mustDoItem = items.find((i) => i.mustDo && i.status !== 'completed') ?? items.find((i) => i.mustDo) ?? null;
+  const nextItem = items.filter((i) => i.status !== 'completed').sort((a, b) => a.startTime.localeCompare(b.startTime))[0] ?? null;
 
-  const { totalFreeMinutes } = getFreeTimeAndSuggestion(blocks, condition);
   const progress = getPlannerProgress(items);
   const tip = getHomeTip(condition, items, mustDoItem);
   const urgent = mostUrgentMaterial(state.studyMaterials, date);
@@ -59,9 +58,15 @@ export default function HomeScreen({
           )}
         </Card>
         <Card tint="secondary">
-          <Icon name="timer" className="!text-[20px] text-secondary mb-1" />
-          <p className="text-xs text-on-surface-variant mb-1">공부 가능 시간</p>
-          <p className="text-base font-bold">{formatMinutes(totalFreeMinutes)}</p>
+          <Icon name="upcoming" className="!text-[20px] text-secondary mb-1" />
+          <p className="text-xs text-on-surface-variant mb-1">다음 학습</p>
+          {nextItem ? (
+            <p className="text-base font-bold">
+              {getSubject(nextItem.subjectId).label} · {nextItem.startTime}
+            </p>
+          ) : (
+            <p className="text-sm text-on-surface-variant">예정된 학습 없음</p>
+          )}
         </Card>
       </div>
 

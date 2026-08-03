@@ -1,8 +1,7 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
-import { todayKey, weekStrip, formatMinutes, uid } from '../lib';
+import { todayKey, monthGrid, addMonthsToKey, uid } from '../lib';
 import { getFreeTimeAndSuggestion } from '../ai';
-import { DIFFICULTY_LEVELS } from '../constants';
 import { TopAppBar, Card, SectionTitle, ChipGroup, TextField, Button, Icon } from '../primitives';
 import type { TabId } from '../primitives';
 import type { ScheduleBlock } from '../types';
@@ -16,17 +15,21 @@ const BLOCK_TYPES = [
   { id: 'other', label: '기타' },
 ];
 
+const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
 export default function CalendarScreen({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
   const { state, actions } = useAppState();
-  const [selectedDate, setSelectedDate] = React.useState(todayKey());
+  const today = todayKey();
+  const [selectedDate, setSelectedDate] = React.useState(today);
+  const [viewMonthKey, setViewMonthKey] = React.useState(today);
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({ type: 'school', label: '', startTime: '08:00', endTime: '16:00' });
 
   const blocks = state.scheduleBlocks[selectedDate] ?? [];
   const condition = state.conditions[selectedDate] ?? null;
-  const { totalFreeMinutes, bestGap, recommendedDifficulty, suggestionText } = getFreeTimeAndSuggestion(blocks, condition);
+  const { suggestionText } = getFreeTimeAndSuggestion(blocks, condition);
 
-  const days = weekStrip(selectedDate);
+  const grid = monthGrid(viewMonthKey);
 
   const addBlock = () => {
     if (!form.label.trim()) return;
@@ -36,54 +39,72 @@ export default function CalendarScreen({ onNavigate }: { onNavigate: (tab: TabId
     setShowForm(false);
   };
 
-  const [y, m] = selectedDate.split('-');
+  const goToToday = () => {
+    setSelectedDate(today);
+    setViewMonthKey(today);
+  };
+
+  const [viewY, viewM] = viewMonthKey.split('-');
+  const [selY, selM, selD] = selectedDate.split('-');
 
   return (
     <div className="px-5 pt-4 pb-28">
       <TopAppBar />
 
       <div className="flex items-center justify-between mt-2 mb-3">
-        <p className="text-base font-bold">
-          {y}년 {Number(m)}월
-        </p>
-        <button onClick={() => setSelectedDate(todayKey())} className="text-xs font-semibold bg-surface-container rounded-full px-3 py-1.5">
-          오늘
+        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, -1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <Icon name="chevron_left" />
         </button>
+        <p className="text-base font-bold">
+          {viewY}년 {Number(viewM)}월
+        </p>
+        <div className="flex items-center gap-2">
+          <button onClick={goToToday} className="text-xs font-semibold bg-surface-container rounded-full px-3 py-1.5">
+            오늘
+          </button>
+          <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+            <Icon name="chevron_right" />
+          </button>
+        </div>
       </div>
 
-      <div className="flex justify-between mb-5">
-        {days.map((d) => (
-          <button
-            key={d.key}
-            onClick={() => setSelectedDate(d.key)}
-            className={`flex flex-col items-center gap-1 w-9 py-2 rounded-xl ${d.key === selectedDate ? 'bg-primary text-on-primary' : 'text-on-surface'}`}
-          >
-            <span className="text-[11px]">{d.label}</span>
-            <span className="text-sm font-bold">{d.date}</span>
-          </button>
+      <div className="grid grid-cols-7 mb-1">
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} className="text-center text-[11px] text-on-surface-variant py-1">
+            {label}
+          </div>
         ))}
       </div>
 
-      <Card tint="secondary" className="mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Icon name="event_available" className="text-secondary" />
-          <span className="text-sm font-bold">오늘 공부 가능 시간 요약</span>
-        </div>
-        <div className="grid grid-cols-3 text-center">
-          <div>
-            <p className="text-xs text-on-surface-variant">총 시간</p>
-            <p className="text-sm font-bold">{formatMinutes(totalFreeMinutes)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-on-surface-variant">최적 시간</p>
-            <p className="text-sm font-bold">{bestGap ? `${bestGap.start}~${bestGap.end}` : '-'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-on-surface-variant">추천 난이도</p>
-            <p className="text-sm font-bold">{DIFFICULTY_LEVELS.find((d) => d.id === recommendedDifficulty)?.label}</p>
-          </div>
-        </div>
-      </Card>
+      <div className="grid grid-cols-7 gap-y-1 mb-5">
+        {grid.map((d) => {
+          const isSelected = d.key === selectedDate;
+          const isToday = d.key === today;
+          const hasBlocks = (state.scheduleBlocks[d.key] ?? []).length > 0;
+          return (
+            <button key={d.key} onClick={() => setSelectedDate(d.key)} className="flex flex-col items-center py-1.5">
+              <span
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm ${
+                  isSelected
+                    ? 'bg-primary text-on-primary font-bold'
+                    : isToday
+                      ? 'border border-primary text-primary font-semibold'
+                      : d.inCurrentMonth
+                        ? 'text-on-surface'
+                        : 'text-outline-variant'
+                }`}
+              >
+                {d.date}
+              </span>
+              <span className={`w-1 h-1 rounded-full mt-0.5 ${hasBlocks ? 'bg-secondary' : 'bg-transparent'}`} />
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-xs font-semibold text-primary mb-3">
+        {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''} 선택됨
+      </p>
 
       <SectionTitle
         action={
@@ -92,7 +113,7 @@ export default function CalendarScreen({ onNavigate }: { onNavigate: (tab: TabId
           </button>
         }
       >
-        오늘의 일과
+        선택한 날짜의 일과
       </SectionTitle>
 
       {showForm && (

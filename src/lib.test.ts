@@ -11,6 +11,8 @@ import {
   resolveQuickTimeChip,
   computeMaterialPace,
   addDaysToKey,
+  addMonthsToKey,
+  monthGrid,
   uid,
 } from './lib';
 import type { ScheduleBlock, PlannerItem, StudyMaterial } from './types';
@@ -190,6 +192,34 @@ describe('computeMaterialPace', () => {
 describe('addDaysToKey', () => {
   it('adds days across a month boundary', () => {
     expect(addDaysToKey('2026-07-30', 3)).toBe('2026-08-02');
+  });
+});
+
+describe('addMonthsToKey', () => {
+  it('shifts to the 1st of a later month', () => {
+    expect(addMonthsToKey('2026-08-15', 1)).toBe('2026-09-01');
+  });
+  it('shifts to the 1st of an earlier month, crossing a year boundary', () => {
+    expect(addMonthsToKey('2026-01-15', -1)).toBe('2025-12-01');
+  });
+});
+
+describe('monthGrid', () => {
+  it('returns a 42-day grid starting on a Monday and ending on a Sunday', () => {
+    const grid = monthGrid('2026-08-01');
+    expect(grid).toHaveLength(42);
+    const [fy, fm, fd] = grid[0].key.split('-').map(Number);
+    expect(new Date(fy, fm - 1, fd).getDay()).toBe(1); // Monday
+    const [ly, lm, ld] = grid[41].key.split('-').map(Number);
+    expect(new Date(ly, lm - 1, ld).getDay()).toBe(0); // Sunday
+  });
+
+  it('marks every day of the requested month as inCurrentMonth, and no others', () => {
+    const grid = monthGrid('2026-08-01');
+    const augustDays = grid.filter((d) => d.inCurrentMonth);
+    expect(augustDays).toHaveLength(31);
+    expect(augustDays[0].key).toBe('2026-08-01');
+    expect(augustDays[30].key).toBe('2026-08-31');
   });
 });
 
