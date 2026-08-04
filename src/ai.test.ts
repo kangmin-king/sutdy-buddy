@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHomeTip, recommendedDifficultyFor, getFreeTimeAndSuggestion, getTomorrowRecommendation } from './ai';
+import { getHomeTip, recommendedDifficultyFor, getScheduleTip, getTomorrowRecommendation } from './ai';
 import type { DailyCondition, PlannerItem, ScheduleBlock } from './types';
 
 function condition(overrides: Partial<DailyCondition>): DailyCondition {
@@ -53,16 +53,20 @@ function block(overrides: Partial<ScheduleBlock>): ScheduleBlock {
   return { id: 'b1', date: '2026-07-30', type: 'school', label: '학교', startTime: '08:00', endTime: '16:00', ...overrides };
 }
 
-describe('getFreeTimeAndSuggestion', () => {
-  it('suggests a short review session when there is no free gap', () => {
-    const result = getFreeTimeAndSuggestion([block({ startTime: '00:00', endTime: '23:59' })], null);
-    expect(result.bestGap).toBeNull();
-    expect(result.suggestionText).toContain('복습');
+describe('getScheduleTip', () => {
+  it('asks to register a schedule when there are no blocks', () => {
+    expect(getScheduleTip([], null)).toContain('일정을 등록');
   });
-  it('names the best gap and a subject in the suggestion', () => {
-    const result = getFreeTimeAndSuggestion([block({})], condition({}), '영어');
-    expect(result.suggestionText).toContain('영어');
-    expect(result.bestGap?.start).toBe('16:00');
+  it('asks for condition when blocks exist but condition is missing', () => {
+    expect(getScheduleTip([block({})], null)).toContain('컨디션');
+  });
+  it('names the postponed subject and a difficulty in the tip', () => {
+    const result = getScheduleTip([block({})], condition({}), '영어');
+    expect(result).toContain('영어');
+  });
+  it('never claims a specific amount of free time', () => {
+    const result = getScheduleTip([block({})], condition({ fatigue: 5 }));
+    expect(result).not.toMatch(/\d+분|\d+시간/);
   });
 });
 
@@ -79,7 +83,6 @@ describe('getTomorrowRecommendation', () => {
       completionRate: 0,
       incompleteCount: 0,
       lowFocusWindow: null,
-      availableMinutesTomorrow: 1020, // default 07:00-24:00 window with no blocks
       reasons: [],
       items: [],
     });
@@ -146,14 +149,15 @@ describe('getTomorrowRecommendation', () => {
     expect(result.items[0].difficulty).toBe('easy');
   });
 
-  it('reflects tomorrow\'s actual free time, not today\'s', () => {
+  it('places recommended items after tomorrow\'s registered schedule, not today\'s', () => {
+    const items = [item({ id: '1', status: 'partial' })];
     const result = getTomorrowRecommendation({
-      todayPlannerItems: [],
+      todayPlannerItems: items,
       todayCondition: null,
       tomorrowScheduleBlocks: [block({ startTime: '08:00', endTime: '16:00' })],
       recentPlannerItems: [],
       mainSubjects: [],
     });
-    expect(result.availableMinutesTomorrow).toBe(1020 - (16 - 8) * 60); // 07:00-24:00 window minus the 08:00-16:00 block
+    expect(result.items[0].startTime >= '16:00').toBe(true);
   });
 });

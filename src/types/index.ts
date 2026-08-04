@@ -99,7 +99,6 @@ export interface TomorrowRecommendation {
   completionRate: number;
   incompleteCount: number;
   lowFocusWindow: string | null;
-  availableMinutesTomorrow: number;
   reasons: string[];
   items: TomorrowRecommendationItem[];
 }

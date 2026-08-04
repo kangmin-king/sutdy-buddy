@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
-import { todayKey, addDaysToKey, formatMinutes } from '../lib';
+import { todayKey, addDaysToKey } from '../lib';
 import { getTomorrowRecommendation } from '../ai';
 import { getSubject, STUDY_TYPES, DIFFICULTY_LEVELS } from '../constants';
 import { BackBar, Card, Button, Icon } from '../primitives';
@@ -41,7 +41,7 @@ export default function TomorrowRecommendationScreen({ onBack, onApplied }: { on
               <span className="inline-block text-xs font-bold bg-white/60 rounded-full px-3 py-1 mb-2">AI 버디의 제안</span>
               <h1 className="text-xl font-extrabold mb-4">내일 학습 추천 초안</h1>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="bg-white/70 rounded-xl p-3">
                   <p className="text-xs text-on-surface-variant">오늘 완료율</p>
                   <p className="text-lg font-bold">{recommendation.completionRate}%</p>
@@ -53,10 +53,6 @@ export default function TomorrowRecommendationScreen({ onBack, onApplied }: { on
                 <div className="bg-white/70 rounded-xl p-3">
                   <p className="text-xs text-on-surface-variant">집중 낮은 시간</p>
                   <p className="text-lg font-bold">{recommendation.lowFocusWindow ?? '-'}</p>
-                </div>
-                <div className="bg-white/70 rounded-xl p-3">
-                  <p className="text-xs text-on-surface-variant">내일 공부 가능</p>
-                  <p className="text-lg font-bold">{formatMinutes(recommendation.availableMinutesTomorrow)}</p>
                 </div>
               </div>
 

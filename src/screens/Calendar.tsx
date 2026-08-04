@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, uid } from '../lib';
-import { getFreeTimeAndSuggestion } from '../ai';
+import { getScheduleTip } from '../ai';
 import { TopAppBar, Card, SectionTitle, ChipGroup, TextField, Button, Icon } from '../primitives';
 import type { TabId } from '../primitives';
 import type { ScheduleBlock } from '../types';
@@ -27,7 +27,7 @@ export default function CalendarScreen({ onNavigate }: { onNavigate: (tab: TabId
 
   const blocks = state.scheduleBlocks[selectedDate] ?? [];
   const condition = state.conditions[selectedDate] ?? null;
-  const { suggestionText } = getFreeTimeAndSuggestion(blocks, condition);
+  const suggestionText = getScheduleTip(blocks, condition);
 
   const grid = monthGrid(viewMonthKey);
 

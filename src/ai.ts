@@ -1,4 +1,4 @@
-import { computeFreeGaps, sumFreeMinutes, getBestGap, withEul, timeToMinutes, minutesToTime } from './lib';
+import { computeFreeGaps, withEul, timeToMinutes, minutesToTime } from './lib';
 import { getSubject } from './constants';
 import type { DailyCondition, PlannerItem, ScheduleBlock, DifficultyId, SubjectId, StudyTypeId, TomorrowRecommendation, TomorrowRecommendationItem } from './types';
 
@@ -33,23 +33,19 @@ export function recommendedDifficultyFor(condition: DailyCondition | null): Diff
   return 'medium';
 }
 
-export function getFreeTimeAndSuggestion(blocks: ScheduleBlock[], condition: DailyCondition | null, mostPostponedSubjectLabel?: string) {
-  const gaps = computeFreeGaps(blocks);
-  const totalFreeMinutes = sumFreeMinutes(gaps);
-  const bestGap = getBestGap(gaps);
-  const recommendedDifficulty = recommendedDifficultyFor(condition);
-
-  let suggestionText: string;
-  if (!bestGap) {
-    suggestionText = '오늘은 빈 시간이 거의 없어요. 짧게라도 복습해볼까요?';
-  } else {
-    const hours = (bestGap.minutes / 60).toFixed(1).replace(/\.0$/, '');
-    const firstBlock = Math.min(90, bestGap.minutes);
-    const subjectPhrase = mostPostponedSubjectLabel || '핵심 과목';
-    suggestionText = `오늘 ${bestGap.start} 이후로 ${hours}시간이 비어 있어요. 첫 ${firstBlock}분은 ${withEul(subjectPhrase)} 학습을 추천해요.`;
+// 하루 일정(취침/기상/등하원 등)을 다 알 수 없어 "공부 가능 시간"을 분 단위로 추정하지 않는다.
+// 대신 등록된 일정 유무와 컨디션만으로 부담 없는 난이도 팁을 제공한다.
+export function getScheduleTip(blocks: ScheduleBlock[], condition: DailyCondition | null, mostPostponedSubjectLabel?: string) {
+  if (blocks.length === 0) {
+    return '오늘 일정을 등록하면 더 정확한 학습 계획을 세울 수 있어요.';
   }
-
-  return { freeGaps: gaps, totalFreeMinutes, bestGap, recommendedDifficulty, suggestionText };
+  if (!condition) {
+    return '오늘 컨디션을 입력하면 학습 난이도를 추천해드려요.';
+  }
+  const difficulty = recommendedDifficultyFor(condition);
+  const difficultyLabel = { easy: '가벼운', medium: '보통 난이도의', hard: '집중이 필요한' }[difficulty];
+  const subjectPhrase = mostPostponedSubjectLabel ? `${withEul(mostPostponedSubjectLabel)} 먼저 ` : '';
+  return `오늘 컨디션 기준으로 ${subjectPhrase}${difficultyLabel} 학습을 추천해요.`;
 }
 
 // 규칙 기반 "내일 추천" — OpenAI 크레딧이 없어도 동작하는 무료 폴백.
@@ -106,11 +102,10 @@ export function getTomorrowRecommendation({
     reasons.push("컨디션 분석: 피로도가 높아 난이도를 '보통'으로 하향 조정했어요.");
   }
 
-  // 4) 내일 빈 시간
+  // 4) 내일 등록된 일정 기준으로 학습 항목을 배치할 빈 시간대 (전체 "공부 가능 시간"을 추정하지는 않는다)
   const gaps = computeFreeGaps(tomorrowScheduleBlocks)
     .slice()
     .sort((a, b) => b.minutes - a.minutes);
-  const availableMinutesTomorrow = sumFreeMinutes(gaps);
 
   // 5) 우선순위: 미완료 항목을 미룬 과목 순으로 정렬
   const ordered = incompleteItems.slice().sort((a, b) => {
@@ -182,7 +177,6 @@ export function getTomorrowRecommendation({
     completionRate,
     incompleteCount: incompleteItems.length,
     lowFocusWindow,
-    availableMinutesTomorrow,
     reasons: [...new Set(reasons)],
     items: items.slice(0, 4),
   };
