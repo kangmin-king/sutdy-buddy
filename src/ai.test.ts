@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHomeTip, recommendedDifficultyFor, getFreeTimeAndSuggestion } from './ai';
+import { getHomeTip, recommendedDifficultyFor, getFreeTimeAndSuggestion, getTomorrowRecommendation } from './ai';
 import type { DailyCondition, PlannerItem, ScheduleBlock } from './types';
 
 function condition(overrides: Partial<DailyCondition>): DailyCondition {
@@ -63,5 +63,97 @@ describe('getFreeTimeAndSuggestion', () => {
     const result = getFreeTimeAndSuggestion([block({})], condition({}), '영어');
     expect(result.suggestionText).toContain('영어');
     expect(result.bestGap?.start).toBe('16:00');
+  });
+});
+
+describe('getTomorrowRecommendation', () => {
+  it('returns zeroed-out defaults when there is no data at all', () => {
+    const result = getTomorrowRecommendation({
+      todayPlannerItems: [],
+      todayCondition: null,
+      tomorrowScheduleBlocks: [],
+      recentPlannerItems: [],
+      mainSubjects: [],
+    });
+    expect(result).toEqual({
+      completionRate: 0,
+      incompleteCount: 0,
+      lowFocusWindow: null,
+      availableMinutesTomorrow: 1020, // default 07:00-24:00 window with no blocks
+      reasons: [],
+      items: [],
+    });
+  });
+
+  it('computes completion rate from today\'s items', () => {
+    const items = [
+      item({ id: '1', status: 'completed' }),
+      item({ id: '2', status: 'completed' }),
+      item({ id: '3', status: 'partial' }),
+      item({ id: '4', status: 'planned' }),
+    ];
+    const result = getTomorrowRecommendation({
+      todayPlannerItems: items,
+      todayCondition: null,
+      tomorrowScheduleBlocks: [],
+      recentPlannerItems: [],
+      mainSubjects: [],
+    });
+    expect(result.completionRate).toBe(50);
+    expect(result.incompleteCount).toBe(1); // only the 'partial' one counts, 'planned' isn't incomplete-yet
+  });
+
+  it('prioritizes incomplete items into the recommendation, marking the first one must-do', () => {
+    const items = [item({ id: '1', subjectId: 'math', status: 'partial', material: '쎈 수학', startTime: '19:00' })];
+    const result = getTomorrowRecommendation({
+      todayPlannerItems: items,
+      todayCondition: null,
+      tomorrowScheduleBlocks: [],
+      recentPlannerItems: [],
+      mainSubjects: [],
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].subjectId).toBe('math');
+    expect(result.items[0].material).toBe('쎈 수학');
+    expect(result.items[0].mustDo).toBe(true);
+    expect(result.reasons.some((r) => r.includes('수학'))).toBe(true);
+  });
+
+  it('caps difficulty to medium and explains why when fatigue is high', () => {
+    const items = [item({ id: '1', status: 'partial' })];
+    const result = getTomorrowRecommendation({
+      todayPlannerItems: items,
+      todayCondition: condition({ fatigue: 5 }), // high fatigue: base difficulty would be 'easy', capped to 'medium' either way
+      tomorrowScheduleBlocks: [],
+      recentPlannerItems: [],
+      mainSubjects: [],
+    });
+    expect(result.items[0].difficulty).toBe('medium');
+    expect(result.reasons.some((r) => r.includes('피로도'))).toBe(true);
+  });
+
+  it('backfills with an unstudied main subject when fewer than 2 items are recommended', () => {
+    const items = [item({ id: '1', subjectId: 'math', status: 'completed' })];
+    const result = getTomorrowRecommendation({
+      todayPlannerItems: items,
+      todayCondition: null,
+      tomorrowScheduleBlocks: [],
+      recentPlannerItems: [],
+      mainSubjects: ['math', 'english'],
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].subjectId).toBe('english'); // math was already studied today, skipped
+    expect(result.items[0].difficulty).toBe('easy');
+  });
+
+  it('reflects tomorrow\'s actual free time, not today\'s', () => {
+    const result = getTomorrowRecommendation({
+      todayPlannerItems: [],
+      todayCondition: null,
+      tomorrowScheduleBlocks: [block({ startTime: '08:00', endTime: '16:00' })],
+      recentPlannerItems: [],
+      mainSubjects: [],
+    });
+    expect(result.availableMinutesTomorrow).toBe(1020 - (16 - 8) * 60); // 07:00-24:00 window minus the 08:00-16:00 block
   });
 });

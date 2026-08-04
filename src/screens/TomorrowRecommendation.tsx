@@ -1,101 +1,32 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
-import { supabase } from '../lib/supabase';
-import { todayKey, addDaysToKey, timeToMinutes, minutesToTime, getPlannerProgress, computeFreeGaps, sumFreeMinutes, formatMinutes } from '../lib';
-import { getSubject, SUBJECTS, STUDY_TYPES, DIFFICULTY_LEVELS } from '../constants';
+import { todayKey, addDaysToKey, formatMinutes } from '../lib';
+import { getTomorrowRecommendation } from '../ai';
+import { getSubject, STUDY_TYPES, DIFFICULTY_LEVELS } from '../constants';
 import { BackBar, Card, Button, Icon } from '../primitives';
-import type { TomorrowRecommendation, TomorrowRecommendationItem, StudyTypeId, DifficultyId } from '../types';
-
-function subjectIdFromLabel(label: string) {
-  return SUBJECTS.find((s) => s.label === label)?.id ?? SUBJECTS[0].id;
-}
 
 export default function TomorrowRecommendationScreen({ onBack, onApplied }: { onBack: () => void; onApplied: () => void }) {
   const { state, actions } = useAppState();
   const today = todayKey();
   const tomorrow = addDaysToKey(today, 1);
 
-  const [loading, setLoading] = React.useState(true);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [recommendation, setRecommendation] = React.useState<TomorrowRecommendation | null>(null);
   const [applied, setApplied] = React.useState(false);
 
-  React.useEffect(() => {
-    const fetchRecommendation = async () => {
-      const todayItems = state.plannerItems[today] ?? [];
-      const progress = getPlannerProgress(todayItems);
-      const incomplete = todayItems.filter((i) => i.status === 'partial' || i.status === 'carried_over');
-
-      const recentDates = [1, 2, 3, 4, 5, 6, 7].map((n) => addDaysToKey(today, -n));
-      const recentIncomplete = recentDates.flatMap((d) => (state.plannerItems[d] ?? []).filter((i) => i.status === 'partial' || i.status === 'carried_over'));
-      const tally: Record<string, number> = {};
-      for (const i of [...incomplete, ...recentIncomplete]) tally[i.subjectId] = (tally[i.subjectId] ?? 0) + 1;
-      const mostPostponed = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-
-      const windowTally: Record<number, number> = {};
-      for (const i of incomplete) {
-        const bucket = Math.floor(timeToMinutes(i.startTime) / 120) * 120;
-        windowTally[bucket] = (windowTally[bucket] ?? 0) + 1;
-      }
-      const topWindow = Object.entries(windowTally).sort((a, b) => b[1] - a[1])[0];
-      const lowFocusWindow = topWindow ? `${minutesToTime(Number(topWindow[0]))}~${minutesToTime(Number(topWindow[0]) + 120)}` : null;
-
-      const tomorrowBlocks = state.scheduleBlocks[tomorrow] ?? [];
-      const gaps = computeFreeGaps(tomorrowBlocks);
-      const availableMinutesTomorrow = sumFreeMinutes(gaps);
-      const condition = state.conditions[today] ?? null;
-
-      try {
-        const { data, error } = await supabase.functions.invoke('tomorrow-recommendation', {
-          body: {
-            completion_rate: progress.percent,
-            incomplete_items: incomplete.map((i) => ({ subject_label: getSubject(i.subjectId).label, material: i.material, unit: i.unit, page_range: i.pageRange })),
-            most_postponed_subject_label: mostPostponed ? getSubject(mostPostponed as any).label : null,
-            fatigue_high: (condition?.fatigue ?? 0) >= 4,
-            tomorrow_free_gaps: gaps,
-            main_subject_labels: (state.profile?.mainSubjects ?? []).map((s) => getSubject(s).label),
-          },
-        });
-
-        if (error || !data || data.error) {
-          throw new Error(data?.error ?? error?.message ?? 'unknown error');
-        }
-
-        const items: TomorrowRecommendationItem[] = (data.items as any[]).map((it) => ({
-          subjectId: subjectIdFromLabel(it.subject_label),
-          studyType: it.study_type as StudyTypeId,
-          material: it.material,
-          unit: it.unit,
-          pageRange: it.page_range,
-          difficulty: it.difficulty as DifficultyId,
-          mustDo: it.must_do,
-          startTime: it.start_time,
-          endTime: it.end_time,
-          estimatedMinutes: it.estimated_minutes,
-          reason: it.reason,
-        }));
-
-        setRecommendation({
-          completionRate: progress.percent,
-          incompleteCount: incomplete.length,
-          lowFocusWindow,
-          availableMinutesTomorrow,
-          reasons: data.reasons as string[],
-          items,
-        });
-      } catch (err) {
-        // AI 추천 실패해도 화면이 깨지지 않고 안내만 보여준다 — study-planner EveningPlanScreen과 동일한 폴백 원칙.
-        setErrorMessage('AI 추천을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRecommendation();
-  }, []);
+  // 규칙 기반 무료 추천 — OpenAI 크레딧 없이도 즉시 계산된다. Edge Function으로 되돌리려면
+  // 이 useMemo를 supabase.functions.invoke('tomorrow-recommendation', ...) 호출로 교체하면 된다.
+  const recommendation = React.useMemo(() => {
+    const recentDates = [1, 2, 3, 4, 5, 6, 7].map((n) => addDaysToKey(today, -n));
+    const recentPlannerItems = recentDates.flatMap((d) => state.plannerItems[d] ?? []);
+    return getTomorrowRecommendation({
+      todayPlannerItems: state.plannerItems[today] ?? [],
+      todayCondition: state.conditions[today] ?? null,
+      tomorrowScheduleBlocks: state.scheduleBlocks[tomorrow] ?? [],
+      recentPlannerItems,
+      mainSubjects: state.profile?.mainSubjects ?? [],
+    });
+  }, [state.plannerItems, state.conditions, state.scheduleBlocks, state.profile, today, tomorrow]);
 
   const handleApply = () => {
-    if (!recommendation) return;
     actions.applyTomorrowRecommendation(tomorrow, recommendation.items);
     setApplied(true);
     setTimeout(onApplied, 900);
@@ -103,18 +34,9 @@ export default function TomorrowRecommendationScreen({ onBack, onApplied }: { on
 
   return (
     <div className="pb-10">
-      <BackBar title="AI 내일 플래너 추천" onBack={onBack} />
+      <BackBar title="내일 플래너 추천" onBack={onBack} />
       <div className="px-5 pt-2">
-        {loading && <p className="text-sm text-on-surface-variant text-center py-10">추천을 준비하고 있어요...</p>}
-
-        {!loading && errorMessage && (
-          <Card className="text-center py-6">
-            <p className="text-sm text-on-surface-variant">{errorMessage}</p>
-          </Card>
-        )}
-
-        {!loading && recommendation && (
-          <>
+        <>
             <div className="rounded-3xl bg-gradient-to-br from-tertiary-container/40 to-primary-container/30 p-5 mb-5">
               <span className="inline-block text-xs font-bold bg-white/60 rounded-full px-3 py-1 mb-2">AI 버디의 제안</span>
               <h1 className="text-xl font-extrabold mb-4">내일 학습 추천 초안</h1>
@@ -185,8 +107,7 @@ export default function TomorrowRecommendationScreen({ onBack, onApplied }: { on
                 </Button>
               </>
             )}
-          </>
-        )}
+        </>
       </div>
     </div>
   );
