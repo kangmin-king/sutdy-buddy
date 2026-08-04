@@ -36,7 +36,7 @@ export type TabId = (typeof NAV_TABS)[number]['id'];
 
 export function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-surface-container-lowest border-t border-outline-variant/50 flex justify-around py-2 z-30">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-surface-container-lowest border-t border-outline-variant/50 flex justify-around pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-30">
       {NAV_TABS.map((tab) => {
         const isActive = tab.id === active;
         return (
@@ -260,7 +260,7 @@ export function BottomSheet({ open, onClose, title, children }: { open: boolean;
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-[480px] bg-surface-container-lowest rounded-t-2xl p-5 pb-8">
+      <div className="relative w-full max-w-[480px] bg-surface-container-lowest rounded-t-2xl p-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <div className="w-10 h-1.5 rounded-full bg-outline-variant mx-auto mb-4" />
         {title && <h3 className="text-base font-bold mb-3">{title}</h3>}
         {children}

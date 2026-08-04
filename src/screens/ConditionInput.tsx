@@ -23,7 +23,7 @@ export default function ConditionInputScreen({ onBack }: { onBack: () => void })
   };
 
   return (
-    <div className="pb-10">
+    <div className="pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <BackBar title="컨디션 입력" onBack={onBack} />
       <div className="px-5 pt-2 space-y-5">
         <div>

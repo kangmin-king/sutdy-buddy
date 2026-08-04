@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHomeTip, recommendedDifficultyFor, getScheduleTip, getTomorrowRecommendation } from './ai';
+import { getHomeTip, recommendedDifficultyFor, getScheduleTip, getTomorrowRecommendation, getWeeklyPattern } from './ai';
 import type { DailyCondition, PlannerItem, ScheduleBlock } from './types';
 
 function condition(overrides: Partial<DailyCondition>): DailyCondition {
@@ -159,5 +159,34 @@ describe('getTomorrowRecommendation', () => {
       mainSubjects: [],
     });
     expect(result.items[0].startTime >= '16:00').toBe(true);
+  });
+});
+
+describe('getWeeklyPattern', () => {
+  it('returns zeroed defaults when there is no data at all', () => {
+    expect(getWeeklyPattern([], [])).toEqual({ weeklyCompletionRate: 0, mostPostponedSubject: null, totalItems: 0 });
+  });
+
+  it('computes completion rate across recent + today items combined', () => {
+    const recent = [item({ id: '1', status: 'completed' }), item({ id: '2', status: 'planned' })];
+    const today = [item({ id: '3', status: 'completed' })];
+    const result = getWeeklyPattern(recent, today);
+    expect(result.totalItems).toBe(3);
+    expect(result.weeklyCompletionRate).toBe(67);
+  });
+
+  it('finds the most frequently postponed subject across the week', () => {
+    const recent = [
+      item({ id: '1', subjectId: 'math', status: 'partial' }),
+      item({ id: '2', subjectId: 'math', status: 'carried_over' }),
+      item({ id: '3', subjectId: 'english', status: 'partial' }),
+    ];
+    const result = getWeeklyPattern(recent, []);
+    expect(result.mostPostponedSubject).toBe('math');
+  });
+
+  it('has no postponed subject when nothing was postponed', () => {
+    const recent = [item({ id: '1', status: 'completed' }), item({ id: '2', status: 'planned' })];
+    expect(getWeeklyPattern(recent, []).mostPostponedSubject).toBeNull();
   });
 });

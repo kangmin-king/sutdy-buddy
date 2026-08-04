@@ -12,6 +12,8 @@ import ExecutionCheckScreen from './screens/ExecutionCheck';
 import ConditionInputScreen from './screens/ConditionInput';
 import StudyLogScreen from './screens/StudyLog';
 import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
+import DistractionStopScreen from './screens/DistractionStop';
+import { useOpenDistractionStopRequest } from './native/distractionStop';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
@@ -21,6 +23,8 @@ function AppShell() {
   const [activeTab, setActiveTab] = React.useState<TabId>('home');
   const [overlay, setOverlay] = React.useState<Overlay>(null);
   const [studyLogItem, setStudyLogItem] = React.useState<PlannerItem | null>(null);
+
+  useOpenDistractionStopRequest(React.useCallback(() => setActiveTab('distractionStop'), []));
 
   if (state.loading) {
     return (
@@ -50,15 +54,7 @@ function AppShell() {
   } else if (overlay === 'studyLog' && studyLogItem) {
     overlayScreen = <StudyLogScreen plannerItem={studyLogItem} onBack={closeOverlay} />;
   } else if (overlay === 'aiRecommendation') {
-    overlayScreen = (
-      <TomorrowRecommendationScreen
-        onBack={closeOverlay}
-        onApplied={() => {
-          closeOverlay();
-          setActiveTab('home');
-        }}
-      />
-    );
+    overlayScreen = <TomorrowRecommendationScreen onBack={closeOverlay} />;
   }
 
   return (
@@ -77,7 +73,7 @@ function AppShell() {
           {activeTab === 'calendar' && <CalendarScreen onNavigate={setActiveTab} />}
           {activeTab === 'planner' && <PlannerCreateScreen />}
           {activeTab === 'check' && <ExecutionCheckScreen onOpenStudyLog={openStudyLog} onOpenAiRecommendation={() => setOverlay('aiRecommendation')} />}
-          {activeTab === 'ai' && <TomorrowRecommendationScreen onBack={() => setActiveTab('home')} onApplied={() => setActiveTab('home')} />}
+          {activeTab === 'distractionStop' && <DistractionStopScreen />}
           <BottomNav active={activeTab} onChange={setActiveTab} />
         </>
       )}

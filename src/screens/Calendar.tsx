@@ -48,7 +48,7 @@ export default function CalendarScreen({ onNavigate }: { onNavigate: (tab: TabId
   const [selY, selM, selD] = selectedDate.split('-');
 
   return (
-    <div className="px-5 pt-4 pb-28">
+    <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
 
       <div className="flex items-center justify-between mt-2 mb-3">

@@ -20,7 +20,7 @@ export default function HomeScreen({
   onOpenOverlay,
 }: {
   onNavigate: (tab: TabId) => void;
-  onOpenOverlay: (overlay: 'condition' | 'aiRecommendation') => void;
+  onOpenOverlay: (overlay: 'condition') => void;
 }) {
   const { state } = useAppState();
   const date = todayKey();
@@ -36,7 +36,7 @@ export default function HomeScreen({
   const profile = state.profile;
 
   return (
-    <div className="px-5 pt-4 pb-10">
+    <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
 
       <p className="text-xs font-semibold text-on-surface-variant mt-2">{formatDateKorean(date)}</p>
@@ -146,10 +146,6 @@ export default function HomeScreen({
       )}
 
       <AiTipCard text={tip.message} />
-
-      <button onClick={() => onOpenOverlay('aiRecommendation')} className="mt-3 text-xs font-semibold text-primary flex items-center gap-1">
-        AI 분석 보기 <Icon name="trending_up" className="!text-[16px]" />
-      </button>
     </div>
   );
 }

@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">스터디 버디</string>
+    <string name="title_activity_main">스터디 버디</string>
+    <string name="package_name">com.studybuddy.app</string>
+    <string name="custom_url_scheme">com.studybuddy.app</string>
+    <string name="accessibility_service_description">딴짓 멈춰는 스크린타임 제한 목적으로만 접근성 서비스를 사용합니다. 이 기능은 인스타그램, 유튜브, 틱톡이 화면 최상단에 떴는지만 확인하며, 화면 내용을 읽거나 저장하지 않습니다.</string>
+</resources>

@@ -58,7 +58,7 @@ export default function StudyMaterialsScreen({ onBack }: { onBack: () => void })
     );
 
   return (
-    <div className="pb-10">
+    <div className="pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <BackBar title="학습 자료 목표" onBack={onBack} />
       <div className="px-5 pt-2 space-y-4">
         {!showForm && (

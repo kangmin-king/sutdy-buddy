@@ -58,7 +58,7 @@ export default function ExecutionCheckScreen({
   ];
 
   return (
-    <div className="px-5 pt-4 pb-40">
+    <div className="px-5 pt-4 pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
 
       <p className="text-xs font-semibold text-on-surface-variant mt-2">오늘의 달성률</p>
@@ -125,9 +125,9 @@ export default function ExecutionCheckScreen({
         text={`오늘은 ${progress.total}개 중 ${progress.completed}개를 완료했어요. ${progress.percent < 100 ? '무리하지 말고 남은 항목은 내일로 조정해도 괜찮아요.' : '정말 훌륭해요!'}`}
       />
 
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 w-full max-w-[480px] px-5 pb-3 pt-2 bg-gradient-to-t from-surface via-surface/95 z-20">
-        <Button className="w-full" onClick={onOpenAiRecommendation} icon="auto_awesome">
-          AI 내일 플래너 보기
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full max-w-[480px] px-5 pb-3 pt-2 bg-gradient-to-t from-surface via-surface/95 z-20">
+        <Button className="w-full" onClick={onOpenAiRecommendation} icon="bedtime">
+          오늘 하루 마무리!!
         </Button>
       </div>
 

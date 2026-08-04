@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppState } from '../state/AppStateContext';
-import { todayKey, timeToMinutes, minutesToTime } from '../lib';
+import { timeToMinutes, minutesToTime } from '../lib';
 import { STUDY_TYPES, DIFFICULTY_LEVELS, REST_PATTERNS, getSubject } from '../constants';
 import { BackBar, Card, ChipGroup, TextField, SelectField, ToggleSwitch, Icon, Button } from '../primitives';
 import type { PlannerItem, StudyTypeId, DifficultyId, RestPatternId } from '../types';
@@ -15,7 +15,7 @@ export default function PlannerItemDetailScreen({
   onBack: () => void;
 }) {
   const { actions } = useAppState();
-  const date = todayKey();
+  const date = item.date;
 
   const [studyType, setStudyType] = React.useState<StudyTypeId | null>(item.studyType);
   const [material, setMaterial] = React.useState(item.material);
@@ -68,7 +68,7 @@ export default function PlannerItemDetailScreen({
   };
 
   return (
-    <div className="pb-10">
+    <div className="pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <BackBar title={`${getSubject(item.subjectId).label} · ${startTime} 시작`} onBack={handleSave} />
       <div className="px-5 pt-2 space-y-4">
         <Card className="space-y-4">

@@ -28,7 +28,7 @@ export default function StudyLogScreen({ plannerItem, onBack }: { plannerItem: P
   };
 
   return (
-    <div className="pb-10">
+    <div className="pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <BackBar title={`학습 기록 · ${getSubject(plannerItem.subjectId).label}`} onBack={onBack} />
       <div className="px-5 pt-2 space-y-4">
         <Card className="space-y-4">

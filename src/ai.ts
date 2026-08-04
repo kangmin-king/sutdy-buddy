@@ -48,6 +48,26 @@ export function getScheduleTip(blocks: ScheduleBlock[], condition: DailyConditio
   return `오늘 컨디션 기준으로 ${subjectPhrase}${difficultyLabel} 학습을 추천해요.`;
 }
 
+// 오늘 마무리 시점(체크 화면의 "오늘 하루 마무리!!")에 보여줄 "이번주 나의 패턴" 요약.
+// 최근 7일 + 오늘 데이터를 합쳐 완료율과 가장 자주 미루는 과목을 계산한다.
+export function getWeeklyPattern(recentItems: PlannerItem[], todayItems: PlannerItem[]) {
+  const all = [...recentItems, ...todayItems];
+  const totalItems = all.length;
+  const completed = all.filter((i) => i.status === 'completed').length;
+  const weeklyCompletionRate = totalItems === 0 ? 0 : Math.round((completed / totalItems) * 100);
+
+  const postponedTally: Partial<Record<SubjectId, number>> = {};
+  for (const i of all) {
+    if (i.status === 'partial' || i.status === 'carried_over') {
+      postponedTally[i.subjectId] = (postponedTally[i.subjectId] ?? 0) + 1;
+    }
+  }
+  const sorted = (Object.entries(postponedTally) as [SubjectId, number][]).sort((a, b) => b[1] - a[1]);
+  const mostPostponedSubject: SubjectId | null = sorted.length ? sorted[0][0] : null;
+
+  return { weeklyCompletionRate, mostPostponedSubject, totalItems };
+}
+
 // 규칙 기반 "내일 추천" — OpenAI 크레딧이 없어도 동작하는 무료 폴백.
 // study-buddy 프로토타입의 getTomorrowRecommendation을 이 프로젝트의 타입에 맞게 이식했다.
 // TomorrowRecommendationScreen이 Edge Function 대신 이 함수를 직접 호출한다.

@@ -2,15 +2,17 @@ import React from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { todayKey, resolveQuickTimeChip } from '../lib';
 import { SUBJECTS, QUICK_TIME_CHIPS, getSubject } from '../constants';
-import { TopAppBar, Card, SectionTitle, ChipGroup, Button, Icon } from '../primitives';
+import { TopAppBar, BackBar, Card, SectionTitle, ChipGroup, Button, Icon } from '../primitives';
 import PlannerItemDetailScreen from './PlannerItemDetail';
 import StudyMaterialsScreen from './StudyMaterials';
-import type { SubjectId } from '../types';
+import type { DateKey, SubjectId } from '../types';
 import type { QuickTimeChipId } from '../constants';
 
-export default function PlannerCreateScreen() {
+export default function PlannerCreateScreen({ date: dateProp, onBack }: { date?: DateKey; onBack?: () => void } = {}) {
   const { state, actions } = useAppState();
-  const date = todayKey();
+  const today = todayKey();
+  const date = dateProp ?? today;
+  const isToday = date === today;
   const items = (state.plannerItems[date] ?? []).slice().sort((a, b) => a.order - b.order);
   const blocks = state.scheduleBlocks[date] ?? [];
 
@@ -58,27 +60,29 @@ export default function PlannerCreateScreen() {
   };
 
   return (
-    <div className="px-5 pt-4 pb-28">
-      <TopAppBar />
+    <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      {onBack ? <BackBar title={isToday ? '오늘의 학습' : '내일의 학습'} onBack={onBack} /> : <TopAppBar />}
 
-      <button onClick={() => setShowMaterials(true)} className="w-full text-left mb-4">
-        <div className="rounded-2xl bg-primary-container/20 border border-primary-container/60 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-              <Icon name="target" className="!text-[20px] text-on-primary" />
+      {isToday && (
+        <button onClick={() => setShowMaterials(true)} className="w-full text-left mb-4 mt-2">
+          <div className="rounded-2xl bg-primary-container/20 border border-primary-container/60 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                <Icon name="target" className="!text-[20px] text-on-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-on-surface">학습 자료 목표</p>
+                <p className="text-xs text-on-surface-variant">
+                  {state.studyMaterials.length > 0 ? `${state.studyMaterials.length}개 등록됨 · 오늘 목표 확인` : '시험 범위를 등록하면 오늘 할 분량을 알려드려요'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-bold text-on-surface">학습 자료 목표</p>
-              <p className="text-xs text-on-surface-variant">
-                {state.studyMaterials.length > 0 ? `${state.studyMaterials.length}개 등록됨 · 오늘 목표 확인` : '시험 범위를 등록하면 오늘 할 분량을 알려드려요'}
-              </p>
-            </div>
+            <Icon name="chevron_right" className="text-primary shrink-0" />
           </div>
-          <Icon name="chevron_right" className="text-primary shrink-0" />
-        </div>
-      </button>
+        </button>
+      )}
 
-      <h1 className="text-xl font-bold mt-2 mb-1">오늘의 학습</h1>
+      <h1 className="text-xl font-bold mt-2 mb-1">{isToday ? '오늘의 학습' : '내일의 학습'}</h1>
       <p className="text-sm text-on-surface-variant mb-4">과목 + 시작 시간만 입력하면 끝. 나머지는 눌러서 원할 때 채워요.</p>
 
       {!showForm && (
@@ -103,7 +107,7 @@ export default function PlannerCreateScreen() {
         </Card>
       )}
 
-      <SectionTitle>오늘의 학습 목록 ({items.length})</SectionTitle>
+      <SectionTitle>{isToday ? '오늘' : '내일'}의 학습 목록 ({items.length})</SectionTitle>
       <div className="space-y-2">
         {items.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">아직 추가된 학습이 없어요.</p>}
         {items.map((it) => (

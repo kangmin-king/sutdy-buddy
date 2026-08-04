@@ -65,7 +65,7 @@ export const NAV_TABS = [
   { id: 'planner', label: '플래너', icon: 'edit_note' },
   { id: 'home', label: '홈', icon: 'home' },
   { id: 'check', label: '체크', icon: 'task_alt' },
-  { id: 'ai', label: 'AI 분석', icon: 'auto_awesome' },
+  { id: 'distractionStop', label: '딴짓 멈춰', icon: 'phonelink_lock' },
 ] as const;
 
 export const REST_PATTERNS: { id: RestPatternId; label: string }[] = [
