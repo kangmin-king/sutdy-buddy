@@ -19,6 +19,33 @@ import type { PlannerItem } from './types';
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
 
 function AppShell() {
+  const { state } = useAppState();
+
+  if (state.loading || !state.profile) {
+    return <LegacyStudentAppShell />;
+  }
+
+  if (state.profile.role === 'manager') {
+    return <ManagerAppShell />;
+  }
+
+  return <LegacyStudentAppShell />;
+}
+
+function ManagerAppShell() {
+  const { state } = useAppState();
+  return (
+    <div id="app-shell" className="px-5 pt-6">
+      <h1 className="text-xl font-bold mb-4">관리 중인 학생</h1>
+      {state.managedStudents.length === 0 && <p className="text-sm text-on-surface-variant">아직 연결된 학생이 없어요.</p>}
+      {state.managedStudents.map((s, i) => (
+        <div key={i} className="rounded-xl bg-surface-container-lowest p-4 mb-2 shadow-card">{s.goal || '학생'}</div>
+      ))}
+    </div>
+  );
+}
+
+function LegacyStudentAppShell() {
   const { state, actions } = useAppState();
   const [activeTab, setActiveTab] = React.useState<TabId>('home');
   const [overlay, setOverlay] = React.useState<Overlay>(null);
