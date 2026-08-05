@@ -1,4 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment } from './types';
 import { QuickTimeChipId } from './constants';
 
 function pad2(n: number): string {
@@ -37,6 +37,10 @@ export function daysBetween(fromKey: DateKey, toKeyValue: DateKey): number {
   const from = Date.UTC(fy, fm - 1, fd);
   const to = Date.UTC(ty, tm - 1, td);
   return Math.round((to - from) / 86400000);
+}
+
+export function shouldGenerateHomeworkItem(assignment: HomeworkAssignment, date: DateKey): boolean {
+  return date >= assignment.startDate && date <= assignment.endDate;
 }
 
 export function formatDateKorean(dateKey: DateKey): string {

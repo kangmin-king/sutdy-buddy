@@ -228,3 +228,30 @@ describe('uid', () => {
     expect(uid()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
 });
+
+import { shouldGenerateHomeworkItem } from './lib';
+import type { HomeworkAssignment } from './types';
+
+function homework(overrides: Partial<HomeworkAssignment>): HomeworkAssignment {
+  return {
+    id: 'h1', studentId: 's1', createdBy: 'm1', subjectId: 'math',
+    material: '쎈 수학', amountPerDay: '10p', startDate: '2026-08-01',
+    endDate: '2026-08-10', updatedAt: '2026-08-01T00:00:00Z', ...overrides,
+  };
+}
+
+describe('shouldGenerateHomeworkItem', () => {
+  it('is true for a date inside the assignment range', () => {
+    expect(shouldGenerateHomeworkItem(homework({}), '2026-08-05')).toBe(true);
+  });
+  it('is true on the exact start and end dates', () => {
+    expect(shouldGenerateHomeworkItem(homework({}), '2026-08-01')).toBe(true);
+    expect(shouldGenerateHomeworkItem(homework({}), '2026-08-10')).toBe(true);
+  });
+  it('is false before the start date', () => {
+    expect(shouldGenerateHomeworkItem(homework({}), '2026-07-31')).toBe(false);
+  });
+  it('is false after the end date', () => {
+    expect(shouldGenerateHomeworkItem(homework({}), '2026-08-11')).toBe(false);
+  });
+});
