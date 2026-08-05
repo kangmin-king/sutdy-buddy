@@ -68,6 +68,13 @@ export const NAV_TABS = [
   { id: 'distractionStop', label: '딴짓 멈춰', icon: 'phonelink_lock' },
 ] as const;
 
+export const STUDENT_NAV_TABS = [
+  { id: 'home', label: '홈', icon: 'home' },
+  { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
+  { id: 'planner', label: '스터디플래너', icon: 'edit_note' },
+  { id: 'distractionStop', label: '딴짓 멈춰', icon: 'phonelink_lock' },
+] as const;
+
 export const REST_PATTERNS: { id: RestPatternId; label: string }[] = [
   { id: 'pomodoro_25_5', label: '25분 공부 + 5분 휴식 (뽀모도로)' },
   { id: 'block_50_10', label: '50분 공부 + 10분 휴식' },

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { BottomNav, Card, Button } from './primitives';
 import type { TabId } from './primitives';
+import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/Onboarding';
 import HomeScreen from './screens/Home';
@@ -13,6 +14,9 @@ import ConditionInputScreen from './screens/ConditionInput';
 import StudyLogScreen from './screens/StudyLog';
 import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
 import DistractionStopScreen from './screens/DistractionStop';
+import StudentHomeScreen from './screens/student/StudentHome';
+import StudentPlannerScreen from './screens/student/StudentPlanner';
+import StudyTimelineScreen from './screens/shared/StudyTimeline';
 import { useOpenDistractionStopRequest } from './native/distractionStop';
 import type { PlannerItem } from './types';
 
@@ -29,7 +33,20 @@ function AppShell() {
     return <ManagerAppShell />;
   }
 
-  return <LegacyStudentAppShell />;
+  return <StudentAppShell />;
+}
+
+function StudentAppShell() {
+  const [activeTab, setActiveTab] = React.useState<(typeof STUDENT_NAV_TABS)[number]['id']>('home');
+  return (
+    <div id="app-shell">
+      {activeTab === 'home' && <StudentHomeScreen />}
+      {activeTab === 'calendar' && <StudyTimelineScreen />}
+      {activeTab === 'planner' && <StudentPlannerScreen />}
+      {activeTab === 'distractionStop' && <DistractionStopScreen />}
+      <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
+    </div>
+  );
 }
 
 function ManagerAppShell() {
@@ -101,7 +118,7 @@ function LegacyStudentAppShell() {
           {activeTab === 'planner' && <PlannerCreateScreen />}
           {activeTab === 'check' && <ExecutionCheckScreen onOpenStudyLog={openStudyLog} onOpenAiRecommendation={() => setOverlay('aiRecommendation')} />}
           {activeTab === 'distractionStop' && <DistractionStopScreen />}
-          <BottomNav active={activeTab} onChange={setActiveTab} />
+          <BottomNav tabs={NAV_TABS} active={activeTab} onChange={setActiveTab} />
         </>
       )}
     </div>

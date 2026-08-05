@@ -34,10 +34,18 @@ export function BackBar({ title, onBack }: { title: string; onBack: () => void }
 
 export type TabId = (typeof NAV_TABS)[number]['id'];
 
-export function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
+export function BottomNav<T extends { id: string; label: string; icon: string }>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: readonly T[];
+  active: T['id'];
+  onChange: (id: T['id']) => void;
+}) {
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-surface-container-lowest border-t border-outline-variant/50 flex justify-around pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-30">
-      {NAV_TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = tab.id === active;
         return (
           <button
