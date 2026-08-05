@@ -257,6 +257,43 @@ export function splitPagesAcrossDates(startPage: number, endPage: number, select
   return result;
 }
 
+export interface TutoringScheduleExceptionInput {
+  originalDate: DateKey;
+  newDate: DateKey | null;
+}
+
+// 요일 패턴(0=일..6=토)으로 기간 안의 과외 날짜를 계산한 뒤 예외를 적용한다.
+// 취소(newDate: null)는 그 날짜를 빼고, 변경(newDate가 있음)은 원래 날짜를 빼고 새 날짜를 추가한다.
+// 관리자 캘린더 탭에서 매번 계산해서 보여주며, DB에 미래 날짜 행을 미리 만들지 않는다.
+export function getTutoringDaysInRange(
+  weekdays: number[],
+  exceptions: TutoringScheduleExceptionInput[],
+  startDate: DateKey,
+  endDate: DateKey
+): DateKey[] {
+  const weekdaySet = new Set(weekdays);
+  const dates = new Set<DateKey>();
+
+  if (weekdaySet.size > 0) {
+    let cursor = startDate;
+    while (cursor <= endDate) {
+      const [y, m, d] = cursor.split('-').map(Number);
+      const dow = new Date(y, m - 1, d).getDay();
+      if (weekdaySet.has(dow)) dates.add(cursor);
+      cursor = addDaysToKey(cursor, 1);
+    }
+  }
+
+  for (const exception of exceptions) {
+    dates.delete(exception.originalDate);
+    if (exception.newDate && exception.newDate >= startDate && exception.newDate <= endDate) {
+      dates.add(exception.newDate);
+    }
+  }
+
+  return Array.from(dates).sort();
+}
+
 export interface MaterialPace {
   remainingDays: number;
   remainingSessions: number;

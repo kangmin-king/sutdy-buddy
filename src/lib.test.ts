@@ -17,6 +17,7 @@ import {
   shouldGenerateHomeworkItem,
   sessionsToTimelineBlocks,
   splitPagesAcrossDates,
+  getTutoringDaysInRange,
 } from './lib';
 import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession } from './types';
 
@@ -341,5 +342,34 @@ describe('splitPagesAcrossDates', () => {
 
   it('returns an empty array when no dates are selected', () => {
     expect(splitPagesAcrossDates(1, 40, [])).toEqual([]);
+  });
+});
+
+describe('getTutoringDaysInRange', () => {
+  it('returns dates matching the weekday pattern within range (0=일..6=토)', () => {
+    // 2026-08-06 is a Thursday (4), 2026-08-07 Friday (5), 2026-08-08 Saturday (6)
+    const result = getTutoringDaysInRange([5, 6], [], '2026-08-06', '2026-08-12');
+    expect(result).toEqual(['2026-08-07', '2026-08-08']);
+  });
+
+  it('removes a date cancelled by an exception with newDate null', () => {
+    const result = getTutoringDaysInRange([5, 6], [{ originalDate: '2026-08-07', newDate: null }], '2026-08-06', '2026-08-12');
+    expect(result).toEqual(['2026-08-08']);
+  });
+
+  it('adds the exception newDate when a session is moved, without duplicating an existing tutoring day', () => {
+    // moved from Fri 08-07 to Sun 08-09 (not itself a tutoring weekday)
+    const result = getTutoringDaysInRange([5, 6], [{ originalDate: '2026-08-07', newDate: '2026-08-09' }], '2026-08-06', '2026-08-12');
+    expect(result).toEqual(['2026-08-08', '2026-08-09']);
+  });
+
+  it('does not duplicate when a moved date lands on an already-tutoring weekday', () => {
+    // moved from Fri 08-07 to Sat 08-08, which is already a tutoring day
+    const result = getTutoringDaysInRange([5, 6], [{ originalDate: '2026-08-07', newDate: '2026-08-08' }], '2026-08-06', '2026-08-12');
+    expect(result).toEqual(['2026-08-08']);
+  });
+
+  it('returns an empty array when no weekdays are set', () => {
+    expect(getTutoringDaysInRange([], [], '2026-08-06', '2026-08-12')).toEqual([]);
   });
 });
