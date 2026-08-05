@@ -1,0 +1,112 @@
+import React from 'react';
+import { useAppState } from '../../state/AppStateContext';
+import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange } from '../../lib';
+import { getSubject } from '../../constants';
+import { Card, Icon } from '../../primitives';
+
+const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+export default function ManagerCalendarScreen({ studentId }: { studentId: string }) {
+  const { state, actions } = useAppState();
+  const today = todayKey();
+  const [selectedDate, setSelectedDate] = React.useState(today);
+  const [viewMonthKey, setViewMonthKey] = React.useState(today);
+
+  React.useEffect(() => {
+    actions.loadStudentPlannerItems(studentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId]);
+
+  const grid = monthGrid(viewMonthKey);
+  const schedule = state.tutoringSchedules.find((sch) => sch.studentId === studentId);
+  const scheduleExceptions = state.tutoringScheduleExceptions.filter((ex) => ex.studentId === studentId);
+  const tutoringDays = new Set(
+    getTutoringDaysInRange(schedule?.weekdays ?? [], scheduleExceptions, grid[0].key, grid[grid.length - 1].key)
+  );
+
+  const itemsByDate = state.studentPlannerItems[studentId] ?? {};
+  const selectedItems = (itemsByDate[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
+
+  const [viewY, viewM] = viewMonthKey.split('-');
+  const [selY, selM, selD] = selectedDate.split('-');
+
+  return (
+    <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      <div className="flex items-center justify-between mt-2 mb-3">
+        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, -1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <Icon name="chevron_left" />
+        </button>
+        <p className="text-base font-bold">
+          {viewY}년 {Number(viewM)}월
+        </p>
+        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <Icon name="chevron_right" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 mb-1">
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} className="text-center text-[11px] text-on-surface-variant py-1">
+            {label}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-1 mb-5">
+        {grid.map((d) => {
+          const isSelected = d.key === selectedDate;
+          const isToday = d.key === today;
+          const isTutoringDay = tutoringDays.has(d.key);
+          const dayItems = itemsByDate[d.key] ?? [];
+          const hasItems = dayItems.length > 0;
+          return (
+            <button key={d.key} onClick={() => setSelectedDate(d.key)} className="flex flex-col items-center py-1.5">
+              <span
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm ${
+                  isSelected
+                    ? 'bg-primary text-on-primary font-bold'
+                    : isTutoringDay
+                      ? 'bg-tertiary-container/40 text-on-surface'
+                      : isToday
+                        ? 'border border-primary text-primary font-semibold'
+                        : d.inCurrentMonth
+                          ? 'text-on-surface'
+                          : 'text-outline-variant'
+                }`}
+              >
+                {d.date}
+              </span>
+              <span className={`w-1 h-1 rounded-full mt-0.5 ${hasItems ? 'bg-secondary' : 'bg-transparent'}`} />
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-xs font-semibold text-primary mb-3">
+        {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''}
+        {tutoringDays.has(selectedDate) ? ' · 과외 날' : ''}
+      </p>
+
+      <div className="space-y-2">
+        {selectedItems.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">이 날 계획된 항목이 없어요.</p>}
+        {selectedItems.map((item) => (
+          <Card key={item.id} className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold">
+                {getSubject(item.subjectId).label} {item.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
+              </p>
+              <p className="text-xs text-on-surface-variant">{item.material || item.pageRange || '할 일'}</p>
+            </div>
+            <div
+              className={`w-7 h-7 rounded-md border-2 flex items-center justify-center ${
+                item.status === 'completed' ? 'bg-primary border-primary' : 'border-outline-variant'
+              }`}
+            >
+              {item.status === 'completed' && <Icon name="check" className="!text-[18px] text-on-primary" />}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
