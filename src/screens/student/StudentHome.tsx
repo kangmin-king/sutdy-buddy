@@ -95,6 +95,11 @@ export default function StudentHomeScreen() {
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
+      {state.profile?.inviteCode && (
+        <p className="mt-2 text-xs text-on-surface-variant">
+          내 초대코드 <span className="font-mono font-bold text-on-surface tracking-wider">{state.profile.inviteCode}</span> · 과외쌤/학부모께 알려주세요
+        </p>
+      )}
       <button
         onClick={() => setShowTodo(true)}
         className="mt-3 mb-4 inline-flex items-center gap-1 rounded-lg bg-tertiary-container/30 px-3 py-1.5 text-xs font-semibold text-on-surface"
