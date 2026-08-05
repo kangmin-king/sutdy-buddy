@@ -30,10 +30,19 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val packageName = event.packageName?.toString() ?: return
-        val blockedApp = BlockedApp.fromPackageName(packageName) ?: return
 
         scope.launch {
             val state = store.observeState().first()
+
+            // Study-session allow-list deviation detection: independent of the break-timer
+            // blocking logic below. Only flips a flag — no forced navigation — so the web
+            // layer notices via the state Flow and stops the timer on its own.
+            if (state.sessionActive && packageName != applicationContext.packageName && packageName !in state.allowedApps) {
+                store.setSessionActive(false)
+                return@launch
+            }
+
+            val blockedApp = BlockedApp.fromPackageName(packageName) ?: return@launch
             if (!state.featureEnabled) return@launch
             if (blockedApp !in state.enabledApps) return@launch
             if (state.isBreakActive(System.currentTimeMillis())) return@launch

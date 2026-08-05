@@ -3,6 +3,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { todayKey } from '../../lib';
 import { getSubject } from '../../constants';
 import { TopAppBar, Card, Icon } from '../../primitives';
+import { DistractionStop, isNativePlatform } from '../../native/distractionStop';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -30,6 +31,7 @@ export default function StudentHomeScreen() {
     try {
       const sessionId = await actions.startStudySession(itemId);
       setRunningSessionId((m) => ({ ...m, [itemId]: sessionId }));
+      if (isNativePlatform()) DistractionStop.setSessionActive({ active: true });
     } finally {
       setStartPending((m) => {
         const next = { ...m };
@@ -42,6 +44,7 @@ export default function StudentHomeScreen() {
     const sessionId = runningSessionId[itemId];
     if (!sessionId) return;
     actions.endStudySession(itemId, sessionId, false);
+    if (isNativePlatform()) DistractionStop.setSessionActive({ active: false });
     setRunningSessionId((m) => {
       const next = { ...m };
       delete next[itemId];

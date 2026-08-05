@@ -1,5 +1,6 @@
 package com.studybuddy.app.distraction
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,5 +96,11 @@ class TimerStateTest {
             featureEnabled = true
         )
         assertFalse(state.isWithinLockout(nowMillis = 5_000L))
+    }
+
+    @Test
+    fun `DEFAULT has no allowed apps and inactive session`() {
+        assertEquals(emptySet<String>(), TimerState.DEFAULT.allowedApps)
+        assertEquals(false, TimerState.DEFAULT.sessionActive)
     }
 }

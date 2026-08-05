@@ -142,6 +142,30 @@ class DistractionStopPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setAllowedApps(call: PluginCall) {
+        val apps = call.getArray("apps")?.toList<String>()?.toSet() ?: run {
+            call.reject("apps is required")
+            return
+        }
+        scope.launch {
+            store.setAllowedApps(apps)
+            call.resolve(store.observeState().value.toJSObject())
+        }
+    }
+
+    @PluginMethod
+    fun setSessionActive(call: PluginCall) {
+        val active = call.getBoolean("active") ?: run {
+            call.reject("active is required")
+            return
+        }
+        scope.launch {
+            store.setSessionActive(active)
+            call.resolve(store.observeState().value.toJSObject())
+        }
+    }
+
+    @PluginMethod
     fun isAccessibilityServiceEnabled(call: PluginCall) {
         val enabledServices = Settings.Secure.getString(
             context.contentResolver,
@@ -195,6 +219,8 @@ class DistractionStopPlugin : Plugin() {
         obj.put("enabledApps", com.getcapacitor.JSArray(enabledApps.map { it.name }))
         obj.put("lockoutDurationMillis", lockoutDurationMillis)
         obj.put("featureEnabled", featureEnabled)
+        obj.put("allowedApps", com.getcapacitor.JSArray(allowedApps.toList()))
+        obj.put("sessionActive", sessionActive)
         return obj
     }
 

@@ -13,6 +13,7 @@ interface DistractionStopPlugin {
   setAppEnabled(opts: { app: BlockedAppId; enabled: boolean }): Promise<DistractionState>;
   setFeatureEnabled(opts: { enabled: boolean }): Promise<DistractionState>;
   setAllowedApps(opts: { apps: string[] }): Promise<DistractionState>;
+  setSessionActive(opts: { active: boolean }): Promise<DistractionState>;
   isAccessibilityServiceEnabled(): Promise<{ enabled: boolean }>;
   isOverlayPermissionGranted(): Promise<{ granted: boolean }>;
   openAccessibilitySettings(): Promise<void>;

@@ -6,7 +6,9 @@ data class TimerState(
     val gracePeriodSeconds: Int,
     val enabledApps: Set<BlockedApp>,
     val lockoutDurationMillis: Long,
-    val featureEnabled: Boolean
+    val featureEnabled: Boolean,
+    val allowedApps: Set<String> = emptySet(),
+    val sessionActive: Boolean = false
 ) {
     fun isBreakActive(nowMillis: Long): Boolean =
         endTimeMillis != null && nowMillis < endTimeMillis
@@ -23,7 +25,9 @@ data class TimerState(
             gracePeriodSeconds = 10,
             enabledApps = setOf(BlockedApp.INSTAGRAM, BlockedApp.YOUTUBE, BlockedApp.TIKTOK),
             lockoutDurationMillis = 10 * 60_000L,
-            featureEnabled = true
+            featureEnabled = true,
+            allowedApps = emptySet(),
+            sessionActive = false
         )
     }
 }
