@@ -142,6 +142,13 @@ export interface Database {
       sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at'>; Update: never; Relationships: [] };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // 초대코드로 학생 id를 찾는 security definer 함수 (0006 마이그레이션).
+      // 관리자는 연결 전이라 학생 프로필 행을 RLS로 읽을 수 없으므로 직접 select 대신 이 RPC를 쓴다.
+      find_student_by_invite_code: {
+        Args: { code: string };
+        Returns: string | null;
+      };
+    };
   };
 }
