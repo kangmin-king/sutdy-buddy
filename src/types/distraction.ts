@@ -8,4 +8,5 @@ export interface DistractionState {
   enabledApps: BlockedAppId[];
   lockoutDurationMillis: number;
   featureEnabled: boolean;
+  allowedApps: string[];
 }

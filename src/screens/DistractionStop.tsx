@@ -1,5 +1,5 @@
 import React from 'react';
-import { TopAppBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon } from '../primitives';
+import { TopAppBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon, TextField } from '../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../native/distractionStop';
 import type { BlockedAppId, DistractionState, ExitModeId } from '../types/distraction';
 
@@ -21,6 +21,28 @@ const LOCKOUT_OPTIONS = [
   { id: '600000', label: '10분' },
   { id: '1800000', label: '30분' },
 ];
+
+function AllowedAppAdder({ onAdd }: { onAdd: (pkg: string) => void }) {
+  const [pkg, setPkg] = React.useState('');
+
+  const handleAdd = () => {
+    const trimmed = pkg.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setPkg('');
+  };
+
+  return (
+    <div className="flex items-end gap-2">
+      <div className="flex-1">
+        <TextField value={pkg} onChange={setPkg} placeholder="com.android.calculator2" />
+      </div>
+      <Button variant="secondary" className="!px-4" onClick={handleAdd}>
+        추가
+      </Button>
+    </div>
+  );
+}
 
 function formatRemaining(endTimeMillis: number | null, nowMillis: number): string | null {
   if (endTimeMillis == null) return null;
@@ -186,6 +208,33 @@ export default function DistractionStopScreen() {
               DistractionStop.setLockoutDurationMillis({ durationMillis });
             }}
           />
+        </div>
+
+        <div>
+          <SectionTitle>허용앱 (학습 실행 중 이탈 감지 예외)</SectionTitle>
+          <Card className="space-y-2">
+            {state.allowedApps.map((pkg) => (
+              <div key={pkg} className="flex items-center justify-between">
+                <span className="text-sm">{pkg}</span>
+                <button
+                  onClick={() => {
+                    const next = state.allowedApps.filter((p) => p !== pkg);
+                    setLocal((s) => s && { ...s, allowedApps: next });
+                    DistractionStop.setAllowedApps({ apps: next });
+                  }}
+                >
+                  <Icon name="close" className="!text-[16px]" />
+                </button>
+              </div>
+            ))}
+            <AllowedAppAdder
+              onAdd={(pkg) => {
+                const next = [...state.allowedApps, pkg];
+                setLocal((s) => s && { ...s, allowedApps: next });
+                DistractionStop.setAllowedApps({ apps: next });
+              }}
+            />
+          </Card>
         </div>
       </div>
     </div>
