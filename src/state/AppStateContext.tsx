@@ -1,7 +1,7 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { uid, addDaysToKey } from '../lib';
+import { uid, addDaysToKey, todayKey, shouldGenerateHomeworkItem } from '../lib';
 import {
   profileFromRow,
   conditionFromRow,
@@ -9,6 +9,8 @@ import {
   plannerItemFromRow,
   studyLogFromRow,
   studyMaterialFromRow,
+  homeworkAssignmentFromRow,
+  studySessionFromRow,
   groupByDate,
 } from './mappers';
 import type {
@@ -18,10 +20,12 @@ import type {
   PlannerItem,
   StudyLogEntry,
   StudyMaterial,
+  HomeworkAssignment,
+  StudySession,
   DateKey,
   TomorrowRecommendationItem,
 } from '../types';
-import type { SbPlannerItemRow, SbStudyMaterialRow } from '../types/db';
+import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
 
 interface AppState {
   profile: Profile | null;
@@ -30,6 +34,9 @@ interface AppState {
   plannerItems: Record<DateKey, PlannerItem[]>;
   studyLogs: Record<DateKey, StudyLogEntry[]>;
   studyMaterials: StudyMaterial[];
+  homeworkAssignments: HomeworkAssignment[];
+  studySessions: Record<string, StudySession[]>;
+  managedStudents: Profile[];
   loading: boolean;
   error: string | null;
 }
@@ -41,6 +48,9 @@ const EMPTY_STATE: AppState = {
   plannerItems: {},
   studyLogs: {},
   studyMaterials: [],
+  homeworkAssignments: [],
+  studySessions: {},
+  managedStudents: [],
   loading: true,
   error: null,
 };
@@ -61,32 +71,65 @@ interface AppStateActions {
   updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
   deleteStudyMaterial: (id: string) => Promise<void>;
   applyTomorrowRecommendation: (date: DateKey, items: TomorrowRecommendationItem[]) => Promise<void>;
+  linkByInviteCode: (code: string) => Promise<void>;
+  createHomeworkAssignment: (
+    studentId: string,
+    assignment: Omit<HomeworkAssignment, 'id' | 'studentId' | 'createdBy' | 'updatedAt'>
+  ) => Promise<void>;
+  updateHomeworkAssignment: (id: string, patch: Partial<HomeworkAssignment>) => Promise<void>;
+  startStudySession: (plannerItemId: string) => Promise<string>;
+  endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean) => Promise<void>;
   dismissError: () => void;
 }
 
 const AppStateContext = React.createContext<{ state: AppState; actions: AppStateActions } | null>(null);
 
+function groupByPlannerItemId(rows: StudySession[]): Record<string, StudySession[]> {
+  const grouped: Record<string, StudySession[]> = {};
+  for (const row of rows) {
+    (grouped[row.plannerItemId] ??= []).push(row);
+  }
+  return grouped;
+}
+
 async function loadAll(userId: string): Promise<AppState> {
-  const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes] = await Promise.all([
+  const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes, homeworkRes, sessionsRes, linksRes] = await Promise.all([
     supabase.from('sb_profiles').select('*').eq('id', userId).maybeSingle(),
     supabase.from('sb_daily_conditions').select('*').eq('user_id', userId),
     supabase.from('sb_schedule_blocks').select('*').eq('user_id', userId),
     supabase.from('sb_planner_items').select('*').eq('user_id', userId).order('order'),
     supabase.from('sb_study_logs').select('*').eq('user_id', userId),
     supabase.from('sb_study_materials').select('*').eq('user_id', userId),
+    supabase.from('sb_homework_assignments').select('*').eq('student_id', userId),
+    supabase.from('sb_study_sessions').select('*').eq('user_id', userId),
+    supabase.from('sb_student_manager_links').select('*').or(`student_id.eq.${userId},manager_id.eq.${userId}`),
   ]);
 
   const conditionRows = (conditionsRes.data ?? []).map(conditionFromRow);
   const conditions: Record<DateKey, DailyCondition> = {};
   for (const c of conditionRows) conditions[c.date] = c;
 
+  const profile = profileRes.data ? profileFromRow(profileRes.data) : null;
+
+  let managedStudents: Profile[] = [];
+  if (profile?.role === 'manager') {
+    const studentIds = (linksRes.data ?? []).map((link) => link.student_id);
+    if (studentIds.length > 0) {
+      const studentsRes = await supabase.from('sb_profiles').select('*').in('id', studentIds);
+      managedStudents = ((studentsRes.data ?? []) as SbProfileRow[]).map(profileFromRow);
+    }
+  }
+
   return {
-    profile: profileRes.data ? profileFromRow(profileRes.data) : null,
+    profile,
     conditions,
     scheduleBlocks: groupByDate((blocksRes.data ?? []).map(scheduleBlockFromRow)),
     plannerItems: groupByDate((itemsRes.data ?? []).map(plannerItemFromRow)),
     studyLogs: groupByDate((logsRes.data ?? []).map(studyLogFromRow)),
     studyMaterials: (materialsRes.data ?? []).map(studyMaterialFromRow),
+    homeworkAssignments: (homeworkRes.data ?? []).map(homeworkAssignmentFromRow),
+    studySessions: groupByPlannerItemId((sessionsRes.data ?? []).map(studySessionFromRow)),
+    managedStudents,
     loading: false,
     error: null,
   };
@@ -119,6 +162,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           exam_date: profile.examDate,
           workbooks: profile.workbooks,
           onboarded_at: profile.onboardedAt,
+          role: profile.role,
+          invite_code: profile.inviteCode,
         });
         if (error) {
           console.error('saveProfile failed:', error.message);
@@ -198,6 +243,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           understanding: fullItem.understanding,
           partial_reason: fullItem.partialReason,
           incomplete_reason: fullItem.incompleteReason,
+          source: fullItem.source,
+          homework_assignment_id: fullItem.homeworkAssignmentId,
         });
         if (error) {
           console.error('addPlannerItem failed:', error.message);
@@ -301,6 +348,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           understanding: clone.understanding,
           partial_reason: null,
           incomplete_reason: null,
+          source: clone.source,
+          homework_assignment_id: clone.homeworkAssignmentId,
         });
         if (insertError) {
           console.error('carryOverPlannerItem (insert) failed:', insertError.message);
@@ -404,6 +453,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           understanding: null,
           partialReason: null,
           incompleteReason: null,
+          source: 'self' as const,
+          homeworkAssignmentId: null,
         }));
         setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...existing, ...newItems] } }));
 
@@ -428,10 +479,124 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             understanding: it.understanding,
             partial_reason: it.partialReason,
             incomplete_reason: it.incompleteReason,
+            source: it.source,
+            homework_assignment_id: it.homeworkAssignmentId,
           }))
         );
         if (error) {
           console.error('applyTomorrowRecommendation failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async linkByInviteCode(code) {
+        const { data: student } = await supabase.from('sb_profiles').select('id').eq('invite_code', code.toUpperCase()).maybeSingle();
+        if (!student) {
+          setState((s) => ({ ...s, error: '초대코드를 찾을 수 없어요. 다시 확인해주세요.' }));
+          return;
+        }
+        const { error } = await supabase.from('sb_student_manager_links').insert({ student_id: student.id, manager_id: userId });
+        if (error) {
+          console.error('linkByInviteCode failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async createHomeworkAssignment(studentId, assignment) {
+        const id = uid();
+        const { error } = await supabase.from('sb_homework_assignments').insert({
+          id,
+          student_id: studentId,
+          created_by: userId,
+          subject_id: assignment.subjectId,
+          material: assignment.material,
+          amount_per_day: assignment.amountPerDay,
+          start_date: assignment.startDate,
+          end_date: assignment.endDate,
+        });
+        if (error) {
+          console.error('createHomeworkAssignment failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          homeworkAssignments: [
+            ...s.homeworkAssignments,
+            { id, studentId, createdBy: userId, ...assignment, updatedAt: new Date().toISOString() },
+          ],
+        }));
+      },
+
+      async updateHomeworkAssignment(id, patch) {
+        setState((s) => ({
+          ...s,
+          homeworkAssignments: s.homeworkAssignments.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+        }));
+
+        const dbPatch: Partial<SbHomeworkAssignmentRow> = {};
+        if ('subjectId' in patch) dbPatch.subject_id = patch.subjectId;
+        if ('material' in patch) dbPatch.material = patch.material;
+        if ('amountPerDay' in patch) dbPatch.amount_per_day = patch.amountPerDay;
+        if ('startDate' in patch) dbPatch.start_date = patch.startDate;
+        if ('endDate' in patch) dbPatch.end_date = patch.endDate;
+
+        const { error } = await supabase.from('sb_homework_assignments').update(dbPatch).eq('id', id);
+        if (error) {
+          console.error('updateHomeworkAssignment failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async startStudySession(plannerItemId) {
+        const id = uid();
+        const startedAt = new Date().toISOString();
+        setState((s) => ({
+          ...s,
+          studySessions: {
+            ...s.studySessions,
+            [plannerItemId]: [
+              ...(s.studySessions[plannerItemId] ?? []),
+              { id, plannerItemId, startedAt, endedAt: null, durationSeconds: null, deviated: false },
+            ],
+          },
+        }));
+        const { error } = await supabase.from('sb_study_sessions').insert({
+          id,
+          user_id: userId,
+          planner_item_id: plannerItemId,
+          started_at: startedAt,
+          ended_at: null,
+          duration_seconds: null,
+          deviated: false,
+        });
+        if (error) {
+          console.error('startStudySession failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+        return id;
+      },
+
+      async endStudySession(plannerItemId, sessionId, deviated) {
+        const endedAt = new Date().toISOString();
+        // startedAt is immutable once a session is created, so reading it from the outer `state`
+        // closure (rather than deriving inside the setState updater) is safe here — unlike
+        // updatePlannerItem's list derivation, there's no risk of acting on a stale sibling write.
+        const existing = (state.studySessions[plannerItemId] ?? []).find((sess) => sess.id === sessionId);
+        const durationSeconds = existing ? Math.round((Date.parse(endedAt) - Date.parse(existing.startedAt)) / 1000) : null;
+
+        setState((s) => {
+          const list = s.studySessions[plannerItemId] ?? [];
+          const updated = list.map((sess) => (sess.id === sessionId ? { ...sess, endedAt, deviated, durationSeconds } : sess));
+          return { ...s, studySessions: { ...s.studySessions, [plannerItemId]: updated } };
+        });
+
+        const { error } = await supabase
+          .from('sb_study_sessions')
+          .update({ ended_at: endedAt, deviated, duration_seconds: durationSeconds })
+          .eq('id', sessionId);
+        if (error) {
+          console.error('endStudySession failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
       },
@@ -442,6 +607,44 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }),
     [userId, state]
   );
+
+  // 지연 숙제 생성: 학생 본인 계정에서만, 오늘 아직 생성되지 않은 숙제 배정 건에 대해
+  // 오늘 날짜 planner item을 만든다. `loadAll`이 끝난 뒤(profile/homeworkAssignments/plannerItems가
+  // 채워진 뒤) 실행되어야 하므로 별도 useEffect로 둔다 — 매 렌더마다 재평가되지만, 이미 생성된
+  // 배정은 alreadyGenerated로 걸러지므로 중복 insert는 발생하지 않는다.
+  React.useEffect(() => {
+    if (state.loading || !state.profile || state.profile.role !== 'student') return;
+    const today = todayKey();
+    const todayItems = state.plannerItems[today] ?? [];
+    const alreadyGenerated = new Set(
+      todayItems.filter((item) => item.source === 'homework' && item.homeworkAssignmentId).map((item) => item.homeworkAssignmentId)
+    );
+    const toGenerate = state.homeworkAssignments.filter(
+      (assignment) => shouldGenerateHomeworkItem(assignment, today) && !alreadyGenerated.has(assignment.id)
+    );
+    toGenerate.forEach((assignment) => {
+      actions.addPlannerItem(today, {
+        date: today,
+        subjectId: assignment.subjectId,
+        startTime: '09:00',
+        studyType: null,
+        material: assignment.material,
+        unit: '',
+        pageRange: assignment.amountPerDay,
+        endTime: null,
+        difficulty: null,
+        restPattern: null,
+        mustDo: false,
+        status: 'planned',
+        actualMinutes: null,
+        understanding: null,
+        partialReason: null,
+        incompleteReason: null,
+        source: 'homework',
+        homeworkAssignmentId: assignment.id,
+      });
+    });
+  }, [state.loading, state.profile, state.plannerItems, state.homeworkAssignments, actions]);
 
   return <AppStateContext.Provider value={{ state, actions }}>{children}</AppStateContext.Provider>;
 }

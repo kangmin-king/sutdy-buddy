@@ -111,6 +111,8 @@ function plannerItem(overrides: Partial<PlannerItem>): PlannerItem {
     understanding: null,
     partialReason: null,
     incompleteReason: null,
+    source: 'self',
+    homeworkAssignmentId: null,
     ...overrides,
   };
 }
