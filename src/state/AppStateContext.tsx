@@ -504,6 +504,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       async createHomeworkAssignment(studentId, assignment) {
         const id = uid();
+        setState((s) => ({
+          ...s,
+          homeworkAssignments: [
+            ...s.homeworkAssignments,
+            { id, studentId, createdBy: userId, ...assignment, updatedAt: new Date().toISOString() },
+          ],
+        }));
+
         const { error } = await supabase.from('sb_homework_assignments').insert({
           id,
           student_id: studentId,
@@ -517,15 +525,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('createHomeworkAssignment failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-          return;
         }
-        setState((s) => ({
-          ...s,
-          homeworkAssignments: [
-            ...s.homeworkAssignments,
-            { id, studentId, createdBy: userId, ...assignment, updatedAt: new Date().toISOString() },
-          ],
-        }));
       },
 
       async updateHomeworkAssignment(id, patch) {
