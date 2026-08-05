@@ -113,6 +113,54 @@ export type SbStudentManagerLinkRow = {
   student_id: string;
   manager_id: string;
   linked_at: string;
+  label: string | null;
+};
+
+export type SbExamRecordRow = {
+  id: string;
+  student_id: string;
+  created_by: string;
+  title: string;
+  exam_date: string;
+  is_main: boolean;
+  created_at: string;
+};
+
+export type SbExamSubjectRow = {
+  id: string;
+  exam_id: string;
+  subject_id: SubjectId;
+  target_grade: string;
+  target_score: string;
+  target_rank: string;
+  created_at: string;
+};
+
+export type SbExamSubjectRangeRow = {
+  id: string;
+  exam_subject_id: string;
+  material: string;
+  range_label: string;
+  assigned_dates: string[];
+  created_at: string;
+};
+
+export type SbTutoringScheduleRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  weekdays: number[];
+  updated_at: string;
+};
+
+export type SbTutoringScheduleExceptionRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  original_date: string;
+  new_date: string | null;
+  note: string;
+  created_at: string;
 };
 
 export interface Database {
@@ -139,7 +187,12 @@ export interface Database {
       };
       sb_homework_assignments: { Row: SbHomeworkAssignmentRow; Insert: Omit<SbHomeworkAssignmentRow, 'updated_at'>; Update: Partial<SbHomeworkAssignmentRow>; Relationships: [] };
       sb_study_sessions: { Row: SbStudySessionRow; Insert: SbStudySessionRow; Update: Partial<SbStudySessionRow>; Relationships: [] };
-      sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at'>; Update: never; Relationships: [] };
+      sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at' | 'label'>; Update: Partial<Pick<SbStudentManagerLinkRow, 'label'>>; Relationships: [] };
+      sb_exam_records: { Row: SbExamRecordRow; Insert: Omit<SbExamRecordRow, 'created_at'>; Update: Partial<SbExamRecordRow>; Relationships: [] };
+      sb_exam_subjects: { Row: SbExamSubjectRow; Insert: Omit<SbExamSubjectRow, 'created_at'>; Update: Partial<SbExamSubjectRow>; Relationships: [] };
+      sb_exam_subject_ranges: { Row: SbExamSubjectRangeRow; Insert: Omit<SbExamSubjectRangeRow, 'created_at'>; Update: Partial<SbExamSubjectRangeRow>; Relationships: [] };
+      sb_tutoring_schedules: { Row: SbTutoringScheduleRow; Insert: Omit<SbTutoringScheduleRow, 'id' | 'updated_at'>; Update: Partial<SbTutoringScheduleRow>; Relationships: [] };
+      sb_tutoring_schedule_exceptions: { Row: SbTutoringScheduleExceptionRow; Insert: Omit<SbTutoringScheduleExceptionRow, 'id' | 'created_at'>; Update: Partial<SbTutoringScheduleExceptionRow>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: {

@@ -100,6 +100,53 @@ export interface HomeworkAssignment {
   updatedAt: string;
 }
 
+export interface ExamRecord {
+  id: string;
+  studentId: string;
+  createdBy: string;
+  title: string;
+  examDate: string; // "YYYY-MM-DD"
+  isMain: boolean;
+  createdAt: string;
+}
+
+export interface ExamSubject {
+  id: string;
+  examId: string;
+  subjectId: SubjectId;
+  targetGrade: string;
+  targetScore: string;
+  targetRank: string;
+  createdAt: string;
+}
+
+export interface ExamSubjectRange {
+  id: string;
+  examSubjectId: string;
+  material: string;
+  rangeLabel: string;
+  assignedDates: string[]; // ["YYYY-MM-DD", ...]
+  createdAt: string;
+}
+
+export interface TutoringSchedule {
+  id: string;
+  studentId: string;
+  managerId: string;
+  weekdays: number[]; // 0=일 .. 6=토
+  updatedAt: string;
+}
+
+export interface TutoringScheduleException {
+  id: string;
+  studentId: string;
+  managerId: string;
+  originalDate: string;
+  newDate: string | null; // null = 그 날은 취소
+  note: string;
+  createdAt: string;
+}
+
 export interface StudySession {
   id: string;
   plannerItemId: string;

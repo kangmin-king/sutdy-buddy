@@ -1,4 +1,18 @@
-import type { Profile, DailyCondition, ScheduleBlock, PlannerItem, StudyLogEntry, StudyMaterial, HomeworkAssignment, StudySession } from '../types';
+import type {
+  Profile,
+  DailyCondition,
+  ScheduleBlock,
+  PlannerItem,
+  StudyLogEntry,
+  StudyMaterial,
+  HomeworkAssignment,
+  StudySession,
+  ExamRecord,
+  ExamSubject,
+  ExamSubjectRange,
+  TutoringSchedule,
+  TutoringScheduleException,
+} from '../types';
 import type {
   SbProfileRow,
   SbDailyConditionRow,
@@ -8,6 +22,11 @@ import type {
   SbStudyMaterialRow,
   SbHomeworkAssignmentRow,
   SbStudySessionRow,
+  SbExamRecordRow,
+  SbExamSubjectRow,
+  SbExamSubjectRangeRow,
+  SbTutoringScheduleRow,
+  SbTutoringScheduleExceptionRow,
 } from '../types/db';
 
 export function profileFromRow(row: SbProfileRow): Profile {
@@ -107,6 +126,26 @@ export function studySessionFromRow(row: SbStudySessionRow): StudySession {
     durationSeconds: row.duration_seconds,
     deviated: row.deviated,
   };
+}
+
+export function examRecordFromRow(row: SbExamRecordRow): ExamRecord {
+  return { id: row.id, studentId: row.student_id, createdBy: row.created_by, title: row.title, examDate: row.exam_date, isMain: row.is_main, createdAt: row.created_at };
+}
+
+export function examSubjectFromRow(row: SbExamSubjectRow): ExamSubject {
+  return { id: row.id, examId: row.exam_id, subjectId: row.subject_id, targetGrade: row.target_grade, targetScore: row.target_score, targetRank: row.target_rank, createdAt: row.created_at };
+}
+
+export function examSubjectRangeFromRow(row: SbExamSubjectRangeRow): ExamSubjectRange {
+  return { id: row.id, examSubjectId: row.exam_subject_id, material: row.material, rangeLabel: row.range_label, assignedDates: row.assigned_dates, createdAt: row.created_at };
+}
+
+export function tutoringScheduleFromRow(row: SbTutoringScheduleRow): TutoringSchedule {
+  return { id: row.id, studentId: row.student_id, managerId: row.manager_id, weekdays: row.weekdays, updatedAt: row.updated_at };
+}
+
+export function tutoringScheduleExceptionFromRow(row: SbTutoringScheduleExceptionRow): TutoringScheduleException {
+  return { id: row.id, studentId: row.student_id, managerId: row.manager_id, originalDate: row.original_date, newDate: row.new_date, note: row.note, createdAt: row.created_at };
 }
 
 export function groupByDate<T extends { date: string }>(rows: T[]): Record<string, T[]> {
