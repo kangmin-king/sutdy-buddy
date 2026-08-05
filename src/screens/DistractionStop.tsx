@@ -229,6 +229,7 @@ export default function DistractionStopScreen() {
             ))}
             <AllowedAppAdder
               onAdd={(pkg) => {
+                if (state.allowedApps.includes(pkg)) return;
                 const next = [...state.allowedApps, pkg];
                 setLocal((s) => s && { ...s, allowedApps: next });
                 DistractionStop.setAllowedApps({ apps: next });
