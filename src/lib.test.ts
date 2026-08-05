@@ -16,6 +16,7 @@ import {
   uid,
   shouldGenerateHomeworkItem,
   sessionsToTimelineBlocks,
+  splitPagesAcrossDates,
 } from './lib';
 import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession } from './types';
 
@@ -311,5 +312,34 @@ describe('sessionsToTimelineBlocks', () => {
       { session: session({ endedAt: '2026-08-04T14:10:00+09:00', durationSeconds: 600 }), subjectLabel: '수학' },
     ]);
     expect(blocks.map((b) => b.subjectLabel)).toEqual(['수학', '영어']);
+  });
+});
+
+describe('splitPagesAcrossDates', () => {
+  it('splits evenly across selected dates, sorted ascending, remainder on the last date', () => {
+    const result = splitPagesAcrossDates(1, 40, ['2026-08-09', '2026-08-06', '2026-08-07']);
+    expect(result).toEqual([
+      { date: '2026-08-06', pageRange: '1~13페이지' },
+      { date: '2026-08-07', pageRange: '14~26페이지' },
+      { date: '2026-08-09', pageRange: '27~40페이지' },
+    ]);
+  });
+
+  it('assigns the whole range to a single selected date', () => {
+    const result = splitPagesAcrossDates(10, 50, ['2026-08-06']);
+    expect(result).toEqual([{ date: '2026-08-06', pageRange: '10~50페이지' }]);
+  });
+
+  it('handles a range that divides evenly with no remainder', () => {
+    const result = splitPagesAcrossDates(1, 30, ['2026-08-06', '2026-08-07', '2026-08-08']);
+    expect(result).toEqual([
+      { date: '2026-08-06', pageRange: '1~10페이지' },
+      { date: '2026-08-07', pageRange: '11~20페이지' },
+      { date: '2026-08-08', pageRange: '21~30페이지' },
+    ]);
+  });
+
+  it('returns an empty array when no dates are selected', () => {
+    expect(splitPagesAcrossDates(1, 40, [])).toEqual([]);
   });
 });

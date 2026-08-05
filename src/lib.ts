@@ -234,6 +234,29 @@ export function sessionsToTimelineBlocks(
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
+// 선택된 날짜(오름차순 정렬) 수만큼 [startPage, endPage] 총 페이지를 균등 분배한다.
+// 나머지는 마지막 날짜에 몰아준다. 진도관리 탭에서 교재+범위 등록 시, 관리자가 미니 캘린더에서
+// 탭으로 고른 날짜들에 이 결과를 그대로 sb_planner_items로 즉시 일괄 생성한다(지연 생성 없음).
+export function splitPagesAcrossDates(startPage: number, endPage: number, selectedDates: DateKey[]): { date: DateKey; pageRange: string }[] {
+  if (selectedDates.length === 0) return [];
+  const sorted = [...selectedDates].sort();
+  const totalPages = endPage - startPage + 1;
+  const base = Math.floor(totalPages / sorted.length);
+  const remainder = totalPages - base * sorted.length;
+
+  const result: { date: DateKey; pageRange: string }[] = [];
+  let cursor = startPage;
+  sorted.forEach((date, idx) => {
+    const isLast = idx === sorted.length - 1;
+    const count = base + (isLast ? remainder : 0);
+    const rangeStart = cursor;
+    const rangeEnd = cursor + count - 1;
+    result.push({ date, pageRange: `${rangeStart}~${rangeEnd}페이지` });
+    cursor = rangeEnd + 1;
+  });
+  return result;
+}
+
 export interface MaterialPace {
   remainingDays: number;
   remainingSessions: number;
