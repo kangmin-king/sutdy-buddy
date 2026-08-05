@@ -6,11 +6,11 @@ import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId
 // Record<string, unknown>를 만족해야 함)을 통과하지 못해 모든 쿼리의 타입이 `never`로 붕괴한다.
 export type SbProfileRow = {
   id: string;
-  grade: Grade;
-  main_subjects: SubjectId[];
-  goal: string;
+  grade: Grade | null;
+  main_subjects: SubjectId[] | null;
+  goal: string | null;
   exam_date: string | null;
-  workbooks: string;
+  workbooks: string | null;
   onboarded_at: string;
   role: Role;
   invite_code: string | null;

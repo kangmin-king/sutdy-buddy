@@ -11,11 +11,11 @@ export type RestPatternId = 'pomodoro_25_5' | 'block_50_10' | 'none';
 export type Role = 'student' | 'manager';
 
 export interface Profile {
-  grade: Grade;
-  mainSubjects: SubjectId[];
-  goal: string;
+  grade: Grade | null;
+  mainSubjects: SubjectId[] | null;
+  goal: string | null;
   examDate: string | null;
-  workbooks: string;
+  workbooks: string | null;
   onboardedAt: string;
   role: Role;
   inviteCode: string | null;

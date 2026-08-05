@@ -15,7 +15,6 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   const [goal, setGoal] = React.useState('');
   const [examDate, setExamDate] = React.useState('');
   const [workbooks, setWorkbooks] = React.useState('');
-  const [managerName, setManagerName] = React.useState('');
   const [inviteCodeInput, setInviteCodeInput] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -38,12 +37,12 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   const handleManagerSubmit = async () => {
     setSubmitting(true);
     await actions.saveProfile({
-      // 관리자(과외쌤·학부모)는 학생 전용 필드를 쓰지 않으므로 스키마가 요구하는 기본값으로 채운다.
-      grade: GRADES[0],
-      mainSubjects: [],
-      goal: '',
+      // 관리자(과외쌤·학부모)는 학생 전용 필드를 쓰지 않으므로 null로 남긴다.
+      grade: null,
+      mainSubjects: null,
+      goal: null,
       examDate: null,
-      workbooks: '',
+      workbooks: null,
       onboardedAt: new Date().toISOString(),
       role: 'manager',
       inviteCode: null,
@@ -68,7 +67,6 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
         </div>
 
         <div className="space-y-5">
-          <TextField label="이름" value={managerName} onChange={setManagerName} placeholder="예: 김민준 쌤" />
           <TextField label="학생 초대코드 입력" value={inviteCodeInput} onChange={setInviteCodeInput} placeholder="학생에게 받은 8자리 코드" />
         </div>
 
