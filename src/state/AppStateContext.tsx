@@ -1,7 +1,7 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { uid, addDaysToKey, todayKey, shouldGenerateHomeworkItem } from '../lib';
+import { uid, addDaysToKey, todayKey, shouldGenerateHomeworkItem, splitPagesAcrossDates } from '../lib';
 import {
   profileFromRow,
   conditionFromRow,
@@ -12,6 +12,11 @@ import {
   homeworkAssignmentFromRow,
   studySessionFromRow,
   groupByDate,
+  examRecordFromRow,
+  examSubjectFromRow,
+  examSubjectRangeFromRow,
+  tutoringScheduleFromRow,
+  tutoringScheduleExceptionFromRow,
 } from './mappers';
 import type {
   Profile,
@@ -24,6 +29,12 @@ import type {
   StudySession,
   DateKey,
   TomorrowRecommendationItem,
+  ExamRecord,
+  ExamSubject,
+  ExamSubjectRange,
+  TutoringSchedule,
+  TutoringScheduleException,
+  SubjectId,
 } from '../types';
 import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
 
@@ -37,6 +48,13 @@ interface AppState {
   homeworkAssignments: HomeworkAssignment[];
   studySessions: Record<string, StudySession[]>;
   managedStudents: Profile[];
+  examRecords: ExamRecord[];
+  examSubjects: ExamSubject[];
+  examSubjectRanges: ExamSubjectRange[];
+  tutoringSchedules: TutoringSchedule[];
+  tutoringScheduleExceptions: TutoringScheduleException[];
+  studentLabels: Record<string, string>;
+  studentPlannerItems: Record<string, Record<DateKey, PlannerItem[]>>;
   loading: boolean;
   error: string | null;
 }
@@ -51,6 +69,13 @@ const EMPTY_STATE: AppState = {
   homeworkAssignments: [],
   studySessions: {},
   managedStudents: [],
+  examRecords: [],
+  examSubjects: [],
+  examSubjectRanges: [],
+  tutoringSchedules: [],
+  tutoringScheduleExceptions: [],
+  studentLabels: {},
+  studentPlannerItems: {},
   loading: true,
   error: null,
 };
@@ -79,6 +104,17 @@ interface AppStateActions {
   updateHomeworkAssignment: (id: string, patch: Partial<HomeworkAssignment>) => Promise<void>;
   startStudySession: (plannerItemId: string) => Promise<string>;
   endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean) => Promise<void>;
+  updateStudentLabel: (studentId: string, label: string) => Promise<void>;
+  createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
+  addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
+  registerHomeworkRange: (
+    studentId: string,
+    examSubjectId: string,
+    params: { subjectId: SubjectId; material: string; startPage: number; endPage: number; selectedDates: DateKey[] }
+  ) => Promise<void>;
+  upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
+  addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
+  loadStudentPlannerItems: (studentId: string) => Promise<void>;
   dismissError: () => void;
 }
 
@@ -103,6 +139,16 @@ async function fetchManagedStudents(managerId: string): Promise<Profile[]> {
   return ((studentsRes.data ?? []) as SbProfileRow[]).map(profileFromRow);
 }
 
+// 관리자가 자기 화면에서만 보는 학생 별칭. sb_student_manager_links.label에서 읽는다(0007 마이그레이션).
+async function fetchStudentLabels(managerId: string): Promise<Record<string, string>> {
+  const { data } = await supabase.from('sb_student_manager_links').select('student_id, label').eq('manager_id', managerId);
+  const labels: Record<string, string> = {};
+  for (const row of data ?? []) {
+    if (row.label) labels[row.student_id] = row.label;
+  }
+  return labels;
+}
+
 async function loadAll(userId: string): Promise<AppState> {
   const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes, homeworkRes, sessionsRes] = await Promise.all([
     supabase.from('sb_profiles').select('*').eq('id', userId).maybeSingle(),
@@ -124,19 +170,43 @@ async function loadAll(userId: string): Promise<AppState> {
   let managedStudents: Profile[] = [];
   let homeworkRows = homeworkRes.data ?? [];
   let sessionRows = sessionsRes.data ?? [];
+  let examRecords: ExamRecord[] = [];
+  let examSubjects: ExamSubject[] = [];
+  let examSubjectRanges: ExamSubjectRange[] = [];
+  let tutoringSchedules: TutoringSchedule[] = [];
+  let tutoringScheduleExceptions: TutoringScheduleException[] = [];
+  let studentLabels: Record<string, string> = {};
 
   if (profile?.role === 'manager') {
     managedStudents = await fetchManagedStudents(userId);
+    studentLabels = await fetchStudentLabels(userId);
     const studentIds = managedStudents.map((s) => s.id);
     // 관리자 계정에서는 위 병렬 조회(student_id/user_id = 본인)가 항상 비어 있다.
     // 담당 학생들 기준으로 다시 조회해야 등록해둔 숙제와 학습 세션이 보인다.
     if (studentIds.length > 0) {
-      const [managerHomeworkRes, managerSessionsRes] = await Promise.all([
+      const [managerHomeworkRes, managerSessionsRes, examRes, scheduleRes, exceptionRes] = await Promise.all([
         supabase.from('sb_homework_assignments').select('*').in('student_id', studentIds),
         supabase.from('sb_study_sessions').select('*').in('user_id', studentIds),
+        supabase.from('sb_exam_records').select('*').in('student_id', studentIds),
+        supabase.from('sb_tutoring_schedules').select('*').eq('manager_id', userId),
+        supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('manager_id', userId),
       ]);
       homeworkRows = managerHomeworkRes.data ?? [];
       sessionRows = managerSessionsRes.data ?? [];
+      examRecords = (examRes.data ?? []).map(examRecordFromRow);
+      tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
+      tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
+
+      const examIds = examRecords.map((e) => e.id);
+      if (examIds.length > 0) {
+        const subjectsRes = await supabase.from('sb_exam_subjects').select('*').in('exam_id', examIds);
+        examSubjects = (subjectsRes.data ?? []).map(examSubjectFromRow);
+        const subjectIds = examSubjects.map((s) => s.id);
+        if (subjectIds.length > 0) {
+          const rangesRes = await supabase.from('sb_exam_subject_ranges').select('*').in('exam_subject_id', subjectIds);
+          examSubjectRanges = (rangesRes.data ?? []).map(examSubjectRangeFromRow);
+        }
+      }
     } else {
       homeworkRows = [];
       sessionRows = [];
@@ -153,6 +223,13 @@ async function loadAll(userId: string): Promise<AppState> {
     homeworkAssignments: homeworkRows.map(homeworkAssignmentFromRow),
     studySessions: groupByPlannerItemId(sessionRows.map(studySessionFromRow)),
     managedStudents,
+    examRecords,
+    examSubjects,
+    examSubjectRanges,
+    tutoringSchedules,
+    tutoringScheduleExceptions,
+    studentLabels,
+    studentPlannerItems: {},
     loading: false,
     error: null,
   };
@@ -649,6 +726,206 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('endStudySession failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
+      },
+
+      async updateStudentLabel(studentId, label) {
+        setState((s) => ({ ...s, studentLabels: { ...s.studentLabels, [studentId]: label } }));
+        const { error } = await supabase
+          .from('sb_student_manager_links')
+          .update({ label })
+          .eq('student_id', studentId)
+          .eq('manager_id', userId);
+        if (error) {
+          console.error('updateStudentLabel failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async createExamRecord(studentId, exam) {
+        const id = uid();
+        const createdAt = new Date().toISOString();
+        const fullExam: ExamRecord = { id, studentId, createdBy: userId, title: exam.title, examDate: exam.examDate, isMain: exam.isMain, createdAt };
+        setState((s) => ({ ...s, examRecords: [...s.examRecords, fullExam] }));
+
+        const { error } = await supabase.from('sb_exam_records').insert({
+          id,
+          student_id: studentId,
+          created_by: userId,
+          title: exam.title,
+          exam_date: exam.examDate,
+          is_main: exam.isMain,
+        });
+        if (error) {
+          console.error('createExamRecord failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+        return id;
+      },
+
+      async addExamSubject(examId, subject) {
+        const id = uid();
+        const createdAt = new Date().toISOString();
+        const fullSubject: ExamSubject = { id, examId, ...subject, createdAt };
+        setState((s) => ({ ...s, examSubjects: [...s.examSubjects, fullSubject] }));
+
+        const { error } = await supabase.from('sb_exam_subjects').insert({
+          id,
+          exam_id: examId,
+          subject_id: subject.subjectId,
+          target_grade: subject.targetGrade,
+          target_score: subject.targetScore,
+          target_rank: subject.targetRank,
+        });
+        if (error) {
+          console.error('addExamSubject failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async registerHomeworkRange(studentId, examSubjectId, params) {
+        const distribution = splitPagesAcrossDates(params.startPage, params.endPage, params.selectedDates);
+        const rangeLabel = `${params.startPage}~${params.endPage}페이지`;
+        const rangeId = uid();
+        const createdAt = new Date().toISOString();
+        const fullRange: ExamSubjectRange = {
+          id: rangeId,
+          examSubjectId,
+          material: params.material,
+          rangeLabel,
+          assignedDates: params.selectedDates,
+          createdAt,
+        };
+        setState((s) => ({ ...s, examSubjectRanges: [...s.examSubjectRanges, fullRange] }));
+
+        const { error: rangeError } = await supabase.from('sb_exam_subject_ranges').insert({
+          id: rangeId,
+          exam_subject_id: examSubjectId,
+          material: params.material,
+          range_label: rangeLabel,
+          assigned_dates: params.selectedDates,
+        });
+        if (rangeError) {
+          console.error('registerHomeworkRange (range) failed:', rangeError.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
+        }
+
+        // 학생 계정 이름으로 각 날짜에 숙제 항목을 즉시 생성한다(지연 생성 없음). 학생의 plannerItems가
+        // 아니라 studentPlannerItems[studentId]에 낙관적으로 반영한다 — 관리자는 자기 자신의
+        // plannerItems를 갖지 않는다.
+        const newItems = distribution.map(({ date, pageRange }) => ({
+          id: uid(),
+          date,
+          order: 1,
+          subjectId: params.subjectId,
+          startTime: '09:00',
+          studyType: null,
+          material: params.material,
+          unit: '',
+          pageRange,
+          endTime: null,
+          difficulty: null,
+          restPattern: null,
+          mustDo: false,
+          status: 'planned' as const,
+          actualMinutes: null,
+          understanding: null,
+          partialReason: null,
+          incompleteReason: null,
+          source: 'homework' as const,
+          homeworkAssignmentId: null,
+        }));
+
+        setState((s) => {
+          const existing = s.studentPlannerItems[studentId] ?? {};
+          const merged = { ...existing };
+          for (const item of newItems) {
+            const list = merged[item.date] ?? [];
+            const order = list.length === 0 ? 1 : Math.max(...list.map((i) => i.order)) + 1;
+            merged[item.date] = [...list, { ...item, order }];
+          }
+          return { ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: merged } };
+        });
+
+        const { error: itemsError } = await supabase.from('sb_planner_items').insert(
+          newItems.map((it) => ({
+            id: it.id,
+            user_id: studentId,
+            date: it.date,
+            order: it.order,
+            subject_id: it.subjectId,
+            start_time: it.startTime,
+            study_type: it.studyType,
+            material: it.material,
+            unit: it.unit,
+            page_range: it.pageRange,
+            end_time: it.endTime,
+            difficulty: it.difficulty,
+            rest_pattern: it.restPattern,
+            must_do: it.mustDo,
+            status: it.status,
+            actual_minutes: it.actualMinutes,
+            understanding: it.understanding,
+            partial_reason: it.partialReason,
+            incomplete_reason: it.incompleteReason,
+            source: it.source,
+            homework_assignment_id: it.homeworkAssignmentId,
+          }))
+        );
+        if (itemsError) {
+          console.error('registerHomeworkRange (items) failed:', itemsError.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async upsertTutoringSchedule(studentId, weekdays) {
+        setState((s) => {
+          const exists = s.tutoringSchedules.some((sch) => sch.studentId === studentId && sch.managerId === userId);
+          const updated = exists
+            ? s.tutoringSchedules.map((sch) =>
+                sch.studentId === studentId && sch.managerId === userId ? { ...sch, weekdays, updatedAt: new Date().toISOString() } : sch
+              )
+            : [...s.tutoringSchedules, { id: uid(), studentId, managerId: userId, weekdays, updatedAt: new Date().toISOString() }];
+          return { ...s, tutoringSchedules: updated };
+        });
+
+        const { error } = await supabase
+          .from('sb_tutoring_schedules')
+          .upsert({ student_id: studentId, manager_id: userId, weekdays }, { onConflict: 'student_id,manager_id' });
+        if (error) {
+          console.error('upsertTutoringSchedule failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async addTutoringException(studentId, exception) {
+        const id = uid();
+        const createdAt = new Date().toISOString();
+        const fullException: TutoringScheduleException = { id, studentId, managerId: userId, ...exception, createdAt };
+        setState((s) => ({ ...s, tutoringScheduleExceptions: [...s.tutoringScheduleExceptions, fullException] }));
+
+        const { error } = await supabase.from('sb_tutoring_schedule_exceptions').insert({
+          student_id: studentId,
+          manager_id: userId,
+          original_date: exception.originalDate,
+          new_date: exception.newDate,
+          note: exception.note,
+        });
+        if (error) {
+          console.error('addTutoringException failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async loadStudentPlannerItems(studentId) {
+        const { data, error } = await supabase.from('sb_planner_items').select('*').eq('user_id', studentId).order('order');
+        if (error) {
+          console.error('loadStudentPlannerItems failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
+        }
+        const grouped = groupByDate((data ?? []).map(plannerItemFromRow));
+        setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: grouped } }));
       },
 
       dismissError() {
