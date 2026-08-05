@@ -15,6 +15,7 @@ export default function StudentHomeScreen() {
   const today = todayKey();
   const items = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
   const [runningSessionId, setRunningSessionId] = React.useState<Record<string, string>>({});
+  const [startPending, setStartPending] = React.useState<Record<string, boolean>>({});
   const [now, setNow] = React.useState(Date.now());
   const [showTodo, setShowTodo] = React.useState(false);
 
@@ -24,8 +25,18 @@ export default function StudentHomeScreen() {
   }, []);
 
   const handleStart = async (itemId: string) => {
-    const sessionId = await actions.startStudySession(itemId);
-    setRunningSessionId((m) => ({ ...m, [itemId]: sessionId }));
+    if (startPending[itemId]) return;
+    setStartPending((m) => ({ ...m, [itemId]: true }));
+    try {
+      const sessionId = await actions.startStudySession(itemId);
+      setRunningSessionId((m) => ({ ...m, [itemId]: sessionId }));
+    } finally {
+      setStartPending((m) => {
+        const next = { ...m };
+        delete next[itemId];
+        return next;
+      });
+    }
   };
   const handleStop = (itemId: string, completed: boolean) => {
     const sessionId = runningSessionId[itemId];
@@ -76,7 +87,8 @@ export default function StudentHomeScreen() {
               ) : (
                 <button
                   onClick={() => handleStart(it.id)}
-                  className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1"
+                  disabled={!!startPending[it.id]}
+                  className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1 disabled:opacity-50"
                 >
                   <Icon name="play_arrow" className="!text-[16px]" /> 시작하기
                 </button>
