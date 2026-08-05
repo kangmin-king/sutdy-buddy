@@ -9,6 +9,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   const { actions } = useAppState();
   const { session } = useAuth();
   const role: Role = (session?.user.user_metadata.role as Role | undefined) ?? 'student';
+  const userId = session!.user.id;
 
   const [grade, setGrade] = React.useState<Grade>(GRADES[2]);
   const [mainSubjects, setMainSubjects] = React.useState<SubjectId[]>(['math']);
@@ -21,6 +22,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   const handleStudentSubmit = async () => {
     setSubmitting(true);
     await actions.saveProfile({
+      id: userId,
       grade,
       mainSubjects,
       goal,
@@ -37,6 +39,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   const handleManagerSubmit = async () => {
     setSubmitting(true);
     await actions.saveProfile({
+      id: userId,
       // 관리자(과외쌤·학부모)는 학생 전용 필드를 쓰지 않으므로 null로 남긴다.
       grade: null,
       mainSubjects: null,

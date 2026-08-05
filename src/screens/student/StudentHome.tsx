@@ -3,7 +3,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { todayKey } from '../../lib';
 import { getSubject } from '../../constants';
 import { TopAppBar, Card, Icon } from '../../primitives';
-import { DistractionStop, isNativePlatform } from '../../native/distractionStop';
+import { DistractionStop, isNativePlatform, useDistractionState } from '../../native/distractionStop';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -20,10 +20,43 @@ export default function StudentHomeScreen() {
   const [now, setNow] = React.useState(Date.now());
   const [showTodo, setShowTodo] = React.useState(false);
 
+  // 네이티브가 허용앱 밖 이탈을 감지하면 스스로 sessionActive를 false로 내리고 stateChanged로
+  // 알려준다(DistractionStop 화면과 같은 구독 훅). 웹은 그 전환을 보고 타이머를 이탈로 끝낸다.
+  const { state: distraction } = useDistractionState();
+  const nativeSessionActive = distraction?.sessionActive ?? false;
+  const prevNativeSessionActive = React.useRef(false);
+  // 사용자가 직접 정지/완료를 눌러 setSessionActive(false)를 보낸 경우에도 같은 전환이 오기
+  // 때문에, "우리가 멈춘 것"인지 구분할 플래그가 필요하다. 정지 핸들러에서 동기적으로 세워두고
+  // 전환을 관측할 때 소비한다.
+  const selfInitiatedStop = React.useRef(false);
+
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  React.useEffect(() => {
+    const wasActive = prevNativeSessionActive.current;
+    prevNativeSessionActive.current = nativeSessionActive;
+    if (nativeSessionActive) {
+      // false -> true(새 세션 시작) 전환에서만 소비되지 않고 남은 플래그를 버린다. 매번 지우면
+      // 정지 버튼이 세운 플래그가 네이티브 응답 전에(runningSessionId 변경으로 이 이펙트가
+      // 다시 돌면서) 날아가 자기 정지를 이탈로 오인하게 된다.
+      if (!wasActive) selfInitiatedStop.current = false;
+      return;
+    }
+    if (!wasActive) return; // true -> false 전환만 처리
+    if (selfInitiatedStop.current) {
+      selfInitiatedStop.current = false;
+      return;
+    }
+    const running = Object.entries(runningSessionId);
+    if (running.length === 0) return;
+    for (const [itemId, sessionId] of running) {
+      actions.endStudySession(itemId, sessionId, true);
+    }
+    setRunningSessionId({});
+  }, [nativeSessionActive, runningSessionId, actions]);
 
   const handleStart = async (itemId: string) => {
     if (startPending[itemId]) return;
@@ -31,6 +64,7 @@ export default function StudentHomeScreen() {
     try {
       const sessionId = await actions.startStudySession(itemId);
       setRunningSessionId((m) => ({ ...m, [itemId]: sessionId }));
+      selfInitiatedStop.current = false;
       if (isNativePlatform()) DistractionStop.setSessionActive({ active: true });
     } finally {
       setStartPending((m) => {
@@ -44,7 +78,12 @@ export default function StudentHomeScreen() {
     const sessionId = runningSessionId[itemId];
     if (!sessionId) return;
     actions.endStudySession(itemId, sessionId, false);
-    if (isNativePlatform()) DistractionStop.setSessionActive({ active: false });
+    if (isNativePlatform()) {
+      // 아래 setSessionActive(false)가 돌려보낼 true -> false 전환을 이탈로 오인하지 않도록
+      // 네이티브에 알리기 전에 동기적으로 표시해둔다.
+      selfInitiatedStop.current = true;
+      DistractionStop.setSessionActive({ active: false });
+    }
     setRunningSessionId((m) => {
       const next = { ...m };
       delete next[itemId];

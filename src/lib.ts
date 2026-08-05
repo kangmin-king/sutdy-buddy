@@ -212,8 +212,12 @@ export interface TimelineBlock {
   deviated: boolean;
 }
 
+// 세션 시각은 timestamptz(ISO/UTC)로 저장되지만, 타임라인은 사용자가 실제로 겪은 시각을
+// 보여줘야 한다(todayKey()·날짜 선택기도 전부 로컬 기준). 문자열을 그대로 잘라 쓰면 KST에서
+// 9시간 어긋나므로 로컬 시각으로 변환한 뒤 시/분을 뽑는다.
 function toHHMM(isoString: string): string {
-  return isoString.slice(11, 16);
+  const d = new Date(isoString);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 export function sessionsToTimelineBlocks(

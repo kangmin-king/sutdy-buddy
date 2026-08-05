@@ -14,8 +14,10 @@ import {
   addMonthsToKey,
   monthGrid,
   uid,
+  shouldGenerateHomeworkItem,
+  sessionsToTimelineBlocks,
 } from './lib';
-import type { ScheduleBlock, PlannerItem, StudyMaterial } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession } from './types';
 
 describe('timeToMinutes / minutesToTime', () => {
   it('converts HH:MM to minutes and back', () => {
@@ -231,8 +233,6 @@ describe('uid', () => {
   });
 });
 
-import { shouldGenerateHomeworkItem, sessionsToTimelineBlocks } from './lib';
-import type { HomeworkAssignment, StudySession } from './types';
 
 function homework(overrides: Partial<HomeworkAssignment>): HomeworkAssignment {
   return {
@@ -259,31 +259,56 @@ describe('shouldGenerateHomeworkItem', () => {
 });
 
 describe('sessionsToTimelineBlocks', () => {
-  it('converts a completed session into a block with HH:MM start/end', () => {
+  // 세션 시각은 timestamptz(UTC)로 저장되지만 타임라인은 로컬 시각을 보여준다.
+  // 테스트 타임존은 src/test-setup.ts에서 Asia/Seoul로 고정되어 있고, 픽스처는 KST 오프셋을
+  // 명시해 "저장값 -> 화면에 보이는 시각"이 한눈에 대응되게 둔다.
+  function session(overrides: Partial<StudySession>): StudySession {
+    return {
+      id: '1',
+      plannerItemId: 'p1',
+      startedAt: '2026-08-04T14:00:00+09:00',
+      endedAt: '2026-08-04T14:30:00+09:00',
+      durationSeconds: 1800,
+      deviated: false,
+      ...overrides,
+    };
+  }
+
+  it('converts a completed session into a block with local HH:MM start/end', () => {
+    const blocks = sessionsToTimelineBlocks([{ session: session({}), subjectLabel: '수학' }]);
+    expect(blocks).toEqual([{ startTime: '14:00', endTime: '14:30', subjectLabel: '수학', deviated: false }]);
+  });
+
+  it('renders UTC-stored timestamps in local time rather than slicing the ISO string', () => {
+    // 05:00Z == 14:00 KST — 예전 구현은 문자열을 잘라 '05:00'을 보여줬다.
     const blocks = sessionsToTimelineBlocks([
-      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:30:00Z', durationSeconds: 1800, deviated: false }, subjectLabel: '수학' },
+      { session: session({ startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:30:00Z' }), subjectLabel: '수학' },
     ]);
-    expect(blocks).toEqual([{ startTime: '05:00', endTime: '05:30', subjectLabel: '수학', deviated: false }]);
+    expect(blocks[0]).toEqual({ startTime: '14:00', endTime: '14:30', subjectLabel: '수학', deviated: false });
   });
 
   it('uses "now" as the end when a session has not ended yet', () => {
-    const blocks = sessionsToTimelineBlocks([
-      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: null, durationSeconds: null, deviated: false }, subjectLabel: '수학' },
-    ], '2026-08-04T05:10:00Z');
-    expect(blocks[0].endTime).toBe('05:10');
+    const blocks = sessionsToTimelineBlocks(
+      [{ session: session({ endedAt: null, durationSeconds: null }), subjectLabel: '수학' }],
+      '2026-08-04T14:10:00+09:00'
+    );
+    expect(blocks[0].endTime).toBe('14:10');
   });
 
   it('marks deviated sessions', () => {
     const blocks = sessionsToTimelineBlocks([
-      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:05:00Z', durationSeconds: 300, deviated: true }, subjectLabel: '영어' },
+      { session: session({ endedAt: '2026-08-04T14:05:00+09:00', durationSeconds: 300, deviated: true }), subjectLabel: '영어' },
     ]);
     expect(blocks[0].deviated).toBe(true);
   });
 
   it('sorts blocks by start time', () => {
     const blocks = sessionsToTimelineBlocks([
-      { session: { id: '2', plannerItemId: 'p2', startedAt: '2026-08-04T09:00:00Z', endedAt: '2026-08-04T09:10:00Z', durationSeconds: 600, deviated: false }, subjectLabel: '영어' },
-      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:10:00Z', durationSeconds: 600, deviated: false }, subjectLabel: '수학' },
+      {
+        session: session({ id: '2', plannerItemId: 'p2', startedAt: '2026-08-04T18:00:00+09:00', endedAt: '2026-08-04T18:10:00+09:00', durationSeconds: 600 }),
+        subjectLabel: '영어',
+      },
+      { session: session({ endedAt: '2026-08-04T14:10:00+09:00', durationSeconds: 600 }), subjectLabel: '수학' },
     ]);
     expect(blocks.map((b) => b.subjectLabel)).toEqual(['수학', '영어']);
   });

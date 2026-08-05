@@ -11,6 +11,8 @@ export type RestPatternId = 'pomodoro_25_5' | 'block_50_10' | 'none';
 export type Role = 'student' | 'manager';
 
 export interface Profile {
+  // auth.users.id와 동일. 관리자가 담당 학생을 식별할 때(숙제 배정 등) 반드시 필요하다.
+  id: string;
   grade: Grade | null;
   mainSubjects: SubjectId[] | null;
   goal: string | null;

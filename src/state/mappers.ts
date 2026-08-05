@@ -12,6 +12,7 @@ import type {
 
 export function profileFromRow(row: SbProfileRow): Profile {
   return {
+    id: row.id,
     grade: row.grade,
     mainSubjects: row.main_subjects,
     goal: row.goal,

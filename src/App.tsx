@@ -24,6 +24,20 @@ import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
 
+// 쓰기 실패/초대코드 오류 같은 전역 오류는 어느 셸(학생/관리자/레거시)에 있든 보여야 한다.
+function ErrorBanner() {
+  const { state, actions } = useAppState();
+  if (!state.error) return null;
+  return (
+    <Card className="mx-5 mt-4 flex items-center justify-between gap-3 border border-error/40">
+      <p className="text-sm text-error">{state.error}</p>
+      <Button variant="error" onClick={actions.dismissError} className="!px-3 !py-1.5 shrink-0">
+        닫기
+      </Button>
+    </Card>
+  );
+}
+
 function AppShell() {
   const { state } = useAppState();
 
@@ -42,6 +56,7 @@ function StudentAppShell() {
   const [activeTab, setActiveTab] = React.useState<(typeof STUDENT_NAV_TABS)[number]['id']>('home');
   return (
     <div id="app-shell">
+      <ErrorBanner />
       {activeTab === 'home' && <StudentHomeScreen />}
       {activeTab === 'calendar' && <StudyTimelineScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
@@ -56,10 +71,16 @@ function ManagerAppShell() {
   const [tab, setTab] = React.useState<'homework' | 'timeline'>('homework');
 
   if (!selectedStudentId) {
-    return <ManagerStudentListScreen onSelectStudent={setSelectedStudentId} />;
+    return (
+      <div id="app-shell">
+        <ErrorBanner />
+        <ManagerStudentListScreen onSelectStudent={setSelectedStudentId} />
+      </div>
+    );
   }
   return (
     <div id="app-shell">
+      <ErrorBanner />
       {tab === 'homework' && <ManagerHomeworkFormScreen studentId={selectedStudentId} onBack={() => setSelectedStudentId(null)} />}
       {tab === 'timeline' && <StudyTimelineScreen />}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-surface-container-lowest rounded-full p-1 shadow-card">
@@ -71,7 +92,7 @@ function ManagerAppShell() {
 }
 
 function LegacyStudentAppShell() {
-  const { state, actions } = useAppState();
+  const { state } = useAppState();
   const [activeTab, setActiveTab] = React.useState<TabId>('home');
   const [overlay, setOverlay] = React.useState<Overlay>(null);
   const [studyLogItem, setStudyLogItem] = React.useState<PlannerItem | null>(null);
@@ -111,14 +132,7 @@ function LegacyStudentAppShell() {
 
   return (
     <div id="app-shell">
-      {state.error && (
-        <Card className="mx-5 mt-4 flex items-center justify-between gap-3 border border-error/40">
-          <p className="text-sm text-error">{state.error}</p>
-          <Button variant="error" onClick={actions.dismissError} className="!px-3 !py-1.5 shrink-0">
-            닫기
-          </Button>
-        </Card>
-      )}
+      <ErrorBanner />
       {overlayScreen ?? (
         <>
           {activeTab === 'home' && <HomeScreen onNavigate={setActiveTab} onOpenOverlay={setOverlay} />}
