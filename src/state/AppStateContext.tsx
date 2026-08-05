@@ -92,8 +92,19 @@ function groupByPlannerItemId(rows: StudySession[]): Record<string, StudySession
   return grouped;
 }
 
+// 관리자가 담당하는 학생 프로필 목록. 최초 로드(loadAll)와 초대코드 연결 직후(linkByInviteCode)
+// 양쪽에서 쓰이므로 헬퍼로 분리한다.
+// 관리자가 남의 프로필 행을 읽을 수 있게 해주는 RLS 정책은 0006 마이그레이션에 있다.
+async function fetchManagedStudents(managerId: string): Promise<Profile[]> {
+  const linksRes = await supabase.from('sb_student_manager_links').select('*').eq('manager_id', managerId);
+  const studentIds = (linksRes.data ?? []).map((link) => link.student_id);
+  if (studentIds.length === 0) return [];
+  const studentsRes = await supabase.from('sb_profiles').select('*').in('id', studentIds);
+  return ((studentsRes.data ?? []) as SbProfileRow[]).map(profileFromRow);
+}
+
 async function loadAll(userId: string): Promise<AppState> {
-  const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes, homeworkRes, sessionsRes, linksRes] = await Promise.all([
+  const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes, homeworkRes, sessionsRes] = await Promise.all([
     supabase.from('sb_profiles').select('*').eq('id', userId).maybeSingle(),
     supabase.from('sb_daily_conditions').select('*').eq('user_id', userId),
     supabase.from('sb_schedule_blocks').select('*').eq('user_id', userId),
@@ -102,7 +113,6 @@ async function loadAll(userId: string): Promise<AppState> {
     supabase.from('sb_study_materials').select('*').eq('user_id', userId),
     supabase.from('sb_homework_assignments').select('*').eq('student_id', userId),
     supabase.from('sb_study_sessions').select('*').eq('user_id', userId),
-    supabase.from('sb_student_manager_links').select('*').or(`student_id.eq.${userId},manager_id.eq.${userId}`),
   ]);
 
   const conditionRows = (conditionsRes.data ?? []).map(conditionFromRow);
@@ -112,11 +122,24 @@ async function loadAll(userId: string): Promise<AppState> {
   const profile = profileRes.data ? profileFromRow(profileRes.data) : null;
 
   let managedStudents: Profile[] = [];
+  let homeworkRows = homeworkRes.data ?? [];
+  let sessionRows = sessionsRes.data ?? [];
+
   if (profile?.role === 'manager') {
-    const studentIds = (linksRes.data ?? []).map((link) => link.student_id);
+    managedStudents = await fetchManagedStudents(userId);
+    const studentIds = managedStudents.map((s) => s.id);
+    // 관리자 계정에서는 위 병렬 조회(student_id/user_id = 본인)가 항상 비어 있다.
+    // 담당 학생들 기준으로 다시 조회해야 등록해둔 숙제와 학습 세션이 보인다.
     if (studentIds.length > 0) {
-      const studentsRes = await supabase.from('sb_profiles').select('*').in('id', studentIds);
-      managedStudents = ((studentsRes.data ?? []) as SbProfileRow[]).map(profileFromRow);
+      const [managerHomeworkRes, managerSessionsRes] = await Promise.all([
+        supabase.from('sb_homework_assignments').select('*').in('student_id', studentIds),
+        supabase.from('sb_study_sessions').select('*').in('user_id', studentIds),
+      ]);
+      homeworkRows = managerHomeworkRes.data ?? [];
+      sessionRows = managerSessionsRes.data ?? [];
+    } else {
+      homeworkRows = [];
+      sessionRows = [];
     }
   }
 
@@ -127,8 +150,8 @@ async function loadAll(userId: string): Promise<AppState> {
     plannerItems: groupByDate((itemsRes.data ?? []).map(plannerItemFromRow)),
     studyLogs: groupByDate((logsRes.data ?? []).map(studyLogFromRow)),
     studyMaterials: (materialsRes.data ?? []).map(studyMaterialFromRow),
-    homeworkAssignments: (homeworkRes.data ?? []).map(homeworkAssignmentFromRow),
-    studySessions: groupByPlannerItemId((sessionsRes.data ?? []).map(studySessionFromRow)),
+    homeworkAssignments: homeworkRows.map(homeworkAssignmentFromRow),
+    studySessions: groupByPlannerItemId(sessionRows.map(studySessionFromRow)),
     managedStudents,
     loading: false,
     error: null,
@@ -139,6 +162,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const userId = session!.user.id;
   const [state, setState] = React.useState<AppState>(EMPTY_STATE);
+
+  // 커밋을 기다리지 않고 동기적으로 읽을 수 있는 plannerItems 미러(addPlannerItem 참고).
+  // 커밋될 때마다 실제 state로 다시 맞춰주므로 다른 액션(삭제/이월 등)과도 어긋나지 않는다.
+  const plannerItemsRef = React.useRef<Record<DateKey, PlannerItem[]>>(EMPTY_STATE.plannerItems);
+  React.useEffect(() => {
+    plannerItemsRef.current = state.plannerItems;
+  }, [state.plannerItems]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -217,11 +247,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async addPlannerItem(date, item) {
-        const list = state.plannerItems[date] ?? [];
+        // 목록은 반드시 "현재" 상태에서 파생해야 한다. 숙제 지연 생성 이펙트는 한 tick 안에서
+        // addPlannerItem을 여러 번 연달아 호출하는데, 바깥 `state` 클로저를 읽으면 모든 호출이
+        // 같은 (오래된) 목록을 보고 서로의 낙관적 항목을 덮어써 버린다. 그러면 이펙트가 다시
+        // 돌 때 앞선 배정이 "아직 생성 안 됨"으로 보여 DB 행이 중복 insert된다.
+        // plannerItemsRef는 setState 커밋을 기다리지 않고 동기적으로 갱신되므로, 같은 tick 안의
+        // 연속 호출도 직전 호출의 항목을 보고 order를 이어서 매길 수 있다.
+        const list = plannerItemsRef.current[date] ?? [];
         const id = uid();
         const order = list.length === 0 ? 1 : Math.max(...list.map((i) => i.order)) + 1;
         const fullItem: PlannerItem = { ...item, id, order };
-        setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...list, fullItem] } }));
+        plannerItemsRef.current = { ...plannerItemsRef.current, [date]: [...list, fullItem] };
+        setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...(s.plannerItems[date] ?? []), fullItem] } }));
 
         const { error } = await supabase.from('sb_planner_items').insert({
           id,
@@ -490,16 +527,29 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async linkByInviteCode(code) {
-        const { data: student } = await supabase.from('sb_profiles').select('id').eq('invite_code', code.toUpperCase()).maybeSingle();
-        if (!student) {
+        // 아직 링크가 없는 상태라 RLS상 학생 프로필 행을 직접 select할 수 없다.
+        // 정확한 코드를 아는 경우에만 id 하나를 돌려주는 security definer RPC를 쓴다(0006 마이그레이션).
+        const { data: studentId, error: lookupError } = await supabase.rpc('find_student_by_invite_code', {
+          code: code.toUpperCase(),
+        });
+        if (lookupError) {
+          console.error('linkByInviteCode (lookup) failed:', lookupError.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
+        }
+        if (!studentId) {
           setState((s) => ({ ...s, error: '초대코드를 찾을 수 없어요. 다시 확인해주세요.' }));
           return;
         }
-        const { error } = await supabase.from('sb_student_manager_links').insert({ student_id: student.id, manager_id: userId });
+        const { error } = await supabase.from('sb_student_manager_links').insert({ student_id: studentId, manager_id: userId });
         if (error) {
           console.error('linkByInviteCode failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
         }
+        // 연결 직후 학생 목록을 다시 불러와야 관리자 화면에 바로 나타난다.
+        const managedStudents = await fetchManagedStudents(userId);
+        setState((s) => ({ ...s, managedStudents }));
       },
 
       async createHomeworkAssignment(studentId, assignment) {
