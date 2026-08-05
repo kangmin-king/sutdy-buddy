@@ -1,4 +1,4 @@
-import type { Profile, DailyCondition, ScheduleBlock, PlannerItem, StudyLogEntry, StudyMaterial } from '../types';
+import type { Profile, DailyCondition, ScheduleBlock, PlannerItem, StudyLogEntry, StudyMaterial, HomeworkAssignment, StudySession } from '../types';
 import type {
   SbProfileRow,
   SbDailyConditionRow,
@@ -6,6 +6,8 @@ import type {
   SbPlannerItemRow,
   SbStudyLogRow,
   SbStudyMaterialRow,
+  SbHomeworkAssignmentRow,
+  SbStudySessionRow,
 } from '../types/db';
 
 export function profileFromRow(row: SbProfileRow): Profile {
@@ -16,6 +18,8 @@ export function profileFromRow(row: SbProfileRow): Profile {
     examDate: row.exam_date,
     workbooks: row.workbooks,
     onboardedAt: row.onboarded_at,
+    role: row.role,
+    inviteCode: row.invite_code,
   };
 }
 
@@ -47,6 +51,8 @@ export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
     understanding: row.understanding,
     partialReason: row.partial_reason,
     incompleteReason: row.incomplete_reason,
+    source: row.source,
+    homeworkAssignmentId: row.homework_assignment_id,
   };
 }
 
@@ -74,6 +80,31 @@ export function studyMaterialFromRow(row: SbStudyMaterialRow): StudyMaterial {
     targetDate: row.target_date,
     sessionIntervalDays: row.session_interval_days,
     createdAt: row.created_at,
+  };
+}
+
+export function homeworkAssignmentFromRow(row: SbHomeworkAssignmentRow): HomeworkAssignment {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    createdBy: row.created_by,
+    subjectId: row.subject_id,
+    material: row.material,
+    amountPerDay: row.amount_per_day,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function studySessionFromRow(row: SbStudySessionRow): StudySession {
+  return {
+    id: row.id,
+    plannerItemId: row.planner_item_id,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationSeconds: row.duration_seconds,
+    deviated: row.deviated,
   };
 }
 

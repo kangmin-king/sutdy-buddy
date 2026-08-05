@@ -1,4 +1,4 @@
-import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId, PlannerItemStatus } from './index';
+import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId, PlannerItemStatus, Role } from './index';
 
 // 아래 Row 타입들은 반드시 `type`(object literal type)으로 선언한다. `interface`로 선언하면
 // TypeScript가 암묵적 문자열 인덱스 시그니처를 추론하지 않아 `Record<string, unknown>`에
@@ -12,6 +12,8 @@ export type SbProfileRow = {
   exam_date: string | null;
   workbooks: string;
   onboarded_at: string;
+  role: Role;
+  invite_code: string | null;
 };
 
 export type SbDailyConditionRow = {
@@ -55,6 +57,8 @@ export type SbPlannerItemRow = {
   understanding: 'low' | 'medium' | 'high' | null;
   partial_reason: string | null;
   incomplete_reason: string | null;
+  source: 'homework' | 'self';
+  homework_assignment_id: string | null;
 };
 
 export type SbStudyLogRow = {
@@ -82,6 +86,35 @@ export type SbStudyMaterialRow = {
   created_at: string;
 };
 
+export type SbHomeworkAssignmentRow = {
+  id: string;
+  student_id: string;
+  created_by: string;
+  subject_id: SubjectId;
+  material: string;
+  amount_per_day: string;
+  start_date: string;
+  end_date: string;
+  updated_at: string;
+};
+
+export type SbStudySessionRow = {
+  id: string;
+  user_id: string;
+  planner_item_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  deviated: boolean;
+};
+
+export type SbStudentManagerLinkRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  linked_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -104,6 +137,9 @@ export interface Database {
         Update: Partial<SbStudyMaterialRow>;
         Relationships: [];
       };
+      sb_homework_assignments: { Row: SbHomeworkAssignmentRow; Insert: Omit<SbHomeworkAssignmentRow, 'updated_at'>; Update: Partial<SbHomeworkAssignmentRow>; Relationships: [] };
+      sb_study_sessions: { Row: SbStudySessionRow; Insert: SbStudySessionRow; Update: Partial<SbStudySessionRow>; Relationships: [] };
+      sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at'>; Update: never; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -8,6 +8,7 @@ export type DifficultyId = 'easy' | 'medium' | 'hard';
 export type ReviewNeedId = 'must' | 'light' | 'done';
 export type PlannerItemStatus = 'planned' | 'completed' | 'partial' | 'carried_over';
 export type RestPatternId = 'pomodoro_25_5' | 'block_50_10' | 'none';
+export type Role = 'student' | 'manager';
 
 export interface Profile {
   grade: Grade;
@@ -16,6 +17,8 @@ export interface Profile {
   examDate: string | null;
   workbooks: string;
   onboardedAt: string;
+  role: Role;
+  inviteCode: string | null;
 }
 
 export interface DailyCondition {
@@ -56,6 +59,8 @@ export interface PlannerItem {
   understanding: 'low' | 'medium' | 'high' | null;
   partialReason: string | null;
   incompleteReason: string | null;
+  source: 'homework' | 'self';
+  homeworkAssignmentId: string | null;
 }
 
 export interface StudyLogEntry {
@@ -79,6 +84,27 @@ export interface StudyMaterial {
   targetDate: string; // "YYYY-MM-DD"
   sessionIntervalDays: number;
   createdAt: string;
+}
+
+export interface HomeworkAssignment {
+  id: string;
+  studentId: string;
+  createdBy: string;
+  subjectId: SubjectId;
+  material: string;
+  amountPerDay: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;
+  updatedAt: string;
+}
+
+export interface StudySession {
+  id: string;
+  plannerItemId: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  deviated: boolean;
 }
 
 export interface TomorrowRecommendationItem {
