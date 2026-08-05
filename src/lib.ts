@@ -1,4 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession } from './types';
 import { QuickTimeChipId } from './constants';
 
 function pad2(n: number): string {
@@ -203,6 +203,31 @@ export function resolveQuickTimeChip(chipId: QuickTimeChipId, blocks: ScheduleBl
     return minutesToTime(latestEnd + 10);
   }
   return QUICK_TIME_FALLBACK[chipId];
+}
+
+export interface TimelineBlock {
+  startTime: string;
+  endTime: string;
+  subjectLabel: string;
+  deviated: boolean;
+}
+
+function toHHMM(isoString: string): string {
+  return isoString.slice(11, 16);
+}
+
+export function sessionsToTimelineBlocks(
+  entries: { session: StudySession; subjectLabel: string }[],
+  nowIso: string = new Date().toISOString()
+): TimelineBlock[] {
+  return entries
+    .map(({ session, subjectLabel }) => ({
+      startTime: toHHMM(session.startedAt),
+      endTime: toHHMM(session.endedAt ?? nowIso),
+      subjectLabel,
+      deviated: session.deviated,
+    }))
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
 export interface MaterialPace {

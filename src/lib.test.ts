@@ -229,8 +229,8 @@ describe('uid', () => {
   });
 });
 
-import { shouldGenerateHomeworkItem } from './lib';
-import type { HomeworkAssignment } from './types';
+import { shouldGenerateHomeworkItem, sessionsToTimelineBlocks } from './lib';
+import type { HomeworkAssignment, StudySession } from './types';
 
 function homework(overrides: Partial<HomeworkAssignment>): HomeworkAssignment {
   return {
@@ -253,5 +253,36 @@ describe('shouldGenerateHomeworkItem', () => {
   });
   it('is false after the end date', () => {
     expect(shouldGenerateHomeworkItem(homework({}), '2026-08-11')).toBe(false);
+  });
+});
+
+describe('sessionsToTimelineBlocks', () => {
+  it('converts a completed session into a block with HH:MM start/end', () => {
+    const blocks = sessionsToTimelineBlocks([
+      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:30:00Z', durationSeconds: 1800, deviated: false }, subjectLabel: '수학' },
+    ]);
+    expect(blocks).toEqual([{ startTime: '05:00', endTime: '05:30', subjectLabel: '수학', deviated: false }]);
+  });
+
+  it('uses "now" as the end when a session has not ended yet', () => {
+    const blocks = sessionsToTimelineBlocks([
+      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: null, durationSeconds: null, deviated: false }, subjectLabel: '수학' },
+    ], '2026-08-04T05:10:00Z');
+    expect(blocks[0].endTime).toBe('05:10');
+  });
+
+  it('marks deviated sessions', () => {
+    const blocks = sessionsToTimelineBlocks([
+      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:05:00Z', durationSeconds: 300, deviated: true }, subjectLabel: '영어' },
+    ]);
+    expect(blocks[0].deviated).toBe(true);
+  });
+
+  it('sorts blocks by start time', () => {
+    const blocks = sessionsToTimelineBlocks([
+      { session: { id: '2', plannerItemId: 'p2', startedAt: '2026-08-04T09:00:00Z', endedAt: '2026-08-04T09:10:00Z', durationSeconds: 600, deviated: false }, subjectLabel: '영어' },
+      { session: { id: '1', plannerItemId: 'p1', startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:10:00Z', durationSeconds: 600, deviated: false }, subjectLabel: '수학' },
+    ]);
+    expect(blocks.map((b) => b.subjectLabel)).toEqual(['수학', '영어']);
   });
 });
