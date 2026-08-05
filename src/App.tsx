@@ -17,6 +17,8 @@ import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import StudentPlannerScreen from './screens/student/StudentPlanner';
 import StudyTimelineScreen from './screens/shared/StudyTimeline';
+import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
+import ManagerHomeworkFormScreen from './screens/manager/ManagerHomeworkForm';
 import { useOpenDistractionStopRequest } from './native/distractionStop';
 import type { PlannerItem } from './types';
 
@@ -50,14 +52,20 @@ function StudentAppShell() {
 }
 
 function ManagerAppShell() {
-  const { state } = useAppState();
+  const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<'homework' | 'timeline'>('homework');
+
+  if (!selectedStudentId) {
+    return <ManagerStudentListScreen onSelectStudent={setSelectedStudentId} />;
+  }
   return (
-    <div id="app-shell" className="px-5 pt-6">
-      <h1 className="text-xl font-bold mb-4">관리 중인 학생</h1>
-      {state.managedStudents.length === 0 && <p className="text-sm text-on-surface-variant">아직 연결된 학생이 없어요.</p>}
-      {state.managedStudents.map((s, i) => (
-        <div key={i} className="rounded-xl bg-surface-container-lowest p-4 mb-2 shadow-card">{s.goal || '학생'}</div>
-      ))}
+    <div id="app-shell">
+      {tab === 'homework' && <ManagerHomeworkFormScreen studentId={selectedStudentId} onBack={() => setSelectedStudentId(null)} />}
+      {tab === 'timeline' && <StudyTimelineScreen />}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-surface-container-lowest rounded-full p-1 shadow-card">
+        <button onClick={() => setTab('homework')} className={`px-4 py-2 rounded-full text-xs font-semibold ${tab === 'homework' ? 'bg-primary text-on-primary' : ''}`}>숙제</button>
+        <button onClick={() => setTab('timeline')} className={`px-4 py-2 rounded-full text-xs font-semibold ${tab === 'timeline' ? 'bg-primary text-on-primary' : ''}`}>캘린더</button>
+      </div>
     </div>
   );
 }
