@@ -33,34 +33,42 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
 
         scope.launch {
             val state = store.observeState().first()
+            val now = System.currentTimeMillis()
 
-            // Study-session allow-list deviation detection: independent of the break-timer
-            // blocking logic below. Only flips a flag — no forced navigation — so the web
-            // layer notices via the state Flow and stops the timer on its own.
-            if (state.sessionActive && packageName != applicationContext.packageName && packageName !in state.allowedApps) {
-                store.setSessionActive(false)
-                return@launch
-            }
-
-            val blockedApp = BlockedApp.fromPackageName(packageName) ?: return@launch
-            if (!state.featureEnabled) return@launch
-            if (blockedApp !in state.enabledApps) return@launch
-            if (state.isBreakActive(System.currentTimeMillis())) return@launch
+            // Existing break-timer blocking logic takes priority: it must not be skipped
+            // just because a study session also happens to be active. We first determine
+            // whether THIS event qualifies for a break-timer block; only if it does not do
+            // we fall through to the (independent) session-deviation check below.
+            val blockedApp = BlockedApp.fromPackageName(packageName)
+            val inCooldown = blockedApp != null &&
+                blockedApp.packageName == lastBlockedPackage &&
+                now - lastBlockedAtMillis < BLOCK_COOLDOWN_MILLIS
             // Outside the lockout window (break ended a while ago and nobody re-armed
             // it), stop auto-blocking — the lockout is meant to prevent immediately
             // re-opening a just-blocked app, not to block forever.
-            if (!state.isWithinLockout(System.currentTimeMillis())) return@launch
+            val shouldBreakBlock = blockedApp != null &&
+                state.featureEnabled &&
+                blockedApp in state.enabledApps &&
+                !state.isBreakActive(now) &&
+                state.isWithinLockout(now) &&
+                !inCooldown
 
-            val now = System.currentTimeMillis()
-            val inCooldown = blockedApp.packageName == lastBlockedPackage &&
-                now - lastBlockedAtMillis < BLOCK_COOLDOWN_MILLIS
-            if (inCooldown) return@launch
+            if (shouldBreakBlock) {
+                lastBlockedPackage = blockedApp!!.packageName
+                lastBlockedAtMillis = now
 
-            lastBlockedPackage = blockedApp.packageName
-            lastBlockedAtMillis = now
+                val action = exitHandler.decide(state.exitMode, state.gracePeriodSeconds)
+                handleExitAction(action)
+                return@launch
+            }
 
-            val action = exitHandler.decide(state.exitMode, state.gracePeriodSeconds)
-            handleExitAction(action)
+            // Study-session allow-list deviation detection: independent of the break-timer
+            // blocking logic above. Only flips a flag — no forced navigation — so the web
+            // layer notices via the state Flow and stops the timer on its own. Only reached
+            // when this event did NOT qualify for a break-timer block above.
+            if (state.sessionActive && packageName != applicationContext.packageName && packageName !in state.allowedApps) {
+                store.setSessionActive(false)
+            }
         }
     }
 
