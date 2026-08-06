@@ -1,7 +1,7 @@
 export type DateKey = string; // "YYYY-MM-DD"
 
 export type Grade = '중1' | '중2' | '중3' | '고1' | '고2' | '고3';
-export type SubjectId = 'korean' | 'math' | 'english' | 'science' | 'social';
+export type SubjectId = 'korean' | 'math' | 'english' | 'science' | 'social' | 'etc';
 export type MoodId = 'happy' | 'tired' | 'neutral' | 'stressed' | 'excited';
 export type StudyTypeId = 'concept' | 'practice' | 'memorize' | 'review';
 export type DifficultyId = 'easy' | 'medium' | 'hard';
@@ -63,6 +63,7 @@ export interface PlannerItem {
   incompleteReason: string | null;
   source: 'homework' | 'self';
   homeworkAssignmentId: string | null;
+  examSubjectRangeId: string | null;
 }
 
 export interface StudyLogEntry {

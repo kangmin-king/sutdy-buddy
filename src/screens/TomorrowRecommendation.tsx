@@ -63,6 +63,7 @@ export default function TomorrowRecommendationScreen({ onBack }: { onBack: () =>
       incompleteReason: null,
       source: 'self',
       homeworkAssignmentId: null,
+      examSubjectRangeId: null,
     });
     setTask('');
     setShowForm(false);
@@ -90,6 +91,7 @@ export default function TomorrowRecommendationScreen({ onBack }: { onBack: () =>
         incompleteReason: null,
         source: 'self',
         homeworkAssignmentId: null,
+        examSubjectRangeId: null,
       };
       actions.addPlannerItem(tomorrow, newItem);
     });

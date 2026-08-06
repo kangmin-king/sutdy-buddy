@@ -40,6 +40,7 @@ export default function StudentPlannerScreen() {
       incompleteReason: null,
       source: 'self',
       homeworkAssignmentId: null,
+      examSubjectRangeId: null,
     });
     setTask('');
     setShowForm(false);

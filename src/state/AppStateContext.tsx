@@ -367,6 +367,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           incomplete_reason: fullItem.incompleteReason,
           source: fullItem.source,
           homework_assignment_id: fullItem.homeworkAssignmentId,
+          exam_subject_range_id: fullItem.examSubjectRangeId,
         });
         if (error) {
           console.error('addPlannerItem failed:', error.message);
@@ -472,6 +473,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           incomplete_reason: null,
           source: clone.source,
           homework_assignment_id: clone.homeworkAssignmentId,
+          exam_subject_range_id: clone.examSubjectRangeId,
         });
         if (insertError) {
           console.error('carryOverPlannerItem (insert) failed:', insertError.message);
@@ -577,6 +579,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           incompleteReason: null,
           source: 'self' as const,
           homeworkAssignmentId: null,
+          examSubjectRangeId: null,
         }));
         setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...existing, ...newItems] } }));
 
@@ -603,6 +606,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             incomplete_reason: it.incompleteReason,
             source: it.source,
             homework_assignment_id: it.homeworkAssignmentId,
+            exam_subject_range_id: it.examSubjectRangeId,
           }))
         );
         if (error) {
@@ -851,6 +855,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             incompleteReason: null,
             source: 'homework' as const,
             homeworkAssignmentId: null,
+            examSubjectRangeId: rangeId,
           };
           merged[date] = [...list, item];
           return item;
@@ -882,6 +887,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             incomplete_reason: it.incompleteReason,
             source: it.source,
             homework_assignment_id: it.homeworkAssignmentId,
+            exam_subject_range_id: it.examSubjectRangeId,
           }))
         );
         if (itemsError) {
@@ -981,6 +987,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         incompleteReason: null,
         source: 'homework',
         homeworkAssignmentId: assignment.id,
+        examSubjectRangeId: null,
       });
     });
   }, [state.loading, state.profile, state.plannerItems, state.homeworkAssignments, actions]);

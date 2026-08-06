@@ -59,6 +59,7 @@ export type SbPlannerItemRow = {
   incomplete_reason: string | null;
   source: 'homework' | 'self';
   homework_assignment_id: string | null;
+  exam_subject_range_id: string | null;
 };
 
 export type SbStudyLogRow = {

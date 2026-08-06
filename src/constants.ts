@@ -14,6 +14,7 @@ export const SUBJECTS: { id: SubjectId; label: string; color: string }[] = [
   { id: 'english', label: '영어', color: 'tertiary' },
   { id: 'science', label: '과학', color: 'secondary' },
   { id: 'social', label: '사회', color: 'secondary' },
+  { id: 'etc', label: '기타', color: 'secondary' },
 ];
 
 export function getSubject(id: SubjectId) {

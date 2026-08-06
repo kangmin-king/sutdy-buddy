@@ -73,6 +73,7 @@ export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
     incompleteReason: row.incomplete_reason,
     source: row.source,
     homeworkAssignmentId: row.homework_assignment_id,
+    examSubjectRangeId: row.exam_subject_range_id,
   };
 }
 
