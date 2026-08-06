@@ -25,7 +25,7 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
         <PlannerItemRow
           key={item.id}
           item={item}
-          onSaveAmount={(value) => actions.updateStudentPlannerItem(studentId, today, item.id, { pageRange: value })}
+          onSaveAmount={(value) => actions.updateHomeworkAmountForDate(studentId, item.id, today, item.examSubjectRangeId, value)}
         />
       ))}
 

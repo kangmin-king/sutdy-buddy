@@ -130,7 +130,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           <PlannerItemRow
             key={item.id}
             item={item}
-            onSaveAmount={(value) => actions.updateStudentPlannerItem(studentId, selectedDate, item.id, { pageRange: value })}
+            onSaveAmount={(value) => actions.updateHomeworkAmountForDate(studentId, item.id, selectedDate, item.examSubjectRangeId, value)}
           />
         ))}
       </div>

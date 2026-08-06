@@ -126,6 +126,13 @@ interface AppStateActions {
   ) => Promise<void>;
   deleteExamRange: (studentId: string, rangeId: string) => Promise<void>;
   updateStudentPlannerItem: (studentId: string, date: DateKey, id: string, patch: Partial<PlannerItem>) => Promise<void>;
+  updateHomeworkAmountForDate: (
+    studentId: string,
+    itemId: string,
+    date: DateKey,
+    rangeId: string | null,
+    newValue: string
+  ) => Promise<void>;
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
@@ -1153,6 +1160,56 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.from('sb_planner_items').update(dbPatch).eq('id', id);
         if (error) {
           console.error('updateStudentPlannerItem failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async updateHomeworkAmountForDate(studentId, itemId, date, rangeId, newValue) {
+        // 이 날짜의 항목은 입력한 그대로 저장한다(예: 아파서 4장만 했다 → "1~4페이지").
+        await actions.updateStudentPlannerItem(studentId, date, itemId, { pageRange: newValue });
+
+        // 페이지 범위로 등록된 교재라면, 오늘 입력한 값의 마지막 숫자를 "실제로 도달한 페이지"로 보고
+        // 남은(아직 안 하고 완료도 아닌) 날짜들에 나머지 분량을 다시 나눠 담는다. 자유 입력(모의고사 등)
+        // 범위거나 아예 범위에 연결되지 않은 항목이면 건드리지 않는다.
+        if (!rangeId) return;
+        const range = state.examSubjectRanges.find((r) => r.id === rangeId);
+        if (!range) return;
+        const totalMatch = range.rangeLabel.match(/^(\d+)~(\d+)페이지$/);
+        if (!totalMatch) return;
+        const totalEnd = Number(totalMatch[2]);
+
+        const nums = newValue.match(/\d+/g);
+        const endReached = nums && nums.length > 0 ? Number(nums[nums.length - 1]) : null;
+        if (endReached === null || endReached >= totalEnd) return;
+
+        const currentItems = studentPlannerItemsRef.current[studentId] ?? {};
+        const futureItems = Object.values(currentItems)
+          .flat()
+          .filter((i) => i.examSubjectRangeId === rangeId && i.date > date && i.status !== 'completed');
+        if (futureItems.length === 0) return;
+
+        const futureDates = Array.from(new Set(futureItems.map((i) => i.date))).sort();
+        const distribution = splitPagesAcrossDates(endReached + 1, totalEnd, futureDates);
+
+        const updatedByDate: Record<DateKey, PlannerItem[]> = { ...currentItems };
+        const dbUpdates: { id: string; pageRange: string }[] = [];
+        for (const { date: futureDate, pageRange } of distribution) {
+          updatedByDate[futureDate] = (updatedByDate[futureDate] ?? []).map((i) => {
+            if (i.examSubjectRangeId === rangeId) {
+              dbUpdates.push({ id: i.id, pageRange });
+              return { ...i, pageRange };
+            }
+            return i;
+          });
+        }
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: updatedByDate };
+        setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: updatedByDate } }));
+
+        const results = await Promise.all(
+          dbUpdates.map(({ id, pageRange }) => supabase.from('sb_planner_items').update({ page_range: pageRange }).eq('id', id))
+        );
+        if (results.some((r) => r.error)) {
+          console.error('updateHomeworkAmountForDate (redistribute) failed');
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
       },

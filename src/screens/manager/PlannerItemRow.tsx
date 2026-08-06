@@ -31,11 +31,16 @@ export default function PlannerItemRow({ item, onSaveAmount }: { item: PlannerIt
         </p>
         {item.source === 'homework' ? (
           editing ? (
-            <div className="flex items-center gap-1 mt-1">
-              <TextField value={draft} onChange={setDraft} placeholder="오늘 분량/내용" />
-              <button onClick={commit} className="text-xs font-semibold text-primary shrink-0">
-                저장
-              </button>
+            <div className="mt-1">
+              <div className="flex items-center gap-1">
+                <TextField value={draft} onChange={setDraft} placeholder="오늘 분량/내용" />
+                <button onClick={commit} className="text-xs font-semibold text-primary shrink-0">
+                  저장
+                </button>
+              </div>
+              <p className="text-[10px] text-on-surface-variant mt-1">
+                페이지 범위 숙제는 마지막 숫자(예: "1~4페이지"의 4)까지 한 걸로 보고, 남은 날짜에 나머지를 자동으로 다시 나눠요.
+              </p>
             </div>
           ) : (
             <div className="flex items-center gap-1">
