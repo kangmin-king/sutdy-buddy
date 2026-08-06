@@ -16,6 +16,7 @@ import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
 import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import StudentPlannerScreen from './screens/student/StudentPlanner';
+import StudentCalendarScreen from './screens/student/StudentCalendar';
 import StudyTimelineScreen from './screens/shared/StudyTimeline';
 import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
 import StudentSelector from './screens/manager/StudentSelector';
@@ -82,7 +83,8 @@ function StudentAppShell() {
     <div id="app-shell">
       <ErrorBanner />
       {activeTab === 'home' && <StudentHomeScreen />}
-      {activeTab === 'calendar' && <StudyTimelineScreen />}
+      {activeTab === 'calendar' && <StudentCalendarScreen />}
+      {activeTab === 'timeline' && <StudyTimelineScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
       <button
         onClick={() => setShowDistractionStop(true)}

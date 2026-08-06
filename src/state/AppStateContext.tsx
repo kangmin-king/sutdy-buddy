@@ -267,9 +267,15 @@ async function loadAll(userId: string): Promise<AppState> {
       sessionRows = [];
     }
   } else if (profile?.role === 'student') {
-    // 학생 본인 계정: 선생님/학부모가 등록해준 시험 일정·과목별 목표·교재 범위를 읽기 전용으로 본다.
-    const examRes = await supabase.from('sb_exam_records').select('*').eq('student_id', userId);
+    // 학생 본인 계정: 선생님/학부모가 등록해준 시험 일정·과목별 목표·교재 범위·과외 요일을 읽기 전용으로 본다.
+    const [examRes, scheduleRes, exceptionRes] = await Promise.all([
+      supabase.from('sb_exam_records').select('*').eq('student_id', userId),
+      supabase.from('sb_tutoring_schedules').select('*').eq('student_id', userId),
+      supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('student_id', userId),
+    ]);
     examRecords = (examRes.data ?? []).map(examRecordFromRow);
+    tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
+    tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
     const examIds = examRecords.map((e) => e.id);
     if (examIds.length > 0) {
       const subjectsRes = await supabase.from('sb_exam_subjects').select('*').in('exam_id', examIds);

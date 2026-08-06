@@ -71,9 +71,12 @@ export const NAV_TABS = [
 
 // 딴짓 멈춰는 초기 설정 이후로는 대부분 네이티브 알림(상단바 내려서)으로 여닫아서, 하단 탭 대신
 // 오른쪽 아래 떠 있는 원형 버튼으로 옮겼다(App.tsx의 StudentAppShell).
+// "캘린더"는 선생님 캘린더 탭과 같은 월간 그리드(과외 요일/시험일 표시), "타임라인"은 날짜 하나를
+// 골라 그날 언제 무엇을 공부했는지 시간대별로 보는 기존 화면 — 이름이 겹쳐서 각자 역할대로 분리했다.
 export const STUDENT_NAV_TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
   { id: 'home', label: '홈', icon: 'home' },
+  { id: 'timeline', label: '타임라인', icon: 'schedule' },
   { id: 'planner', label: '스터디플래너', icon: 'edit_note' },
 ] as const;
 
