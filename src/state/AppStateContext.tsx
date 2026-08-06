@@ -112,6 +112,11 @@ interface AppStateActions {
     examSubjectId: string,
     params: { subjectId: SubjectId; material: string; startPage: number; endPage: number; selectedDates: DateKey[] }
   ) => Promise<void>;
+  updateHomeworkRange: (
+    studentId: string,
+    rangeId: string,
+    params: { material: string; startPage: number; endPage: number; selectedDates: DateKey[] }
+  ) => Promise<void>;
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
@@ -893,6 +898,121 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (itemsError) {
           console.error('registerHomeworkRange (items) failed:', itemsError.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async updateHomeworkRange(studentId, rangeId, params) {
+        // 이미 지난 날짜거나 학생이 완료 처리한 항목은 절대 건드리지 않는다("과거는 보존, 이후만
+        // 반영" — 기존 숙제 등록 기능과 같은 원칙). 잠긴 날짜를 제외한 나머지만 지우고 새로 등록한다.
+        const today = todayKey();
+        const currentByDate = studentPlannerItemsRef.current[studentId] ?? {};
+        const linkedItems = Object.values(currentByDate)
+          .flat()
+          .filter((i) => i.examSubjectRangeId === rangeId);
+        if (linkedItems.length === 0) return;
+        const subjectId = linkedItems[0].subjectId;
+        const lockedDates = new Set(linkedItems.filter((i) => i.date < today || i.status === 'completed').map((i) => i.date));
+        const removable = linkedItems.filter((i) => !lockedDates.has(i.date));
+        const selectedDates = [...params.selectedDates].sort().filter((d) => !lockedDates.has(d));
+        const distribution = splitPagesAcrossDates(params.startPage, params.endPage, selectedDates);
+        const rangeLabel = `${params.startPage}~${params.endPage}페이지`;
+        const assignedDates = Array.from(new Set([...lockedDates, ...selectedDates])).sort();
+
+        setState((s) => ({
+          ...s,
+          examSubjectRanges: s.examSubjectRanges.map((r) =>
+            r.id === rangeId ? { ...r, material: params.material, rangeLabel, assignedDates } : r
+          ),
+        }));
+        const { error: rangeError } = await supabase
+          .from('sb_exam_subject_ranges')
+          .update({ material: params.material, range_label: rangeLabel, assigned_dates: assignedDates })
+          .eq('id', rangeId);
+        if (rangeError) {
+          console.error('updateHomeworkRange (range) failed:', rangeError.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
+        }
+
+        const merged: Record<DateKey, PlannerItem[]> = { ...currentByDate };
+        for (const removed of removable) {
+          merged[removed.date] = (merged[removed.date] ?? []).filter((i) => i.id !== removed.id);
+        }
+        const newItems: PlannerItem[] = distribution.map(({ date, pageRange }) => {
+          const list = merged[date] ?? [];
+          const order = list.length === 0 ? 1 : Math.max(...list.map((i) => i.order)) + 1;
+          const item: PlannerItem = {
+            id: uid(),
+            date,
+            order,
+            subjectId,
+            startTime: '09:00',
+            studyType: null,
+            material: params.material,
+            unit: '',
+            pageRange,
+            endTime: null,
+            difficulty: null,
+            restPattern: null,
+            mustDo: false,
+            status: 'planned' as const,
+            actualMinutes: null,
+            understanding: null,
+            partialReason: null,
+            incompleteReason: null,
+            source: 'homework' as const,
+            homeworkAssignmentId: null,
+            examSubjectRangeId: rangeId,
+          };
+          merged[date] = [...list, item];
+          return item;
+        });
+
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: merged };
+        setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: merged } }));
+
+        if (removable.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('sb_planner_items')
+            .delete()
+            .in('id', removable.map((i) => i.id));
+          if (deleteError) {
+            console.error('updateHomeworkRange (delete) failed:', deleteError.message);
+            setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          }
+        }
+
+        if (newItems.length > 0) {
+          const { error: itemsError } = await supabase.from('sb_planner_items').insert(
+            newItems.map((it) => ({
+              id: it.id,
+              user_id: studentId,
+              date: it.date,
+              order: it.order,
+              subject_id: it.subjectId,
+              start_time: it.startTime,
+              study_type: it.studyType,
+              material: it.material,
+              unit: it.unit,
+              page_range: it.pageRange,
+              end_time: it.endTime,
+              difficulty: it.difficulty,
+              rest_pattern: it.restPattern,
+              must_do: it.mustDo,
+              status: it.status,
+              actual_minutes: it.actualMinutes,
+              understanding: it.understanding,
+              partial_reason: it.partialReason,
+              incomplete_reason: it.incompleteReason,
+              source: it.source,
+              homework_assignment_id: it.homeworkAssignmentId,
+              exam_subject_range_id: it.examSubjectRangeId,
+            }))
+          );
+          if (itemsError) {
+            console.error('updateHomeworkRange (items) failed:', itemsError.message);
+            setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          }
         }
       },
 

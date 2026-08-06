@@ -1,26 +1,140 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, getTutoringDaysInRange, addDaysToKey } from '../../lib';
+import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName } from '../../lib';
 import { SUBJECTS, getSubject } from '../../constants';
-import { Card, Button, TextField, ToggleSwitch, ChipGroup, SectionTitle } from '../../primitives';
+import { Card, Button, TextField, ToggleSwitch, ChipGroup, SectionTitle, Icon } from '../../primitives';
 import type { SubjectId } from '../../types';
+
+const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+// range_label은 "10~50페이지" 형식으로 저장된다. 수정 폼을 열 때 시작/끝 페이지로 되돌린다.
+function parseRangeLabel(rangeLabel: string): { startPage: string; endPage: string } {
+  const match = rangeLabel.match(/^(\d+)~(\d+)/);
+  return match ? { startPage: match[1], endPage: match[2] } : { startPage: '', endPage: '' };
+}
+
+// 캘린더 탭과 같은 월별 그리드 디자인을 그대로 쓰되, 날짜를 여러 개 탭으로 선택하는 용도로 축소한
+// 버전. lockedDates(이미 지났거나 완료된 날짜)는 항상 선택된 것처럼 보이되 탭해도 바뀌지 않는다.
+function CompactMonthPicker({
+  viewMonthKey,
+  onViewMonthChange,
+  selectedDates,
+  onToggleDate,
+  tutoringDays,
+  lockedDates = new Set<string>(),
+  minDate,
+}: {
+  viewMonthKey: string;
+  onViewMonthChange: (key: string) => void;
+  selectedDates: string[];
+  onToggleDate: (date: string) => void;
+  tutoringDays: Set<string>;
+  lockedDates?: Set<string>;
+  minDate?: string;
+}) {
+  const grid = monthGrid(viewMonthKey);
+  const today = todayKey();
+  const [viewY, viewM] = viewMonthKey.split('-');
+  const selectedSet = new Set(selectedDates);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => onViewMonthChange(addMonthsToKey(viewMonthKey, -1))} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <Icon name="chevron_left" className="!text-[18px]" />
+        </button>
+        <p className="text-xs font-bold">
+          {viewY}년 {Number(viewM)}월
+        </p>
+        <button onClick={() => onViewMonthChange(addMonthsToKey(viewMonthKey, 1))} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container">
+          <Icon name="chevron_right" className="!text-[18px]" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 mb-0.5">
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} className="text-center text-[10px] text-on-surface-variant py-0.5">
+            {label}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {grid.map((d) => {
+          const isLocked = lockedDates.has(d.key);
+          const isSelected = isLocked || selectedSet.has(d.key);
+          const isDisabled = !isLocked && minDate !== undefined && d.key < minDate;
+          const isTutoringDay = tutoringDays.has(d.key);
+          const isToday = d.key === today;
+          const isRedDay = d.isSunday || getHolidayName(d.key) !== null;
+          return (
+            <button
+              key={d.key}
+              disabled={isDisabled}
+              onClick={() => !isLocked && !isDisabled && onToggleDate(d.key)}
+              className="flex items-center justify-center py-0.5"
+            >
+              <span
+                className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] ${
+                  isSelected
+                    ? isLocked
+                      ? 'bg-outline-variant text-on-surface font-semibold'
+                      : 'bg-primary text-on-primary font-bold'
+                    : isTutoringDay
+                      ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
+                      : isToday
+                        ? 'border border-primary text-primary font-semibold'
+                        : isDisabled
+                          ? 'text-outline-variant/50'
+                          : isRedDay
+                            ? d.inCurrentMonth
+                              ? 'text-error'
+                              : 'text-error/40'
+                            : d.inCurrentMonth
+                              ? 'text-on-surface'
+                              : 'text-outline-variant'
+                }`}
+              >
+                {d.date}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-on-surface-variant mt-1">
+        진한 표시 칸 = 과외 날짜 · 빨간 숫자 = 공휴일/일요일{lockedDates.size > 0 ? ' · 회색 = 이미 지났거나 완료돼 수정할 수 없는 날' : ''}
+      </p>
+    </div>
+  );
+}
 
 export default function ManagerProgressScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
+  const today = todayKey();
   const [showExamForm, setShowExamForm] = React.useState(false);
   const [examTitle, setExamTitle] = React.useState('');
-  const [examDate, setExamDate] = React.useState(todayKey());
+  const [examDate, setExamDate] = React.useState(today);
   const [examIsMain, setExamIsMain] = React.useState(false);
   const [selectedExamId, setSelectedExamId] = React.useState<string | null>(null);
   const [subjectId, setSubjectId] = React.useState<SubjectId>('math');
   const [targetGrade, setTargetGrade] = React.useState('');
   const [targetScore, setTargetScore] = React.useState('');
   const [targetRank, setTargetRank] = React.useState('');
-  const [rangeSubjectId, setRangeSubjectId] = React.useState<string | null>(null); // which ExamSubject is registering a range
+
+  // 교재 등록/수정 폼 — 둘이 같은 필드를 쓰되 editingRangeId가 있으면 수정 모드.
+  const [rangeSubjectId, setRangeSubjectId] = React.useState<string | null>(null);
+  const [editingRangeId, setEditingRangeId] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState('');
   const [startPage, setStartPage] = React.useState('');
   const [endPage, setEndPage] = React.useState('');
   const [selectedDates, setSelectedDates] = React.useState<string[]>([]);
+  const [viewMonthKey, setViewMonthKey] = React.useState(today);
+
+  React.useEffect(() => {
+    actions.loadStudentPlannerItems(studentId);
+    // studentId 바뀔 때만 다시 불러온다 — actions는 매 렌더 재생성되므로 deps에서 제외.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId]);
 
   const studentExams = state.examRecords.filter((e) => e.studentId === studentId);
   const selectedExam = studentExams.find((e) => e.id === selectedExamId) ?? null;
@@ -28,40 +142,91 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
 
   const schedule = state.tutoringSchedules.find((sch) => sch.studentId === studentId);
   const scheduleExceptions = state.tutoringScheduleExceptions.filter((ex) => ex.studentId === studentId);
-  const rangeStart = todayKey();
-  const rangeEnd = addDaysToKey(rangeStart, 13);
-  const tutoringDays = new Set(getTutoringDaysInRange(schedule?.weekdays ?? [], scheduleExceptions, rangeStart, rangeEnd));
-  const miniCalendarDates = React.useMemo(() => {
-    const dates: string[] = [];
-    let cursor = rangeStart;
-    for (let i = 0; i < 14; i++) {
-      dates.push(cursor);
-      cursor = addDaysToKey(cursor, 1);
+  const grid = monthGrid(viewMonthKey);
+  const tutoringDays = new Set(getTutoringDaysInRange(schedule?.weekdays ?? [], scheduleExceptions, grid[0].key, grid[grid.length - 1].key));
+
+  const itemsByDate = state.studentPlannerItems[studentId] ?? {};
+  const allStudentItems = React.useMemo(() => Object.values(itemsByDate).flat(), [itemsByDate]);
+
+  // 수정 중인 범위가 이미 만든 항목 중 "잠긴"(과거이거나 완료된) 날짜 — 항상 선택된 것으로 표시하고
+  // 탭해도 바뀌지 않는다. registerHomeworkRange/updateHomeworkRange 액션의 판단 기준과 동일하다.
+  const lockedDates = React.useMemo(() => {
+    if (!editingRangeId) return new Set<string>();
+    const locked = allStudentItems.filter(
+      (i) => i.examSubjectRangeId === editingRangeId && (i.date < today || i.status === 'completed')
+    );
+    return new Set(locked.map((i) => i.date));
+  }, [editingRangeId, allStudentItems, today]);
+
+  const closeRangeForm = () => {
+    setRangeSubjectId(null);
+    setEditingRangeId(null);
+    setMaterial('');
+    setStartPage('');
+    setEndPage('');
+    setSelectedDates([]);
+  };
+
+  const startRegisterRange = (subjectRecordId: string) => {
+    if (rangeSubjectId === subjectRecordId) {
+      closeRangeForm();
+      return;
     }
-    return dates;
-  }, [rangeStart]);
+    setRangeSubjectId(subjectRecordId);
+    setEditingRangeId(null);
+    setMaterial('');
+    setStartPage('');
+    setEndPage('');
+    setSelectedDates([]);
+    setViewMonthKey(today);
+  };
+
+  const startEditRange = (rangeId: string, subjectRecordId: string) => {
+    const range = state.examSubjectRanges.find((r) => r.id === rangeId);
+    if (!range) return;
+    if (editingRangeId === rangeId) {
+      closeRangeForm();
+      return;
+    }
+    const { startPage: sp, endPage: ep } = parseRangeLabel(range.rangeLabel);
+    setEditingRangeId(rangeId);
+    setRangeSubjectId(subjectRecordId);
+    setMaterial(range.material);
+    setStartPage(sp);
+    setEndPage(ep);
+    setSelectedDates(range.assignedDates);
+    setViewMonthKey(range.assignedDates[0] ?? today);
+  };
 
   const toggleDate = (date: string) => {
     setSelectedDates((prev) => (prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date]));
   };
 
   const submitRange = () => {
-    if (!rangeSubjectId || !material.trim() || !startPage.trim() || !endPage.trim() || selectedDates.length === 0) return;
+    if (!rangeSubjectId || !material.trim() || !startPage.trim() || !endPage.trim()) return;
     if (Number(startPage) > Number(endPage)) return;
-    const subject = subjectsForExam.find((s) => s.id === rangeSubjectId);
-    if (!subject) return;
-    actions.registerHomeworkRange(studentId, rangeSubjectId, {
-      subjectId: subject.subjectId,
-      material,
-      startPage: Number(startPage),
-      endPage: Number(endPage),
-      selectedDates,
-    });
-    setMaterial('');
-    setStartPage('');
-    setEndPage('');
-    setSelectedDates([]);
-    setRangeSubjectId(null);
+
+    if (editingRangeId) {
+      if (selectedDates.length === 0 && lockedDates.size === 0) return;
+      actions.updateHomeworkRange(studentId, editingRangeId, {
+        material,
+        startPage: Number(startPage),
+        endPage: Number(endPage),
+        selectedDates,
+      });
+    } else {
+      if (selectedDates.length === 0) return;
+      const subject = subjectsForExam.find((s) => s.id === rangeSubjectId);
+      if (!subject) return;
+      actions.registerHomeworkRange(studentId, rangeSubjectId, {
+        subjectId: subject.subjectId,
+        material,
+        startPage: Number(startPage),
+        endPage: Number(endPage),
+        selectedDates,
+      });
+    }
+    closeRangeForm();
   };
 
   const submitExam = async () => {
@@ -140,7 +305,6 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
           <div className="space-y-2">
             {subjectsForExam.map((subject) => {
               const ranges = state.examSubjectRanges.filter((r) => r.examSubjectId === subject.id);
-              const isRegistering = rangeSubjectId === subject.id;
               return (
                 <Card key={subject.id} className="mb-2">
                   <div className="flex items-center justify-between">
@@ -150,16 +314,18 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                         {subject.targetGrade} · {subject.targetScore} · {subject.targetRank}
                       </p>
                     </div>
-                    <button
-                      onClick={() => setRangeSubjectId(isRegistering ? null : subject.id)}
-                      className="text-xs font-semibold text-primary"
-                    >
+                    <button onClick={() => startRegisterRange(subject.id)} className="text-xs font-semibold text-primary">
                       교재 등록
                     </button>
                   </div>
 
-                  {isRegistering && (
+                  {rangeSubjectId === subject.id && (
                     <div className="mt-3 pt-3 border-t border-outline-variant/40 space-y-3">
+                      {editingRangeId && (
+                        <p className="text-[11px] text-on-surface-variant">
+                          이미 지났거나 완료된 날짜는 그대로 두고, 남은 날짜만 새로 나눠서 반영해요. 페이지 범위도 남은 분량으로 다시 입력해주세요.
+                        </p>
+                      )}
                       <TextField label="교재명" value={material} onChange={setMaterial} placeholder="예: 쎈 수학 (상)" />
                       <div className="grid grid-cols-2 gap-2">
                         <TextField label="시작 페이지" type="number" value={startPage} onChange={setStartPage} placeholder="10" />
@@ -167,32 +333,18 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">공부할 날짜 선택</label>
-                        <div className="grid grid-cols-7 gap-1.5">
-                          {miniCalendarDates.map((date) => {
-                            const isTutoringDay = tutoringDays.has(date);
-                            const isSelected = selectedDates.includes(date);
-                            const day = Number(date.split('-')[2]);
-                            return (
-                              <button
-                                key={date}
-                                onClick={() => toggleDate(date)}
-                                className={`h-9 rounded-lg text-xs font-semibold flex items-center justify-center ${
-                                  isSelected
-                                    ? 'bg-primary text-on-primary'
-                                    : isTutoringDay
-                                      ? 'bg-tertiary-container/40 text-on-surface'
-                                      : 'bg-surface-container text-on-surface-variant'
-                                }`}
-                              >
-                                {day}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <p className="text-[11px] text-on-surface-variant mt-1">진한 표시 칸 = 과외 날짜</p>
+                        <CompactMonthPicker
+                          viewMonthKey={viewMonthKey}
+                          onViewMonthChange={setViewMonthKey}
+                          selectedDates={selectedDates}
+                          onToggleDate={toggleDate}
+                          tutoringDays={tutoringDays}
+                          lockedDates={editingRangeId ? lockedDates : undefined}
+                          minDate={editingRangeId ? undefined : today}
+                        />
                       </div>
                       <Button className="w-full" onClick={submitRange}>
-                        {selectedDates.length}일에 나눠서 등록
+                        {editingRangeId ? '수정 내용 저장' : `${selectedDates.length}일에 나눠서 등록`}
                       </Button>
                     </div>
                   )}
@@ -200,9 +352,17 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                   {ranges.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-outline-variant/40 space-y-1.5">
                       {ranges.map((r) => (
-                        <p key={r.id} className="text-xs text-on-surface-variant">
-                          {r.material} · {r.rangeLabel} · {r.assignedDates.join(', ')}
-                        </p>
+                        <div key={r.id} className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-on-surface-variant">
+                            {r.material} · {r.rangeLabel} · {r.assignedDates.join(', ')}
+                          </p>
+                          <button
+                            onClick={() => startEditRange(r.id, subject.id)}
+                            className="text-[11px] font-semibold text-primary shrink-0"
+                          >
+                            {editingRangeId === r.id && rangeSubjectId === subject.id ? '취소' : '수정'}
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
