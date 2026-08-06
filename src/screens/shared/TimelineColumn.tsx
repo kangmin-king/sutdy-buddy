@@ -38,7 +38,7 @@ export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
     <div style={{ width: 130 }}>
       {hours.map((h) => (
         <div key={h} className="flex items-center gap-1" style={{ height: ROW_HEIGHT }}>
-          <span className="text-[9px] text-on-surface-variant leading-none w-8 shrink-0">{String(h).padStart(2, '0')}시</span>
+          <span className="text-[10px] text-on-surface-variant leading-none w-8 shrink-0">{String(h).padStart(2, '0')}시</span>
           <div className="grid flex-1 gap-px" style={{ gridTemplateColumns: `repeat(${CELLS_PER_HOUR}, 1fr)`, height: ROW_HEIGHT - 2 }}>
             {cells.map((c) => {
               const cellStart = h * 60 + c * MINUTES_PER_CELL;

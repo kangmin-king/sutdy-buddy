@@ -56,11 +56,11 @@ export default function ChecklistTimeline({
           return (
             <div key={item.id} className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full shrink-0 ${DOT_CLASSES[subject.color] ?? 'bg-primary'}`} />
-              <p className="text-xs flex-1 min-w-0 truncate">
-                <span className="font-bold">{subject.label}</span>{' '}
-                <span className="text-on-surface-variant">{item.material || item.pageRange || '할 일'}</span>
+              <p className="flex-1 min-w-0 truncate">
+                <span className="text-base font-bold">{subject.label}</span>{' '}
+                <span className="text-sm text-on-surface-variant">{item.material || item.pageRange || '할 일'}</span>
                 {elapsedSeconds > 0 && (
-                  <span className="text-primary font-semibold ml-1">{formatMinutes(Math.round(elapsedSeconds / 60))}</span>
+                  <span className="text-sm text-primary font-semibold ml-1">{formatMinutes(Math.round(elapsedSeconds / 60))}</span>
                 )}
               </p>
               <span
