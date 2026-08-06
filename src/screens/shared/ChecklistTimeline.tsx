@@ -1,7 +1,7 @@
 import { getSubject } from '../../constants';
 import { toMinutesOfDay } from '../../lib';
-import { TimelineColumn } from '../shared/VerticalStudyTimeline';
-import type { TimelineSegment } from '../shared/VerticalStudyTimeline';
+import { TimelineColumn } from './TimelineColumn';
+import type { TimelineSegment } from './TimelineColumn';
 import type { PlannerItem, StudySession } from '../../types';
 
 const DOT_CLASSES: Record<string, string> = {
@@ -10,9 +10,10 @@ const DOT_CLASSES: Record<string, string> = {
   tertiary: 'bg-tertiary',
 };
 
-// 모트모트 다이어리 속지처럼, 왼쪽에 오늘 할 일 체크리스트(과목 색 점 + 내용 + 완료 표시)를 두고
+// 모트모트 다이어리 속지처럼, 왼쪽에 할 일 체크리스트(과목 색 점 + 내용 + 완료 표시)를 두고
 // 오른쪽에 시간대별 타임테이블을 붙여서 "무엇을 언제 했는지"를 한 화면에서 보게 한다.
-export default function StudyTimelineChart({
+// 관리자 홈(오늘 고정)과 학생 본인 캘린더(날짜 선택 가능) 둘 다 이 컴포넌트를 쓴다.
+export default function ChecklistTimeline({
   items,
   studySessions,
 }: {
@@ -33,7 +34,7 @@ export default function StudyTimelineChart({
   }
 
   if (items.length === 0) {
-    return <p className="text-sm text-on-surface-variant text-center py-6">오늘 계획된 항목이 없어요.</p>;
+    return <p className="text-sm text-on-surface-variant text-center py-6">계획된 항목이 없어요.</p>;
   }
 
   return (

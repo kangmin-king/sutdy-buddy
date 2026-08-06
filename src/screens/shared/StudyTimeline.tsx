@@ -1,10 +1,8 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, toMinutesOfDay } from '../../lib';
-import { getSubject } from '../../constants';
+import { todayKey } from '../../lib';
 import { TopAppBar } from '../../primitives';
-import VerticalStudyTimeline from './VerticalStudyTimeline';
-import type { TimelineSegment } from './VerticalStudyTimeline';
+import ChecklistTimeline from './ChecklistTimeline';
 
 // `userId`가 없으면 본인 기준(state.plannerItems/studySessions), 있으면(관리자가 학생 조회 시)
 // 해당 학생 기준으로 데이터를 스위칭한다 — 관리자용 학생별 세션 조회 액션이 Task 6에서 추가된 뒤
@@ -12,19 +10,7 @@ import type { TimelineSegment } from './VerticalStudyTimeline';
 export default function StudyTimelineScreen({ userId }: { userId?: string } = {}) {
   const { state } = useAppState();
   const [selectedDate, setSelectedDate] = React.useState(todayKey());
-  const items = state.plannerItems[selectedDate] ?? [];
-  const nowIso = new Date().toISOString();
-
-  const segments: TimelineSegment[] = [];
-  for (const item of items) {
-    const subject = getSubject(item.subjectId);
-    for (const session of state.studySessions[item.id] ?? []) {
-      const startMinutes = toMinutesOfDay(session.startedAt);
-      const endMinutes = toMinutesOfDay(session.endedAt ?? nowIso);
-      if (endMinutes <= startMinutes) continue;
-      segments.push({ subjectLabel: subject.label, color: subject.color, startMinutes, endMinutes, deviated: session.deviated });
-    }
-  }
+  const items = (state.plannerItems[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
@@ -35,7 +21,7 @@ export default function StudyTimelineScreen({ userId }: { userId?: string } = {}
         onChange={(e) => setSelectedDate(e.target.value)}
         className="mb-4 rounded-lg border border-outline-variant px-3 py-2 text-sm"
       />
-      <VerticalStudyTimeline segments={segments} />
+      <ChecklistTimeline items={items} studySessions={state.studySessions} />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey } from '../../lib';
 import PlannerItemRow from './PlannerItemRow';
-import StudyTimelineChart from './StudyTimelineChart';
+import ChecklistTimeline from '../shared/ChecklistTimeline';
 
 export default function ManagerHomeScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
@@ -21,7 +21,7 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
   return (
     <div className="px-5 pt-2 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <h2 className="text-base font-bold mt-2 mb-2">오늘 학습 타임라인</h2>
-      <StudyTimelineChart items={items} studySessions={state.studySessions} />
+      <ChecklistTimeline items={items} studySessions={state.studySessions} />
 
       <h2 className="text-base font-bold mt-6 mb-2">오늘 숙제</h2>
       {homeworkItems.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">오늘 등록된 숙제가 없어요.</p>}
