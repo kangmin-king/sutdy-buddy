@@ -106,6 +106,11 @@ export default function StudentPlannerScreen() {
         ))}
       </div>
 
+      <div className="mt-6">
+        <SectionTitle>오늘 타임라인</SectionTitle>
+        <ChecklistTimeline items={todayItems} studySessions={state.studySessions} />
+      </div>
+
       {completedItems.length > 0 && (
         <div className="mt-6">
           <SectionTitle>완료한 학습</SectionTitle>
@@ -127,11 +132,6 @@ export default function StudentPlannerScreen() {
           </div>
         </div>
       )}
-
-      <div className="mt-6">
-        <SectionTitle>오늘 타임라인</SectionTitle>
-        <ChecklistTimeline items={todayItems} studySessions={state.studySessions} />
-      </div>
     </div>
   );
 }
