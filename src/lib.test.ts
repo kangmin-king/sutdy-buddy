@@ -19,6 +19,7 @@ import {
   splitPagesAcrossDates,
   getTutoringDaysInRange,
   getHolidayName,
+  toMinutesOfDay,
 } from './lib';
 import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession } from './types';
 
@@ -315,6 +316,21 @@ describe('sessionsToTimelineBlocks', () => {
       { session: session({ endedAt: '2026-08-04T14:10:00+09:00', durationSeconds: 600 }), subjectLabel: '수학' },
     ]);
     expect(blocks.map((b) => b.subjectLabel)).toEqual(['수학', '영어']);
+  });
+});
+
+describe('toMinutesOfDay', () => {
+  it('returns local minutes since midnight for a KST-offset timestamp', () => {
+    expect(toMinutesOfDay('2026-08-04T14:30:00+09:00')).toBe(14 * 60 + 30);
+  });
+
+  it('converts a UTC-stored timestamp to local minutes rather than slicing the ISO string', () => {
+    // 05:00Z == 14:00 KST
+    expect(toMinutesOfDay('2026-08-04T05:00:00Z')).toBe(14 * 60);
+  });
+
+  it('handles midnight', () => {
+    expect(toMinutesOfDay('2026-08-04T00:00:00+09:00')).toBe(0);
   });
 });
 

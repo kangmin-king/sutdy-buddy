@@ -251,6 +251,13 @@ function toHHMM(isoString: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// 관리자 홈의 과목별 학습 타임라인 차트가 세션을 자정 기준 분 단위 위치로 배치할 때 쓴다.
+// toHHMM과 같은 이유로 로컬 시각 기준이어야 한다.
+export function toMinutesOfDay(isoString: string): number {
+  const d = new Date(isoString);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 export function sessionsToTimelineBlocks(
   entries: { session: StudySession; subjectLabel: string }[],
   nowIso: string = new Date().toISOString()
