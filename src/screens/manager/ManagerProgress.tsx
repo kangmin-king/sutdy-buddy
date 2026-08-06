@@ -278,18 +278,30 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
       <div className="flex gap-2 overflow-x-auto mb-4">
         {studentExams.length === 0 && <p className="text-sm text-on-surface-variant py-2">등록된 시험이 없어요.</p>}
         {studentExams.map((exam) => (
-          <button
+          <div
             key={exam.id}
-            onClick={() => setSelectedExamId(exam.id)}
-            className={`shrink-0 rounded-xl px-4 py-3 text-left ${
+            className={`shrink-0 rounded-xl px-4 py-3 relative ${
               exam.id === selectedExamId ? 'bg-primary text-on-primary' : 'bg-surface-container-lowest shadow-card'
             }`}
           >
-            <p className="text-sm font-bold">
-              {exam.title} {exam.isMain && '⭐'}
-            </p>
-            <p className="text-xs opacity-80">{exam.examDate}</p>
-          </button>
+            <button onClick={() => setSelectedExamId(exam.id)} className="text-left pr-4">
+              <p className="text-sm font-bold">
+                {exam.title} {exam.isMain && '⭐'}
+              </p>
+              <p className="text-xs opacity-80">{exam.examDate}</p>
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm(`"${exam.title}" 시험을 삭제할까요? 등록된 과목별 목표와 교재 등록 정보도 함께 삭제돼요.`)) {
+                  if (selectedExamId === exam.id) setSelectedExamId(null);
+                  actions.deleteExamRecord(studentId, exam.id);
+                }
+              }}
+              className="absolute top-1 right-1 opacity-60"
+            >
+              <Icon name="close" className="!text-[16px]" />
+            </button>
+          </div>
         ))}
       </div>
 
@@ -313,16 +325,29 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
               const ranges = state.examSubjectRanges.filter((r) => r.examSubjectId === subject.id);
               return (
                 <Card key={subject.id} className="mb-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-bold">{getSubject(subject.subjectId).label}</p>
                       <p className="text-xs text-on-surface-variant">
                         {subject.targetGrade} · {subject.targetScore} · {subject.targetRank}
                       </p>
                     </div>
-                    <button onClick={() => startRegisterRange(subject.id)} className="text-xs font-semibold text-primary">
-                      교재 등록
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => startRegisterRange(subject.id)} className="text-xs font-semibold text-primary">
+                        교재 등록
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`${getSubject(subject.subjectId).label} 과목 목표를 삭제할까요? 등록된 교재 정보도 함께 삭제돼요.`)) {
+                            if (rangeSubjectId === subject.id) closeRangeForm();
+                            actions.deleteExamSubject(studentId, selectedExam.id, subject.id);
+                          }
+                        }}
+                        className="text-on-surface-variant"
+                      >
+                        <Icon name="close" className="!text-[16px]" />
+                      </button>
+                    </div>
                   </div>
 
                   {rangeSubjectId === subject.id && (
@@ -378,12 +403,22 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                           <p className="text-xs text-on-surface-variant">
                             {r.material} · {r.rangeLabel} · {r.assignedDates.join(', ')}
                           </p>
-                          <button
-                            onClick={() => startEditRange(r.id, subject.id)}
-                            className="text-[11px] font-semibold text-primary shrink-0"
-                          >
-                            {editingRangeId === r.id && rangeSubjectId === subject.id ? '취소' : '수정'}
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button onClick={() => startEditRange(r.id, subject.id)} className="text-[11px] font-semibold text-primary">
+                              {editingRangeId === r.id && rangeSubjectId === subject.id ? '취소' : '수정'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm('이 교재 등록을 삭제할까요? 아직 하지 않은 날짜의 숙제는 함께 지워지고, 이미 지났거나 완료된 기록은 그대로 남아요.')) {
+                                  if (editingRangeId === r.id) closeRangeForm();
+                                  actions.deleteExamRange(studentId, r.id);
+                                }
+                              }}
+                              className="text-on-surface-variant"
+                            >
+                              <Icon name="close" className="!text-[14px]" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -111,7 +111,9 @@ interface AppStateActions {
   endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean) => Promise<void>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
+  deleteExamRecord: (studentId: string, examId: string) => Promise<void>;
   addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
+  deleteExamSubject: (studentId: string, examId: string, subjectId: string) => Promise<void>;
   registerHomeworkRange: (
     studentId: string,
     examSubjectId: string,
@@ -122,6 +124,8 @@ interface AppStateActions {
     rangeId: string,
     params: { material: string; selectedDates: DateKey[] } & HomeworkScope
   ) => Promise<void>;
+  deleteExamRange: (studentId: string, rangeId: string) => Promise<void>;
+  updateStudentPlannerItem: (studentId: string, date: DateKey, id: string, patch: Partial<PlannerItem>) => Promise<void>;
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
@@ -784,6 +788,46 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return id;
       },
 
+      async deleteExamRecord(studentId, examId) {
+        // 삭제해도 이미 만들어진 숙제 항목(sb_planner_items)은 지우지 않는다 — DB의 on delete set null이
+        // 참조만 끊는다. 로컬 캐시도 같은 방식으로 examSubjectRangeId만 null로 바꿔 정합성을 맞춘다.
+        const removedSubjectIds = new Set(state.examSubjects.filter((s) => s.examId === examId).map((s) => s.id));
+        const removedRangeIds = new Set(state.examSubjectRanges.filter((r) => removedSubjectIds.has(r.examSubjectId)).map((r) => r.id));
+        const previousExamRecords = state.examRecords;
+        const previousExamSubjects = state.examSubjects;
+        const previousExamSubjectRanges = state.examSubjectRanges;
+        const previousStudentItems = studentPlannerItemsRef.current[studentId] ?? {};
+
+        const unlinked: Record<DateKey, PlannerItem[]> = {};
+        for (const date in previousStudentItems) {
+          unlinked[date] = previousStudentItems[date].map((i) =>
+            i.examSubjectRangeId && removedRangeIds.has(i.examSubjectRangeId) ? { ...i, examSubjectRangeId: null } : i
+          );
+        }
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: unlinked };
+        setState((s) => ({
+          ...s,
+          examRecords: s.examRecords.filter((e) => e.id !== examId),
+          examSubjects: s.examSubjects.filter((sub) => sub.examId !== examId),
+          examSubjectRanges: s.examSubjectRanges.filter((r) => !removedSubjectIds.has(r.examSubjectId)),
+          studentPlannerItems: { ...s.studentPlannerItems, [studentId]: unlinked },
+        }));
+
+        const { error } = await supabase.from('sb_exam_records').delete().eq('id', examId);
+        if (error) {
+          console.error('deleteExamRecord failed:', error.message);
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: previousStudentItems };
+          setState((s) => ({
+            ...s,
+            examRecords: previousExamRecords,
+            examSubjects: previousExamSubjects,
+            examSubjectRanges: previousExamSubjectRanges,
+            studentPlannerItems: { ...s.studentPlannerItems, [studentId]: previousStudentItems },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
+        }
+      },
+
       async addExamSubject(examId, subject) {
         const id = uid();
         const createdAt = new Date().toISOString();
@@ -801,6 +845,40 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('addExamSubject failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async deleteExamSubject(studentId, examId, subjectId) {
+        const removedRangeIds = new Set(state.examSubjectRanges.filter((r) => r.examSubjectId === subjectId).map((r) => r.id));
+        const previousExamSubjects = state.examSubjects;
+        const previousExamSubjectRanges = state.examSubjectRanges;
+        const previousStudentItems = studentPlannerItemsRef.current[studentId] ?? {};
+
+        const unlinked: Record<DateKey, PlannerItem[]> = {};
+        for (const date in previousStudentItems) {
+          unlinked[date] = previousStudentItems[date].map((i) =>
+            i.examSubjectRangeId && removedRangeIds.has(i.examSubjectRangeId) ? { ...i, examSubjectRangeId: null } : i
+          );
+        }
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: unlinked };
+        setState((s) => ({
+          ...s,
+          examSubjects: s.examSubjects.filter((sub) => sub.id !== subjectId),
+          examSubjectRanges: s.examSubjectRanges.filter((r) => r.examSubjectId !== subjectId),
+          studentPlannerItems: { ...s.studentPlannerItems, [studentId]: unlinked },
+        }));
+
+        const { error } = await supabase.from('sb_exam_subjects').delete().eq('id', subjectId);
+        if (error) {
+          console.error('deleteExamSubject failed:', error.message);
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: previousStudentItems };
+          setState((s) => ({
+            ...s,
+            examSubjects: previousExamSubjects,
+            examSubjectRanges: previousExamSubjectRanges,
+            studentPlannerItems: { ...s.studentPlannerItems, [studentId]: previousStudentItems },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
         }
       },
 
@@ -1024,6 +1102,74 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             console.error('updateHomeworkRange (items) failed:', itemsError.message);
             setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
           }
+        }
+      },
+
+      async deleteExamRange(studentId, rangeId) {
+        // updateHomeworkRange와 같은 원칙: 이미 지났거나 완료된 항목은 남겨두고(참조만 끊는다),
+        // 아직 하지 않은 미래 날짜 항목만 실제로 지운다.
+        const today = todayKey();
+        const previousExamSubjectRanges = state.examSubjectRanges;
+        const previousStudentItems = studentPlannerItemsRef.current[studentId] ?? {};
+        const linkedItems = Object.values(previousStudentItems)
+          .flat()
+          .filter((i) => i.examSubjectRangeId === rangeId);
+        const removableIds = new Set(
+          linkedItems.filter((i) => !(i.date < today || i.status === 'completed')).map((i) => i.id)
+        );
+
+        const updated: Record<DateKey, PlannerItem[]> = {};
+        for (const date in previousStudentItems) {
+          updated[date] = previousStudentItems[date]
+            .filter((i) => !removableIds.has(i.id))
+            .map((i) => (i.examSubjectRangeId === rangeId ? { ...i, examSubjectRangeId: null } : i));
+        }
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: updated };
+        setState((s) => ({
+          ...s,
+          examSubjectRanges: s.examSubjectRanges.filter((r) => r.id !== rangeId),
+          studentPlannerItems: { ...s.studentPlannerItems, [studentId]: updated },
+        }));
+
+        if (removableIds.size > 0) {
+          const { error: deleteItemsError } = await supabase.from('sb_planner_items').delete().in('id', Array.from(removableIds));
+          if (deleteItemsError) {
+            console.error('deleteExamRange (items) failed:', deleteItemsError.message);
+            setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          }
+        }
+
+        const { error: deleteRangeError } = await supabase.from('sb_exam_subject_ranges').delete().eq('id', rangeId);
+        if (deleteRangeError) {
+          console.error('deleteExamRange (range) failed:', deleteRangeError.message);
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: previousStudentItems };
+          setState((s) => ({
+            ...s,
+            examSubjectRanges: previousExamSubjectRanges,
+            studentPlannerItems: { ...s.studentPlannerItems, [studentId]: previousStudentItems },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
+        }
+      },
+
+      async updateStudentPlannerItem(studentId, date, id, patch) {
+        setState((s) => {
+          const list = s.studentPlannerItems[studentId]?.[date] ?? [];
+          const updatedList = list.map((i) => (i.id === id ? { ...i, ...patch } : i));
+          const nextForStudent = { ...(s.studentPlannerItems[studentId] ?? {}), [date]: updatedList };
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: nextForStudent };
+          return { ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: nextForStudent } };
+        });
+
+        const dbPatch: Partial<SbPlannerItemRow> = {};
+        if ('material' in patch) dbPatch.material = patch.material;
+        if ('pageRange' in patch) dbPatch.page_range = patch.pageRange;
+        if ('status' in patch) dbPatch.status = patch.status;
+
+        const { error } = await supabase.from('sb_planner_items').update(dbPatch).eq('id', id);
+        if (error) {
+          console.error('updateStudentPlannerItem failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 

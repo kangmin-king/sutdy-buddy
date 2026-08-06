@@ -1,8 +1,8 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName } from '../../lib';
-import { getSubject } from '../../constants';
-import { Card, Icon, BottomSheet, Button, TextField, ChipGroup } from '../../primitives';
+import { Icon, BottomSheet, Button, TextField, ChipGroup } from '../../primitives';
+import PlannerItemRow from './PlannerItemRow';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -127,21 +127,11 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
       <div className="space-y-2">
         {selectedItems.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">이 날 계획된 항목이 없어요.</p>}
         {selectedItems.map((item) => (
-          <Card key={item.id} className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold">
-                {getSubject(item.subjectId).label} {item.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
-              </p>
-              <p className="text-xs text-on-surface-variant">{item.material || item.pageRange || '할 일'}</p>
-            </div>
-            <div
-              className={`w-7 h-7 rounded-md border-2 flex items-center justify-center ${
-                item.status === 'completed' ? 'bg-primary border-primary' : 'border-outline-variant'
-              }`}
-            >
-              {item.status === 'completed' && <Icon name="check" className="!text-[18px] text-on-primary" />}
-            </div>
-          </Card>
+          <PlannerItemRow
+            key={item.id}
+            item={item}
+            onSaveAmount={(value) => actions.updateStudentPlannerItem(studentId, selectedDate, item.id, { pageRange: value })}
+          />
         ))}
       </div>
 
