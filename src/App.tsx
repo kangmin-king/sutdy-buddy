@@ -18,11 +18,20 @@ import StudentHomeScreen from './screens/student/StudentHome';
 import StudentPlannerScreen from './screens/student/StudentPlanner';
 import StudyTimelineScreen from './screens/shared/StudyTimeline';
 import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
-import ManagerHomeworkFormScreen from './screens/manager/ManagerHomeworkForm';
+import StudentSelector from './screens/manager/StudentSelector';
+import ManagerHomeScreen from './screens/manager/ManagerHome';
+import ManagerProgressScreen from './screens/manager/ManagerProgress';
+import ManagerCalendarScreen from './screens/manager/ManagerCalendar';
 import { useOpenDistractionStopRequest } from './native/distractionStop';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
+
+const MANAGER_TABS = [
+  { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
+  { id: 'home', label: '홈', icon: 'home' },
+  { id: 'progress', label: '진도관리', icon: 'trending_up' },
+] as const;
 
 // 쓰기 실패/초대코드 오류 같은 전역 오류는 어느 셸(학생/관리자/레거시)에 있든 보여야 한다.
 function ErrorBanner() {
@@ -68,7 +77,7 @@ function StudentAppShell() {
 
 function ManagerAppShell() {
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
-  const [tab, setTab] = React.useState<'homework' | 'timeline'>('homework');
+  const [tab, setTab] = React.useState<(typeof MANAGER_TABS)[number]['id']>('home');
 
   if (!selectedStudentId) {
     return (
@@ -78,15 +87,15 @@ function ManagerAppShell() {
       </div>
     );
   }
+
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {tab === 'homework' && <ManagerHomeworkFormScreen studentId={selectedStudentId} onBack={() => setSelectedStudentId(null)} />}
-      {tab === 'timeline' && <StudyTimelineScreen />}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-surface-container-lowest rounded-full p-1 shadow-card">
-        <button onClick={() => setTab('homework')} className={`px-4 py-2 rounded-full text-xs font-semibold ${tab === 'homework' ? 'bg-primary text-on-primary' : ''}`}>숙제</button>
-        <button onClick={() => setTab('timeline')} className={`px-4 py-2 rounded-full text-xs font-semibold ${tab === 'timeline' ? 'bg-primary text-on-primary' : ''}`}>캘린더</button>
-      </div>
+      <StudentSelector selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />
+      {tab === 'calendar' && <ManagerCalendarScreen studentId={selectedStudentId} />}
+      {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
+      {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
+      <BottomNav tabs={MANAGER_TABS} active={tab} onChange={setTab} />
     </div>
   );
 }
