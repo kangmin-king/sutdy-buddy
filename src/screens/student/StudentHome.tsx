@@ -159,9 +159,12 @@ export default function StudentHomeScreen() {
           <div className="w-full bg-[#1e2b1e] text-white rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base font-bold mb-3">오늘의 할 일</h2>
             {items.map((it) => (
-              <p key={it.id} className="text-sm py-1.5 border-b border-white/10">
-                {getSubject(it.subjectId).label} — {it.material || '할 일'} {it.status === 'completed' ? '✓' : ''}
-              </p>
+              <div key={it.id} className="py-1.5 border-b border-white/10">
+                <p className="text-sm">
+                  {getSubject(it.subjectId).label} — {it.material || '할 일'} {it.status === 'completed' ? '✓' : ''}
+                </p>
+                {it.pageRange && <p className="text-xs text-white/60 mt-0.5">{it.pageRange}</p>}
+              </div>
             ))}
           </div>
         </div>
