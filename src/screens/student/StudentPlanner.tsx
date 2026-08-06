@@ -4,15 +4,14 @@ import { todayKey } from '../../lib';
 import { getSubject, SUBJECTS } from '../../constants';
 import { TopAppBar, Card, Button, Icon, SectionTitle, ChipGroup, TextField } from '../../primitives';
 import ExamSchedule from './ExamSchedule';
+import ChecklistTimeline from '../shared/ChecklistTimeline';
 import type { SubjectId } from '../../types';
 
 export default function StudentPlannerScreen() {
   const { state, actions } = useAppState();
   const today = todayKey();
-  const items = (state.plannerItems[today] ?? [])
-    .filter((i) => i.source === 'self')
-    .slice()
-    .sort((a, b) => a.order - b.order);
+  const todayItems = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
+  const items = todayItems.filter((i) => i.source === 'self');
 
   const [showForm, setShowForm] = React.useState(false);
   const [subjectId, setSubjectId] = React.useState<SubjectId>('math');
@@ -94,6 +93,9 @@ export default function StudentPlannerScreen() {
           </div>
         ))}
       </div>
+
+      <SectionTitle>오늘 타임라인</SectionTitle>
+      <ChecklistTimeline items={todayItems} studySessions={state.studySessions} />
     </div>
   );
 }

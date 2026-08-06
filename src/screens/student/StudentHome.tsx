@@ -11,6 +11,20 @@ function formatElapsed(seconds: number): string {
   return `${m}:${s}`;
 }
 
+// 오늘 이 항목에 쌓인 총 학습 시간(일시정지-재시작을 반복해도 누적) = 이미 끝난 세션들의
+// durationSeconds 합 + 지금 돌고 있는 세션이 있으면 그 실시간 경과.
+function elapsedTodaySeconds(sessions: { id: string; startedAt: string; durationSeconds: number | null }[], runningSessionId: string | undefined, nowMs: number): number {
+  let total = 0;
+  for (const s of sessions) {
+    if (s.durationSeconds != null) total += s.durationSeconds;
+  }
+  if (runningSessionId) {
+    const running = sessions.find((s) => s.id === runningSessionId);
+    if (running) total += Math.floor((nowMs - Date.parse(running.startedAt)) / 1000);
+  }
+  return total;
+}
+
 export default function StudentHomeScreen() {
   const { state, actions } = useAppState();
   const today = todayKey();
@@ -91,6 +105,15 @@ export default function StudentHomeScreen() {
     });
     if (completed) actions.updatePlannerItem(today, itemId, { status: 'completed' });
   };
+  // 일시정지 중(활성 세션 없음)에도 완료를 누를 수 있어야 하므로, 돌고 있는 세션이 있으면 그걸
+  // 완료로 끝내고, 없으면 세션 없이 바로 상태만 완료로 바꾼다.
+  const handleComplete = (itemId: string) => {
+    if (runningSessionId[itemId]) {
+      handleStop(itemId, true);
+    } else {
+      actions.updatePlannerItem(today, itemId, { status: 'completed' });
+    }
+  };
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
@@ -111,8 +134,9 @@ export default function StudentHomeScreen() {
         {items.length === 0 && <p className="text-sm text-on-surface-variant text-center py-10">오늘 할 일이 없어요.</p>}
         {items.map((it) => {
           const sessionId = runningSessionId[it.id];
-          const session = sessionId ? (state.studySessions[it.id] ?? []).find((s) => s.id === sessionId) : null;
-          const elapsed = session ? Math.floor((now - Date.parse(session.startedAt)) / 1000) : 0;
+          const isRunning = !!sessionId;
+          const sessions = state.studySessions[it.id] ?? [];
+          const elapsed = elapsedTodaySeconds(sessions, sessionId, now);
           return (
             <Card key={it.id}>
               <div className="flex items-center justify-between gap-2">
@@ -120,30 +144,28 @@ export default function StudentHomeScreen() {
                   <p className="text-sm font-bold">
                     {getSubject(it.subjectId).label} {it.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
                   </p>
-                  <p className="text-xs text-on-surface-variant">{it.material || '할 일'}</p>
-                  {session && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
+                  {elapsed > 0 && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
                 </div>
-                {!session ? (
+                {isRunning ? (
+                  <button
+                    onClick={() => handleStop(it.id, false)}
+                    className="text-sm font-semibold text-on-surface-variant px-4 py-2.5 rounded-full bg-surface-container flex items-center gap-1 shrink-0"
+                  >
+                    <Icon name="pause" className="!text-[16px]" /> 일시정지
+                  </button>
+                ) : (
                   <button
                     onClick={() => handleStart(it.id)}
                     disabled={!!startPending[it.id]}
                     className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1 disabled:opacity-50 shrink-0"
                   >
-                    <Icon name="play_arrow" className="!text-[16px]" /> 시작하기
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleStop(it.id, false)}
-                    title="이따가 이어서 할 거예요"
-                    className="text-sm font-semibold text-on-surface-variant px-4 py-2.5 rounded-full bg-surface-container shrink-0"
-                  >
-                    정지
+                    <Icon name="play_arrow" className="!text-[16px]" /> 시작
                   </button>
                 )}
               </div>
-              {session && (
+              {elapsed > 0 && (
                 <button
-                  onClick={() => handleStop(it.id, true)}
+                  onClick={() => handleComplete(it.id)}
                   className="w-full mt-2 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
                 >
                   오늘 학습 완료!!
