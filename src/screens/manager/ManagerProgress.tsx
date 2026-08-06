@@ -47,6 +47,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
 
   const submitRange = () => {
     if (!rangeSubjectId || !material.trim() || !startPage.trim() || !endPage.trim() || selectedDates.length === 0) return;
+    if (Number(startPage) > Number(endPage)) return;
     const subject = subjectsForExam.find((s) => s.id === rangeSubjectId);
     if (!subject) return;
     actions.registerHomeworkRange(studentId, rangeSubjectId, {

@@ -28,10 +28,10 @@ export default function ManagerStudentListScreen({ onSelectStudent }: { onSelect
         {state.managedStudents.length === 0 && (
           <p className="text-sm text-on-surface-variant text-center py-10">아직 연결된 학생이 없어요.</p>
         )}
-        {state.managedStudents.map((s) => (
+        {state.managedStudents.map((s, index) => (
           <button key={s.id} onClick={() => onSelectStudent(s.id)} className="w-full text-left">
             <Card className="flex items-center justify-between">
-              <p className="text-sm font-bold">{s.goal || '학생'}</p>
+              <p className="text-sm font-bold">{state.studentLabels[s.id] ?? `학생 ${index + 1}`}</p>
             </Card>
           </button>
         ))}
