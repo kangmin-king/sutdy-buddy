@@ -247,6 +247,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     plannerItemsRef.current = state.plannerItems;
   }, [state.plannerItems]);
 
+  // 관리자가 보고 있는 학생들의 plannerItems 미러. registerHomeworkRange는 DB insert 페이로드에
+  // 들어갈 order를 만들기 전에 "그 날짜에 이미 있는 항목"을 알아야 하는데, setState 콜백 안에서
+  // 계산하면 그 값이 insert에 반영되지 않는다(리뷰에서 order가 항상 1로 저장되던 원인).
+  const studentPlannerItemsRef = React.useRef<Record<string, Record<DateKey, PlannerItem[]>>>(EMPTY_STATE.studentPlannerItems);
+  React.useEffect(() => {
+    studentPlannerItemsRef.current = state.studentPlannerItems;
+  }, [state.studentPlannerItems]);
+
   React.useEffect(() => {
     let cancelled = false;
     loadAll(userId).then((loaded) => {
@@ -783,7 +791,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async registerHomeworkRange(studentId, examSubjectId, params) {
-        const distribution = splitPagesAcrossDates(params.startPage, params.endPage, params.selectedDates);
+        // 선택 순서 그대로 두면 저장/표시 모두 뒤죽박죽이 된다. 한 번 정렬해서 분배/저장/낙관적 상태에 모두 쓴다.
+        const selectedDates = [...params.selectedDates].sort();
+        const distribution = splitPagesAcrossDates(params.startPage, params.endPage, selectedDates);
         const rangeLabel = `${params.startPage}~${params.endPage}페이지`;
         const rangeId = uid();
         const createdAt = new Date().toISOString();
@@ -792,7 +802,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           examSubjectId,
           material: params.material,
           rangeLabel,
-          assignedDates: params.selectedDates,
+          assignedDates: selectedDates,
           createdAt,
         };
         setState((s) => ({ ...s, examSubjectRanges: [...s.examSubjectRanges, fullRange] }));
@@ -802,7 +812,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           exam_subject_id: examSubjectId,
           material: params.material,
           range_label: rangeLabel,
-          assigned_dates: params.selectedDates,
+          assigned_dates: selectedDates,
         });
         if (rangeError) {
           console.error('registerHomeworkRange (range) failed:', rangeError.message);
@@ -813,39 +823,41 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 학생 계정 이름으로 각 날짜에 숙제 항목을 즉시 생성한다(지연 생성 없음). 학생의 plannerItems가
         // 아니라 studentPlannerItems[studentId]에 낙관적으로 반영한다 — 관리자는 자기 자신의
         // plannerItems를 갖지 않는다.
-        const newItems = distribution.map(({ date, pageRange }) => ({
-          id: uid(),
-          date,
-          order: 1,
-          subjectId: params.subjectId,
-          startTime: '09:00',
-          studyType: null,
-          material: params.material,
-          unit: '',
-          pageRange,
-          endTime: null,
-          difficulty: null,
-          restPattern: null,
-          mustDo: false,
-          status: 'planned' as const,
-          actualMinutes: null,
-          understanding: null,
-          partialReason: null,
-          incompleteReason: null,
-          source: 'homework' as const,
-          homeworkAssignmentId: null,
-        }));
-
-        setState((s) => {
-          const existing = s.studentPlannerItems[studentId] ?? {};
-          const merged = { ...existing };
-          for (const item of newItems) {
-            const list = merged[item.date] ?? [];
-            const order = list.length === 0 ? 1 : Math.max(...list.map((i) => i.order)) + 1;
-            merged[item.date] = [...list, { ...item, order }];
-          }
-          return { ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: merged } };
+        // order는 반드시 insert 페이로드를 만들기 전에 확정해야 한다. setState 콜백 안에서 계산하면
+        // 그 값은 낙관적 상태에만 남고 DB에는 자리표시자가 들어간다(addPlannerItem과 같은 이유로 ref를 쓴다).
+        // 여러 날짜가 한 번에 들어오므로 날짜별로 각각 그 날의 마지막 order 다음 값을 이어 매긴다.
+        const merged: Record<DateKey, PlannerItem[]> = { ...(studentPlannerItemsRef.current[studentId] ?? {}) };
+        const newItems: PlannerItem[] = distribution.map(({ date, pageRange }) => {
+          const list = merged[date] ?? [];
+          const order = list.length === 0 ? 1 : Math.max(...list.map((i) => i.order)) + 1;
+          const item: PlannerItem = {
+            id: uid(),
+            date,
+            order,
+            subjectId: params.subjectId,
+            startTime: '09:00',
+            studyType: null,
+            material: params.material,
+            unit: '',
+            pageRange,
+            endTime: null,
+            difficulty: null,
+            restPattern: null,
+            mustDo: false,
+            status: 'planned' as const,
+            actualMinutes: null,
+            understanding: null,
+            partialReason: null,
+            incompleteReason: null,
+            source: 'homework' as const,
+            homeworkAssignmentId: null,
+          };
+          merged[date] = [...list, item];
+          return item;
         });
+
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: merged };
+        setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: merged } }));
 
         const { error: itemsError } = await supabase.from('sb_planner_items').insert(
           newItems.map((it) => ({
