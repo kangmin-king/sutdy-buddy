@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange } from '../../lib';
+import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName } from '../../lib';
 import { getSubject } from '../../constants';
 import { Card, Icon, BottomSheet, Button, TextField, ChipGroup } from '../../primitives';
 
@@ -74,6 +74,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           const isSelected = d.key === selectedDate;
           const isToday = d.key === today;
           const isTutoringDay = tutoringDays.has(d.key);
+          const isRedDay = d.isSunday || getHolidayName(d.key) !== null;
           const dayItems = itemsByDate[d.key] ?? [];
           const hasItems = dayItems.length > 0;
           return (
@@ -83,12 +84,16 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
                   isSelected
                     ? 'bg-primary text-on-primary font-bold'
                     : isTutoringDay
-                      ? 'bg-tertiary-container/40 text-on-surface'
+                      ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
                       : isToday
                         ? 'border border-primary text-primary font-semibold'
                         : d.inCurrentMonth
-                          ? 'text-on-surface'
-                          : 'text-outline-variant'
+                          ? isRedDay
+                            ? 'text-error'
+                            : 'text-on-surface'
+                          : isRedDay
+                            ? 'text-error/40'
+                            : 'text-outline-variant'
                 }`}
               >
                 {d.date}
@@ -103,6 +108,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
         <p className="text-xs font-semibold text-primary">
           {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''}
           {tutoringDays.has(selectedDate) ? ' · 과외 날' : ''}
+          {getHolidayName(selectedDate) && <span className="text-error"> · {getHolidayName(selectedDate)}</span>}
         </p>
         {tutoringDays.has(selectedDate) && (
           <button

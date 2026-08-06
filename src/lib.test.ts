@@ -18,6 +18,7 @@ import {
   sessionsToTimelineBlocks,
   splitPagesAcrossDates,
   getTutoringDaysInRange,
+  getHolidayName,
 } from './lib';
 import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession } from './types';
 
@@ -372,5 +373,20 @@ describe('getTutoringDaysInRange', () => {
 
   it('returns an empty array when no weekdays are set', () => {
     expect(getTutoringDaysInRange([], [], '2026-08-06', '2026-08-12')).toEqual([]);
+  });
+});
+
+describe('getHolidayName', () => {
+  it('returns the holiday name for a known 2026 public holiday', () => {
+    expect(getHolidayName('2026-08-15')).toBe('광복절');
+  });
+
+  it('returns each day of a multi-day holiday period', () => {
+    expect(getHolidayName('2026-09-24')).toBe('추석 연휴');
+    expect(getHolidayName('2026-09-25')).toBe('추석');
+  });
+
+  it('returns null for an ordinary weekday', () => {
+    expect(getHolidayName('2026-08-06')).toBeNull();
   });
 });
