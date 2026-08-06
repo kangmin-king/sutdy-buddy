@@ -334,10 +334,16 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                       )}
                       <TextField label="교재명" value={material} onChange={setMaterial} placeholder="예: 쎈 수학 (상)" />
                       <div>
-                        <div className="flex items-center gap-1 mb-1.5">
-                          <span className="text-sm font-semibold text-on-surface-variant">
-                            {rangeMode === 'pages' ? '페이지 범위' : '학습 내용'}
-                          </span>
+                        {rangeMode === 'pages' ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <TextField label="시작 페이지" type="number" value={startPage} onChange={setStartPage} placeholder="10" />
+                            <TextField label="끝 페이지" type="number" value={endPage} onChange={setEndPage} placeholder="50" />
+                          </div>
+                        ) : (
+                          <TextField label="학습 내용" value={customLabel} onChange={setCustomLabel} placeholder="예: 1회 모의고사 풀이 및 채점" />
+                        )}
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <span className="text-xs text-on-surface-variant">{rangeMode === 'pages' ? '상세 범위' : '학습 내용'}</span>
                           <button
                             onClick={() => setRangeMode((m) => (m === 'pages' ? 'custom' : 'pages'))}
                             title="모의고사 등 페이지가 아닌 학습은 직접 입력으로 전환"
@@ -346,14 +352,6 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                             <Icon name="arrow_drop_down" className="!text-[16px]" />
                           </button>
                         </div>
-                        {rangeMode === 'pages' ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <TextField label="시작 페이지" type="number" value={startPage} onChange={setStartPage} placeholder="10" />
-                            <TextField label="끝 페이지" type="number" value={endPage} onChange={setEndPage} placeholder="50" />
-                          </div>
-                        ) : (
-                          <TextField value={customLabel} onChange={setCustomLabel} placeholder="예: 1회 모의고사 풀이 및 채점" />
-                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">공부할 날짜 선택</label>
