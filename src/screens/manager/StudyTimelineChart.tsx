@@ -1,12 +1,17 @@
 import { getSubject } from '../../constants';
 import { toMinutesOfDay } from '../../lib';
-import VerticalStudyTimeline from '../shared/VerticalStudyTimeline';
+import { TimelineColumn } from '../shared/VerticalStudyTimeline';
 import type { TimelineSegment } from '../shared/VerticalStudyTimeline';
 import type { PlannerItem, StudySession } from '../../types';
 
-// 열품타 스타일로 "오늘 어떤 과목을 언제 공부했는지" 보여주는 타임라인 — 실제 그리기는
-// VerticalStudyTimeline(학생 캘린더 탭과 공유)이 맡고, 여기서는 관리자 데이터 모양(items +
-// studySessions)을 그 컴포넌트가 받는 세그먼트 배열로 바꾸는 역할만 한다.
+const DOT_CLASSES: Record<string, string> = {
+  primary: 'bg-primary',
+  secondary: 'bg-secondary',
+  tertiary: 'bg-tertiary',
+};
+
+// 모트모트 다이어리 속지처럼, 왼쪽에 오늘 할 일 체크리스트(과목 색 점 + 내용 + 완료 표시)를 두고
+// 오른쪽에 시간대별 타임테이블을 붙여서 "무엇을 언제 했는지"를 한 화면에서 보게 한다.
 export default function StudyTimelineChart({
   items,
   studySessions,
@@ -27,5 +32,32 @@ export default function StudyTimelineChart({
     }
   }
 
-  return <VerticalStudyTimeline segments={segments} />;
+  if (items.length === 0) {
+    return <p className="text-sm text-on-surface-variant text-center py-6">오늘 계획된 항목이 없어요.</p>;
+  }
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex-1 min-w-0 space-y-1.5">
+        {items.map((item) => {
+          const subject = getSubject(item.subjectId);
+          return (
+            <div key={item.id} className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${DOT_CLASSES[subject.color] ?? 'bg-primary'}`} />
+              <p className="text-xs flex-1 min-w-0 truncate">
+                <span className="font-bold">{subject.label}</span>{' '}
+                <span className="text-on-surface-variant">{item.material || item.pageRange || '할 일'}</span>
+              </p>
+              <span
+                className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                  item.status === 'completed' ? 'bg-primary border-primary' : 'border-outline-variant'
+                }`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <TimelineColumn segments={segments} />
+    </div>
+  );
 }
