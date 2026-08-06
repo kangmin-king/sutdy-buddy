@@ -1,8 +1,8 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey } from '../../lib';
+import { todayKey, getPlannerProgress } from '../../lib';
 import { getSubject, SUBJECTS } from '../../constants';
-import { TopAppBar, Card, Button, Icon, SectionTitle, ChipGroup, TextField } from '../../primitives';
+import { TopAppBar, Card, Button, Icon, SectionTitle, ChipGroup, TextField, ProgressRing } from '../../primitives';
 import ExamSchedule from './ExamSchedule';
 import ChecklistTimeline from '../shared/ChecklistTimeline';
 import type { SubjectId } from '../../types';
@@ -11,7 +11,10 @@ export default function StudentPlannerScreen() {
   const { state, actions } = useAppState();
   const today = todayKey();
   const todayItems = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
-  const items = todayItems.filter((i) => i.source === 'self');
+  const selfItems = todayItems.filter((i) => i.source === 'self');
+  const items = selfItems.filter((i) => i.status !== 'completed');
+  const completedItems = selfItems.filter((i) => i.status === 'completed');
+  const progress = getPlannerProgress(todayItems);
 
   const [showForm, setShowForm] = React.useState(false);
   const [subjectId, setSubjectId] = React.useState<SubjectId>('math');
@@ -49,6 +52,15 @@ export default function StudentPlannerScreen() {
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
+      <Card className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold text-on-surface mb-1">플래너 진행률</p>
+          <p className="text-xs text-on-surface-variant">
+            오늘 {progress.total}개 중 {progress.completed}개 완료
+          </p>
+        </div>
+        <ProgressRing percent={progress.percent} />
+      </Card>
       <ExamSchedule />
       <SectionTitle
         action={
@@ -93,6 +105,28 @@ export default function StudentPlannerScreen() {
           </div>
         ))}
       </div>
+
+      {completedItems.length > 0 && (
+        <div className="mt-6">
+          <SectionTitle>완료한 학습</SectionTitle>
+          <div className="space-y-2">
+            {completedItems.map((it) => (
+              <div key={it.id} className="flex items-center justify-between rounded-xl bg-surface-container-high px-4 py-3 opacity-60">
+                <div>
+                  <p className="text-sm font-semibold line-through">
+                    {getSubject(it.subjectId).label} · {it.material}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    {it.startTime}
+                    {it.endTime ? ` - ${it.endTime}` : ''}
+                  </p>
+                </div>
+                <Icon name="check_circle" className="!text-[20px] text-primary" filled />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6">
         <SectionTitle>오늘 타임라인</SectionTitle>
