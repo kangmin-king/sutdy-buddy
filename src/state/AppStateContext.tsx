@@ -82,6 +82,11 @@ const EMPTY_STATE: AppState = {
 
 const WRITE_FAILURE_MESSAGE = '저장하지 못했어요. 다시 시도해주세요.';
 
+// 숙제 범위는 대부분 "몇 페이지부터 몇 페이지"지만, 모의고사처럼 페이지 단위가 아닌 학습도 있다.
+// mode: 'pages'면 날짜별로 자동 분배(splitPagesAcrossDates), 'custom'이면 선택한 모든 날짜에
+// customLabel을 그대로 반복해서 넣는다(분배 없음 — 관리자가 직접 쓴 문구 그대로).
+type HomeworkScope = { mode: 'pages'; startPage: number; endPage: number } | { mode: 'custom'; customLabel: string };
+
 interface AppStateActions {
   saveProfile: (profile: Profile) => Promise<void>;
   saveCondition: (date: DateKey, condition: DailyCondition) => Promise<void>;
@@ -110,12 +115,12 @@ interface AppStateActions {
   registerHomeworkRange: (
     studentId: string,
     examSubjectId: string,
-    params: { subjectId: SubjectId; material: string; startPage: number; endPage: number; selectedDates: DateKey[] }
+    params: { subjectId: SubjectId; material: string; selectedDates: DateKey[] } & HomeworkScope
   ) => Promise<void>;
   updateHomeworkRange: (
     studentId: string,
     rangeId: string,
-    params: { material: string; startPage: number; endPage: number; selectedDates: DateKey[] }
+    params: { material: string; selectedDates: DateKey[] } & HomeworkScope
   ) => Promise<void>;
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
@@ -802,8 +807,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       async registerHomeworkRange(studentId, examSubjectId, params) {
         // 선택 순서 그대로 두면 저장/표시 모두 뒤죽박죽이 된다. 한 번 정렬해서 분배/저장/낙관적 상태에 모두 쓴다.
         const selectedDates = [...params.selectedDates].sort();
-        const distribution = splitPagesAcrossDates(params.startPage, params.endPage, selectedDates);
-        const rangeLabel = `${params.startPage}~${params.endPage}페이지`;
+        const distribution =
+          params.mode === 'pages'
+            ? splitPagesAcrossDates(params.startPage, params.endPage, selectedDates)
+            : selectedDates.map((date) => ({ date, pageRange: params.customLabel }));
+        const rangeLabel = params.mode === 'pages' ? `${params.startPage}~${params.endPage}페이지` : params.customLabel;
         const rangeId = uid();
         const createdAt = new Date().toISOString();
         const fullRange: ExamSubjectRange = {
@@ -914,8 +922,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const lockedDates = new Set(linkedItems.filter((i) => i.date < today || i.status === 'completed').map((i) => i.date));
         const removable = linkedItems.filter((i) => !lockedDates.has(i.date));
         const selectedDates = [...params.selectedDates].sort().filter((d) => !lockedDates.has(d));
-        const distribution = splitPagesAcrossDates(params.startPage, params.endPage, selectedDates);
-        const rangeLabel = `${params.startPage}~${params.endPage}페이지`;
+        const distribution =
+          params.mode === 'pages'
+            ? splitPagesAcrossDates(params.startPage, params.endPage, selectedDates)
+            : selectedDates.map((date) => ({ date, pageRange: params.customLabel }));
+        const rangeLabel = params.mode === 'pages' ? `${params.startPage}~${params.endPage}페이지` : params.customLabel;
         const assignedDates = Array.from(new Set([...lockedDates, ...selectedDates])).sort();
 
         setState((s) => ({

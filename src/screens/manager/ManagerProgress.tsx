@@ -7,10 +7,11 @@ import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
-// range_label은 "10~50페이지" 형식으로 저장된다. 수정 폼을 열 때 시작/끝 페이지로 되돌린다.
-function parseRangeLabel(rangeLabel: string): { startPage: string; endPage: string } {
-  const match = rangeLabel.match(/^(\d+)~(\d+)/);
-  return match ? { startPage: match[1], endPage: match[2] } : { startPage: '', endPage: '' };
+// range_label은 페이지 모드면 "10~50페이지", 자유 입력 모드면 관리자가 쓴 문구 그대로 저장된다.
+// 수정 폼을 열 때 어느 모드였는지 문구만 보고 되짚는다(별도 모드 컬럼 없이 형식으로 구분).
+function parseRangeLabel(rangeLabel: string): { mode: 'pages'; startPage: string; endPage: string } | { mode: 'custom'; customLabel: string } {
+  const match = rangeLabel.match(/^(\d+)~(\d+)페이지$/);
+  return match ? { mode: 'pages', startPage: match[1], endPage: match[2] } : { mode: 'custom', customLabel: rangeLabel };
 }
 
 // 캘린더 탭과 같은 월별 그리드 디자인을 그대로 쓰되, 날짜를 여러 개 탭으로 선택하는 용도로 축소한
@@ -125,8 +126,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
   const [rangeSubjectId, setRangeSubjectId] = React.useState<string | null>(null);
   const [editingRangeId, setEditingRangeId] = React.useState<string | null>(null);
   const [material, setMaterial] = React.useState('');
+  const [rangeMode, setRangeMode] = React.useState<'pages' | 'custom'>('pages');
   const [startPage, setStartPage] = React.useState('');
   const [endPage, setEndPage] = React.useState('');
+  const [customLabel, setCustomLabel] = React.useState('');
   const [selectedDates, setSelectedDates] = React.useState<string[]>([]);
   const [viewMonthKey, setViewMonthKey] = React.useState(today);
 
@@ -162,8 +165,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
     setRangeSubjectId(null);
     setEditingRangeId(null);
     setMaterial('');
+    setRangeMode('pages');
     setStartPage('');
     setEndPage('');
+    setCustomLabel('');
     setSelectedDates([]);
   };
 
@@ -175,8 +180,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
     setRangeSubjectId(subjectRecordId);
     setEditingRangeId(null);
     setMaterial('');
+    setRangeMode('pages');
     setStartPage('');
     setEndPage('');
+    setCustomLabel('');
     setSelectedDates([]);
     setViewMonthKey(today);
   };
@@ -188,12 +195,14 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
       closeRangeForm();
       return;
     }
-    const { startPage: sp, endPage: ep } = parseRangeLabel(range.rangeLabel);
+    const parsed = parseRangeLabel(range.rangeLabel);
     setEditingRangeId(rangeId);
     setRangeSubjectId(subjectRecordId);
     setMaterial(range.material);
-    setStartPage(sp);
-    setEndPage(ep);
+    setRangeMode(parsed.mode);
+    setStartPage(parsed.mode === 'pages' ? parsed.startPage : '');
+    setEndPage(parsed.mode === 'pages' ? parsed.endPage : '');
+    setCustomLabel(parsed.mode === 'custom' ? parsed.customLabel : '');
     setSelectedDates(range.assignedDates);
     setViewMonthKey(range.assignedDates[0] ?? today);
   };
@@ -203,28 +212,25 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
   };
 
   const submitRange = () => {
-    if (!rangeSubjectId || !material.trim() || !startPage.trim() || !endPage.trim()) return;
-    if (Number(startPage) > Number(endPage)) return;
+    if (!rangeSubjectId || !material.trim()) return;
+    const scope: { mode: 'pages'; startPage: number; endPage: number } | { mode: 'custom'; customLabel: string } | null =
+      rangeMode === 'pages'
+        ? startPage.trim() && endPage.trim() && Number(startPage) <= Number(endPage)
+          ? { mode: 'pages', startPage: Number(startPage), endPage: Number(endPage) }
+          : null
+        : customLabel.trim()
+          ? { mode: 'custom', customLabel: customLabel.trim() }
+          : null;
+    if (!scope) return;
 
     if (editingRangeId) {
       if (selectedDates.length === 0 && lockedDates.size === 0) return;
-      actions.updateHomeworkRange(studentId, editingRangeId, {
-        material,
-        startPage: Number(startPage),
-        endPage: Number(endPage),
-        selectedDates,
-      });
+      actions.updateHomeworkRange(studentId, editingRangeId, { material, selectedDates, ...scope });
     } else {
       if (selectedDates.length === 0) return;
       const subject = subjectsForExam.find((s) => s.id === rangeSubjectId);
       if (!subject) return;
-      actions.registerHomeworkRange(studentId, rangeSubjectId, {
-        subjectId: subject.subjectId,
-        material,
-        startPage: Number(startPage),
-        endPage: Number(endPage),
-        selectedDates,
-      });
+      actions.registerHomeworkRange(studentId, rangeSubjectId, { subjectId: subject.subjectId, material, selectedDates, ...scope });
     }
     closeRangeForm();
   };
@@ -323,13 +329,31 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                     <div className="mt-3 pt-3 border-t border-outline-variant/40 space-y-3">
                       {editingRangeId && (
                         <p className="text-[11px] text-on-surface-variant">
-                          이미 지났거나 완료된 날짜는 그대로 두고, 남은 날짜만 새로 나눠서 반영해요. 페이지 범위도 남은 분량으로 다시 입력해주세요.
+                          이미 지났거나 완료된 날짜는 그대로 두고, 남은 날짜만 새로 나눠서 반영해요. 범위/내용도 남은 만큼 다시 입력해주세요.
                         </p>
                       )}
                       <TextField label="교재명" value={material} onChange={setMaterial} placeholder="예: 쎈 수학 (상)" />
-                      <div className="grid grid-cols-2 gap-2">
-                        <TextField label="시작 페이지" type="number" value={startPage} onChange={setStartPage} placeholder="10" />
-                        <TextField label="끝 페이지" type="number" value={endPage} onChange={setEndPage} placeholder="50" />
+                      <div>
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <span className="text-sm font-semibold text-on-surface-variant">
+                            {rangeMode === 'pages' ? '페이지 범위' : '학습 내용'}
+                          </span>
+                          <button
+                            onClick={() => setRangeMode((m) => (m === 'pages' ? 'custom' : 'pages'))}
+                            title="모의고사 등 페이지가 아닌 학습은 직접 입력으로 전환"
+                            className="text-on-surface-variant"
+                          >
+                            <Icon name="arrow_drop_down" className="!text-[16px]" />
+                          </button>
+                        </div>
+                        {rangeMode === 'pages' ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <TextField label="시작 페이지" type="number" value={startPage} onChange={setStartPage} placeholder="10" />
+                            <TextField label="끝 페이지" type="number" value={endPage} onChange={setEndPage} placeholder="50" />
+                          </div>
+                        ) : (
+                          <TextField value={customLabel} onChange={setCustomLabel} placeholder="예: 1회 모의고사 풀이 및 채점" />
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">공부할 날짜 선택</label>
