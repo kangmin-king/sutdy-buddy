@@ -21,11 +21,17 @@ export interface TimelineSegment {
   deviated: boolean;
 }
 
-const PX_PER_HOUR = 40;
+const ROW_HEIGHT = 18;
+const MINUTES_PER_CELL = 10;
+const CELLS_PER_HOUR = 60 / MINUTES_PER_CELL;
 
-// 모트모트 다이어리의 "TIMETABLE" 칸처럼, 시간 눈금을 따라 그 시간에 공부한 과목 색으로 막대를
-// 표시하는 세로 한 줄. 체크리스트(왼쪽)와 나란히 쓰라고 분리해뒀다 — ManagerHome은 실제 오늘 숙제
-// 목록을 왼쪽에 놓고 이 컴포넌트만 오른쪽에 붙여 쓰고, 할 일 목록이 따로 없는 화면은
+function cellSegment(segments: TimelineSegment[], cellStart: number, cellEnd: number): TimelineSegment | undefined {
+  return segments.find((s) => s.startMinutes < cellEnd && s.endMinutes > cellStart);
+}
+
+// 열품타 타임테이블처럼, 시(가로줄)와 분(세로줄)으로 실제 나뉜 격자에 공부한 칸만 과목 색으로
+// 채운다. 체크리스트(왼쪽)와 나란히 쓰라고 분리해뒀다 — ManagerHome은 실제 오늘 숙제 목록을
+// 왼쪽에 놓고 이 컴포넌트만 오른쪽에 붙여 쓰고, 할 일 목록이 따로 없는 화면은
 // VerticalStudyTimeline(과목별 합계 목록 포함) 쪽을 통째로 쓴다.
 export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
   if (segments.length === 0) {
@@ -34,36 +40,36 @@ export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
 
   const minHour = Math.max(0, Math.floor(Math.min(...segments.map((s) => s.startMinutes)) / 60));
   const maxHour = Math.min(24, Math.ceil(Math.max(...segments.map((s) => s.endMinutes)) / 60));
-  const rangeStartMinutes = minHour * 60;
-  const hours = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i);
-  const totalHeight = (maxHour - minHour) * PX_PER_HOUR;
+  const hours = Array.from({ length: maxHour - minHour }, (_, i) => minHour + i);
+  const cells = Array.from({ length: CELLS_PER_HOUR }, (_, i) => i);
 
   return (
-    <div className="flex" style={{ width: 100 }}>
-      <div className="flex flex-col justify-between pr-1 shrink-0" style={{ height: totalHeight }}>
-        {hours.map((h) => (
-          <span key={h} className="text-[9px] text-on-surface-variant leading-none">
-            {String(h).padStart(2, '0')}시
-          </span>
-        ))}
-      </div>
-      <div className="relative flex-1 rounded border border-outline-variant/40" style={{ height: totalHeight }}>
-        {hours.slice(1, -1).map((h) => (
-          <div key={h} className="absolute left-0 right-0 border-t border-outline-variant/40" style={{ top: (h - minHour) * PX_PER_HOUR }} />
-        ))}
-        {segments.map((s, idx) => {
-          const top = ((s.startMinutes - rangeStartMinutes) / 60) * PX_PER_HOUR;
-          const height = ((s.endMinutes - s.startMinutes) / 60) * PX_PER_HOUR;
-          return (
-            <div
-              key={idx}
-              title={s.subjectLabel}
-              className={`absolute left-0.5 right-0.5 rounded-sm ${s.deviated ? 'bg-error/80' : (BAR_CLASSES[s.color] ?? 'bg-primary/80')}`}
-              style={{ top, height: Math.max(2, height) }}
-            />
-          );
-        })}
-      </div>
+    <div style={{ width: 130 }}>
+      {hours.map((h) => (
+        <div key={h} className="flex items-center gap-1" style={{ height: ROW_HEIGHT }}>
+          <span className="text-[9px] text-on-surface-variant leading-none w-8 shrink-0">{String(h).padStart(2, '0')}시</span>
+          <div className="grid flex-1 gap-px" style={{ gridTemplateColumns: `repeat(${CELLS_PER_HOUR}, 1fr)`, height: ROW_HEIGHT - 2 }}>
+            {cells.map((c) => {
+              const cellStart = h * 60 + c * MINUTES_PER_CELL;
+              const cellEnd = cellStart + MINUTES_PER_CELL;
+              const seg = cellSegment(segments, cellStart, cellEnd);
+              return (
+                <div
+                  key={c}
+                  title={seg?.subjectLabel}
+                  className={
+                    seg
+                      ? seg.deviated
+                        ? 'bg-error/80'
+                        : (BAR_CLASSES[seg.color] ?? 'bg-primary/80')
+                      : 'bg-surface-container'
+                  }
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
