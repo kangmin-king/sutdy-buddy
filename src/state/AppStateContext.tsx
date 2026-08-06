@@ -266,6 +266,20 @@ async function loadAll(userId: string): Promise<AppState> {
       homeworkRows = [];
       sessionRows = [];
     }
+  } else if (profile?.role === 'student') {
+    // 학생 본인 계정: 선생님/학부모가 등록해준 시험 일정·과목별 목표·교재 범위를 읽기 전용으로 본다.
+    const examRes = await supabase.from('sb_exam_records').select('*').eq('student_id', userId);
+    examRecords = (examRes.data ?? []).map(examRecordFromRow);
+    const examIds = examRecords.map((e) => e.id);
+    if (examIds.length > 0) {
+      const subjectsRes = await supabase.from('sb_exam_subjects').select('*').in('exam_id', examIds);
+      examSubjects = (subjectsRes.data ?? []).map(examSubjectFromRow);
+      const subjectIds = examSubjects.map((s) => s.id);
+      if (subjectIds.length > 0) {
+        const rangesRes = await supabase.from('sb_exam_subject_ranges').select('*').in('exam_subject_id', subjectIds);
+        examSubjectRanges = (rangesRes.data ?? []).map(examSubjectRangeFromRow);
+      }
+    }
   }
 
   return {

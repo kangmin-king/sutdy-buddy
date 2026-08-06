@@ -22,6 +22,12 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   }, [studentId]);
 
   const grid = monthGrid(viewMonthKey);
+  const studentExams = state.examRecords.filter((e) => e.studentId === studentId);
+  const examsByDate = new Map<string, typeof studentExams>();
+  for (const exam of studentExams) {
+    examsByDate.set(exam.examDate, [...(examsByDate.get(exam.examDate) ?? []), exam]);
+  }
+  const selectedExams = examsByDate.get(selectedDate) ?? [];
   const schedule = state.tutoringSchedules.find((sch) => sch.studentId === studentId);
   const scheduleExceptions = state.tutoringScheduleExceptions.filter((ex) => ex.studentId === studentId);
   const tutoringDays = new Set(
@@ -77,10 +83,11 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           const isRedDay = d.isSunday || getHolidayName(d.key) !== null;
           const dayItems = itemsByDate[d.key] ?? [];
           const hasItems = dayItems.length > 0;
+          const hasExam = examsByDate.has(d.key);
           return (
             <button key={d.key} onClick={() => setSelectedDate(d.key)} className="flex flex-col items-center py-1.5">
               <span
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm ${
+                className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm ${
                   isSelected
                     ? 'bg-primary text-on-primary font-bold'
                     : isTutoringDay
@@ -94,11 +101,14 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
                           : isRedDay
                             ? 'text-error/40'
                             : 'text-outline-variant'
-                }`}
+                } ${hasExam ? 'ring-2 ring-error' : ''}`}
               >
                 {d.date}
               </span>
-              <span className={`w-1 h-1 rounded-full mt-0.5 ${hasItems ? 'bg-secondary' : 'bg-transparent'}`} />
+              <span className="flex items-center gap-0.5 mt-0.5 h-1">
+                {hasItems && <span className="w-1 h-1 rounded-full bg-secondary" />}
+                {hasExam && <span className="w-1 h-1 rounded-full bg-error" />}
+              </span>
             </button>
           );
         })}
@@ -109,6 +119,9 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''}
           {tutoringDays.has(selectedDate) ? ' · 과외 날' : ''}
           {getHolidayName(selectedDate) && <span className="text-error"> · {getHolidayName(selectedDate)}</span>}
+          {selectedExams.length > 0 && (
+            <span className="text-error"> · {selectedExams.map((e) => `📝 ${e.title}`).join(', ')}</span>
+          )}
         </p>
         {tutoringDays.has(selectedDate) && (
           <button

@@ -3,6 +3,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { todayKey } from '../../lib';
 import { getSubject, SUBJECTS } from '../../constants';
 import { TopAppBar, Card, Button, Icon, SectionTitle, ChipGroup, TextField } from '../../primitives';
+import ExamSchedule from './ExamSchedule';
 import type { SubjectId } from '../../types';
 
 export default function StudentPlannerScreen() {
@@ -49,6 +50,7 @@ export default function StudentPlannerScreen() {
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
+      <ExamSchedule />
       <SectionTitle
         action={
           <button onClick={() => setShowForm((s) => !s)} className="text-primary flex items-center gap-1 text-xs font-semibold">

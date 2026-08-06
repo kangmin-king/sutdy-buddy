@@ -11,16 +11,22 @@ export default function StudyTimelineScreen({ userId }: { userId?: string } = {}
   const { state } = useAppState();
   const [selectedDate, setSelectedDate] = React.useState(todayKey());
   const items = (state.plannerItems[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
+  const examsToday = state.examRecords.filter((e) => e.examDate === selectedDate);
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
-      <input
-        type="date"
-        value={selectedDate}
-        onChange={(e) => setSelectedDate(e.target.value)}
-        className="mb-4 rounded-lg border border-outline-variant px-3 py-2 text-sm"
-      />
+      <div className="mb-4 space-y-2">
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="rounded-lg border border-outline-variant px-3 py-2 text-sm"
+        />
+        {examsToday.length > 0 && (
+          <p className="text-sm font-semibold text-error">{examsToday.map((e) => `📝 ${e.title} 시험일`).join(', ')}</p>
+        )}
+      </div>
       <ChecklistTimeline items={items} studySessions={state.studySessions} />
     </div>
   );
