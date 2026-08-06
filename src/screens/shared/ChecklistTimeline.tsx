@@ -20,22 +20,24 @@ export default function ChecklistTimeline({
   items: PlannerItem[];
   studySessions: Record<string, StudySession[]>;
 }) {
-  const nowIso = new Date().toISOString();
-
   const segments: TimelineSegment[] = [];
   const elapsedSecondsByItem: Record<string, number> = {};
   for (const item of items) {
     const subject = getSubject(item.subjectId);
     let elapsedSeconds = 0;
     for (const session of studySessions[item.id] ?? []) {
-      const endedAtMs = Date.parse(session.endedAt ?? nowIso);
+      // 아직 끝나지 않은(정지를 못 받아 endedAt이 계속 비어 있는) 세션은 지금 이 순간까지로
+      // 늘려 계산하지 않는다 — 브라우저가 닫히는 등으로 정지가 누락된 세션이 "몇 시간째 진행
+      // 중"으로 잘못 보이는 걸 막는다. 실제 진행 중인 타이머는 홈 화면이 따로 실시간으로 보여준다.
+      if (session.endedAt == null || session.durationSeconds == null) continue;
       const startedAtMs = Date.parse(session.startedAt);
+      const endedAtMs = Date.parse(session.endedAt);
       if (endedAtMs <= startedAtMs) continue; // 실제로 끝난 시각이 시작보다 앞선(잘못된) 기록만 건너뛴다.
-      elapsedSeconds += Math.round((endedAtMs - startedAtMs) / 1000);
+      elapsedSeconds += session.durationSeconds;
       const startMinutes = toMinutesOfDay(session.startedAt);
       // 시작~종료가 1분 안에 끝나면 분 단위로 내림했을 때 startMinutes와 같아진다. 실제로는
       // 유효한 기록이므로 통째로 버리지 않고 최소 한 칸(1분)은 보이게 한다.
-      const endMinutes = Math.max(startMinutes + 1, toMinutesOfDay(session.endedAt ?? nowIso));
+      const endMinutes = Math.max(startMinutes + 1, toMinutesOfDay(session.endedAt));
       segments.push({ subjectLabel: subject.label, color: subject.color, startMinutes, endMinutes, deviated: session.deviated });
     }
     elapsedSecondsByItem[item.id] = elapsedSeconds;

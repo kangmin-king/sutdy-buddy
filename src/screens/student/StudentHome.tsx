@@ -28,7 +28,9 @@ function elapsedTodaySeconds(sessions: { id: string; startedAt: string; duration
 export default function StudentHomeScreen() {
   const { state, actions } = useAppState();
   const today = todayKey();
-  const items = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
+  // 완료 처리한 항목은 홈 목록에서 사라진다 — "📌 오늘의 할 일" 오버레이에서는 체크 표시로 계속 보인다.
+  const items = (state.plannerItems[today] ?? []).filter((it) => it.status !== 'completed').slice().sort((a, b) => a.order - b.order);
+  const allTodayItems = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
   const [runningSessionId, setRunningSessionId] = React.useState<Record<string, string>>({});
   const [startPending, setStartPending] = React.useState<Record<string, boolean>>({});
   const [now, setNow] = React.useState(Date.now());
@@ -180,7 +182,7 @@ export default function StudentHomeScreen() {
         <div className="fixed inset-0 z-40 bg-black/60 flex items-end" onClick={() => setShowTodo(false)}>
           <div className="w-full bg-[#1e2b1e] text-white rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base font-bold mb-3">오늘의 할 일</h2>
-            {items.map((it) => (
+            {allTodayItems.map((it) => (
               <div key={it.id} className="py-1.5 border-b border-white/10">
                 <p className="text-sm">
                   {getSubject(it.subjectId).label} — {it.material || '할 일'} {it.status === 'completed' ? '✓' : ''}

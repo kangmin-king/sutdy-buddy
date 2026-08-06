@@ -94,8 +94,10 @@ export default function StudentPlannerScreen() {
         ))}
       </div>
 
-      <SectionTitle>오늘 타임라인</SectionTitle>
-      <ChecklistTimeline items={todayItems} studySessions={state.studySessions} />
+      <div className="mt-6">
+        <SectionTitle>오늘 타임라인</SectionTitle>
+        <ChecklistTimeline items={todayItems} studySessions={state.studySessions} />
+      </div>
     </div>
   );
 }
