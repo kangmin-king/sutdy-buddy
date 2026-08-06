@@ -26,6 +26,9 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
           key={item.id}
           item={item}
           onSaveAmount={(value) => actions.updateHomeworkAmountForDate(studentId, item.id, today, item.examSubjectRangeId, value)}
+          onDelete={() => {
+            if (window.confirm('이 숙제를 삭제할까요?')) actions.deleteStudentHomeworkItem(studentId, today, item.id);
+          }}
         />
       ))}
 

@@ -6,7 +6,15 @@ import type { PlannerItem } from '../../types';
 // 홈 탭/캘린더 탭에서 공통으로 쓰는 항목 카드. 숙제(source: 'homework')는 "오늘 얼마나 해야 하는지"
 // (pageRange)를 교재명과 분리해서 보여주고, 연필로 그 자리에서 바로 수정할 수 있다. 학생이 스스로
 // 짠 할 일(source: 'self')은 읽기 전용으로만 보여준다(관리자가 대신 계획을 바꿀 이유가 없다).
-export default function PlannerItemRow({ item, onSaveAmount }: { item: PlannerItem; onSaveAmount?: (value: string) => void }) {
+export default function PlannerItemRow({
+  item,
+  onSaveAmount,
+  onDelete,
+}: {
+  item: PlannerItem;
+  onSaveAmount?: (value: string) => void;
+  onDelete?: () => void;
+}) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(item.pageRange);
 
@@ -56,12 +64,19 @@ export default function PlannerItemRow({ item, onSaveAmount }: { item: PlannerIt
           <p className="text-xs text-on-surface-variant">{item.material || '할 일'}</p>
         )}
       </div>
-      <div
-        className={`w-7 h-7 rounded-md border-2 flex items-center justify-center shrink-0 ${
-          item.status === 'completed' ? 'bg-primary border-primary' : 'border-outline-variant'
-        }`}
-      >
-        {item.status === 'completed' && <Icon name="check" className="!text-[18px] text-on-primary" />}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div
+          className={`w-7 h-7 rounded-md border-2 flex items-center justify-center ${
+            item.status === 'completed' ? 'bg-primary border-primary' : 'border-outline-variant'
+          }`}
+        >
+          {item.status === 'completed' && <Icon name="check" className="!text-[18px] text-on-primary" />}
+        </div>
+        {onDelete && item.source === 'homework' && (
+          <button onClick={onDelete} className="text-on-surface-variant">
+            <Icon name="close" className="!text-[16px]" />
+          </button>
+        )}
       </div>
     </Card>
   );

@@ -131,6 +131,9 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             key={item.id}
             item={item}
             onSaveAmount={(value) => actions.updateHomeworkAmountForDate(studentId, item.id, selectedDate, item.examSubjectRangeId, value)}
+            onDelete={() => {
+              if (window.confirm('이 숙제를 삭제할까요?')) actions.deleteStudentHomeworkItem(studentId, selectedDate, item.id);
+            }}
           />
         ))}
       </div>

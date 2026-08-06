@@ -133,6 +133,7 @@ interface AppStateActions {
     rangeId: string | null,
     newValue: string
   ) => Promise<void>;
+  deleteStudentHomeworkItem: (studentId: string, date: DateKey, itemId: string) => Promise<void>;
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
@@ -1211,6 +1212,52 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (results.some((r) => r.error)) {
           console.error('updateHomeworkAmountForDate (redistribute) failed');
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async deleteStudentHomeworkItem(studentId, date, itemId) {
+        // 홈/캘린더에서 그날 숙제 하나만 지운다. 진도관리의 등록 이력(assignedDates)에서도 그 날짜를
+        // 빼서, 나중에 그 범위를 "수정"으로 열었을 때 이미 지운 날짜가 다시 나타나지 않게 한다.
+        const previousItems = studentPlannerItemsRef.current[studentId]?.[date] ?? [];
+        const item = previousItems.find((i) => i.id === itemId);
+        if (!item) return;
+        const previousRanges = state.examSubjectRanges;
+
+        const nextForDate = previousItems.filter((i) => i.id !== itemId);
+        const nextForStudent = { ...(studentPlannerItemsRef.current[studentId] ?? {}), [date]: nextForDate };
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: nextForStudent };
+        setState((s) => ({
+          ...s,
+          studentPlannerItems: { ...s.studentPlannerItems, [studentId]: nextForStudent },
+          examSubjectRanges: item.examSubjectRangeId
+            ? s.examSubjectRanges.map((r) =>
+                r.id === item.examSubjectRangeId ? { ...r, assignedDates: r.assignedDates.filter((d) => d !== date) } : r
+              )
+            : s.examSubjectRanges,
+        }));
+
+        const { error } = await supabase.from('sb_planner_items').delete().eq('id', itemId);
+        if (error) {
+          console.error('deleteStudentHomeworkItem failed:', error.message);
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: { ...studentPlannerItemsRef.current[studentId], [date]: previousItems } };
+          setState((s) => ({
+            ...s,
+            studentPlannerItems: { ...s.studentPlannerItems, [studentId]: { ...s.studentPlannerItems[studentId], [date]: previousItems } },
+            examSubjectRanges: previousRanges,
+            error: WRITE_FAILURE_MESSAGE,
+          }));
+          return;
+        }
+
+        if (item.examSubjectRangeId) {
+          const range = previousRanges.find((r) => r.id === item.examSubjectRangeId);
+          if (range) {
+            const { error: rangeError } = await supabase
+              .from('sb_exam_subject_ranges')
+              .update({ assigned_dates: range.assignedDates.filter((d) => d !== date) })
+              .eq('id', range.id);
+            if (rangeError) console.error('deleteStudentHomeworkItem (range update) failed:', rangeError.message);
+          }
         }
       },
 
