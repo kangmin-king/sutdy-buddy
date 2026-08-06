@@ -26,9 +26,13 @@ export default function ChecklistTimeline({
   for (const item of items) {
     const subject = getSubject(item.subjectId);
     for (const session of studySessions[item.id] ?? []) {
+      const endedAtMs = Date.parse(session.endedAt ?? nowIso);
+      const startedAtMs = Date.parse(session.startedAt);
+      if (endedAtMs <= startedAtMs) continue; // 실제로 끝난 시각이 시작보다 앞선(잘못된) 기록만 건너뛴다.
       const startMinutes = toMinutesOfDay(session.startedAt);
-      const endMinutes = toMinutesOfDay(session.endedAt ?? nowIso);
-      if (endMinutes <= startMinutes) continue; // 자정을 넘긴 세션 등 예외 케이스는 표시하지 않는다.
+      // 시작~종료가 1분 안에 끝나면 분 단위로 내림했을 때 startMinutes와 같아진다. 실제로는
+      // 유효한 기록이므로 통째로 버리지 않고 최소 한 칸(1분)은 보이게 한다.
+      const endMinutes = Math.max(startMinutes + 1, toMinutesOfDay(session.endedAt ?? nowIso));
       segments.push({ subjectLabel: subject.label, color: subject.color, startMinutes, endMinutes, deviated: session.deviated });
     }
   }
