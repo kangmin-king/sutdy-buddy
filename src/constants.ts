@@ -69,11 +69,12 @@ export const NAV_TABS = [
   { id: 'distractionStop', label: '딴짓 멈춰', icon: 'phonelink_lock' },
 ] as const;
 
+// 딴짓 멈춰는 초기 설정 이후로는 대부분 네이티브 알림(상단바 내려서)으로 여닫아서, 하단 탭 대신
+// 오른쪽 아래 떠 있는 원형 버튼으로 옮겼다(App.tsx의 StudentAppShell).
 export const STUDENT_NAV_TABS = [
-  { id: 'home', label: '홈', icon: 'home' },
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
+  { id: 'home', label: '홈', icon: 'home' },
   { id: 'planner', label: '스터디플래너', icon: 'edit_note' },
-  { id: 'distractionStop', label: '딴짓 멈춰', icon: 'phonelink_lock' },
 ] as const;
 
 export const REST_PATTERNS: { id: RestPatternId; label: string }[] = [

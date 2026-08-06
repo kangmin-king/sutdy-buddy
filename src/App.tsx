@@ -1,7 +1,7 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
-import { BottomNav, Card, Button } from './primitives';
+import { BottomNav, Card, Button, Icon } from './primitives';
 import type { TabId } from './primitives';
 import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
@@ -63,13 +63,39 @@ function AppShell() {
 
 function StudentAppShell() {
   const [activeTab, setActiveTab] = React.useState<(typeof STUDENT_NAV_TABS)[number]['id']>('home');
+  const [showDistractionStop, setShowDistractionStop] = React.useState(false);
+
+  // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
+  // 탭 전환 대신 이 오버레이를 띄운다.
+  useOpenDistractionStopRequest(React.useCallback(() => setShowDistractionStop(true), []));
+
+  if (showDistractionStop) {
+    return (
+      <div id="app-shell">
+        <ErrorBanner />
+        <DistractionStopScreen onClose={() => setShowDistractionStop(false)} />
+      </div>
+    );
+  }
+
   return (
     <div id="app-shell">
       <ErrorBanner />
       {activeTab === 'home' && <StudentHomeScreen />}
       {activeTab === 'calendar' && <StudyTimelineScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
-      {activeTab === 'distractionStop' && <DistractionStopScreen />}
+      <button
+        onClick={() => setShowDistractionStop(true)}
+        className="fixed z-30 right-4 flex flex-col items-center gap-1"
+        style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+      >
+        <span className="w-12 h-12 rounded-full bg-on-surface text-surface flex items-center justify-center shadow-card">
+          <Icon name="phonelink_lock" className="!text-[22px]" />
+        </span>
+        <span className="text-[10px] font-semibold text-on-surface-variant bg-surface-container-lowest px-1.5 py-0.5 rounded-full shadow-card">
+          딴짓멈춰
+        </span>
+      </button>
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
   );
