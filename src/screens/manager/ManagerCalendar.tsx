@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange } from '../../lib';
 import { getSubject } from '../../constants';
-import { Card, Icon } from '../../primitives';
+import { Card, Icon, BottomSheet, Button, TextField, ChipGroup } from '../../primitives';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -11,6 +11,10 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const today = todayKey();
   const [selectedDate, setSelectedDate] = React.useState(today);
   const [viewMonthKey, setViewMonthKey] = React.useState(today);
+  const [exceptionSheetOpen, setExceptionSheetOpen] = React.useState(false);
+  const [exceptionAction, setExceptionAction] = React.useState<'cancel' | 'move'>('cancel');
+  const [exceptionNewDate, setExceptionNewDate] = React.useState(today);
+  const [scheduleSheetOpen, setScheduleSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
@@ -23,6 +27,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const tutoringDays = new Set(
     getTutoringDaysInRange(schedule?.weekdays ?? [], scheduleExceptions, grid[0].key, grid[grid.length - 1].key)
   );
+  const [draftWeekdays, setDraftWeekdays] = React.useState<number[]>(schedule?.weekdays ?? []);
 
   const itemsByDate = state.studentPlannerItems[studentId] ?? {};
   const selectedItems = (itemsByDate[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
@@ -41,6 +46,18 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
         </p>
         <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
           <Icon name="chevron_right" />
+        </button>
+      </div>
+
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={() => {
+            setDraftWeekdays(schedule?.weekdays ?? []);
+            setScheduleSheetOpen(true);
+          }}
+          className="text-[11px] text-on-surface-variant underline"
+        >
+          과외 요일 설정
         </button>
       </div>
 
@@ -82,10 +99,24 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
         })}
       </div>
 
-      <p className="text-xs font-semibold text-primary mb-3">
-        {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''}
-        {tutoringDays.has(selectedDate) ? ' · 과외 날' : ''}
-      </p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-primary">
+          {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''}
+          {tutoringDays.has(selectedDate) ? ' · 과외 날' : ''}
+        </p>
+        {tutoringDays.has(selectedDate) && (
+          <button
+            onClick={() => {
+              setExceptionAction('cancel');
+              setExceptionNewDate(selectedDate);
+              setExceptionSheetOpen(true);
+            }}
+            className="text-[11px] text-error font-semibold"
+          >
+            이 날 일정 변경
+          </button>
+        )}
+      </div>
 
       <div className="space-y-2">
         {selectedItems.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">이 날 계획된 항목이 없어요.</p>}
@@ -107,6 +138,63 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           </Card>
         ))}
       </div>
+
+      <BottomSheet open={exceptionSheetOpen} onClose={() => setExceptionSheetOpen(false)} title="과외 일정 변경">
+        <div className="space-y-3">
+          <ChipGroup
+            options={[
+              { id: 'cancel', label: '이번만 취소' },
+              { id: 'move', label: '다른 날로 변경' },
+            ]}
+            value={exceptionAction}
+            onChange={setExceptionAction}
+          />
+          {exceptionAction === 'move' && (
+            <TextField label="변경할 날짜" type="date" value={exceptionNewDate} onChange={setExceptionNewDate} />
+          )}
+          <Button
+            className="w-full"
+            onClick={() => {
+              actions.addTutoringException(studentId, {
+                originalDate: selectedDate,
+                newDate: exceptionAction === 'cancel' ? null : exceptionNewDate,
+                note: '',
+              });
+              setExceptionSheetOpen(false);
+            }}
+          >
+            적용하기
+          </Button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={scheduleSheetOpen} onClose={() => setScheduleSheetOpen(false)} title="과외 요일 설정">
+        <div className="space-y-3">
+          <ChipGroup
+            multi
+            options={[
+              { id: '0', label: '일' },
+              { id: '1', label: '월' },
+              { id: '2', label: '화' },
+              { id: '3', label: '수' },
+              { id: '4', label: '목' },
+              { id: '5', label: '금' },
+              { id: '6', label: '토' },
+            ]}
+            value={draftWeekdays.map(String)}
+            onChange={(ids: string[]) => setDraftWeekdays(ids.map(Number))}
+          />
+          <Button
+            className="w-full"
+            onClick={() => {
+              actions.upsertTutoringSchedule(studentId, draftWeekdays);
+              setScheduleSheetOpen(false);
+            }}
+          >
+            저장
+          </Button>
+        </div>
+      </BottomSheet>
     </div>
   );
 }
