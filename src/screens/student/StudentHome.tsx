@@ -136,17 +136,17 @@ export default function StudentHomeScreen() {
               {session && (
                 <div className="flex gap-2 mt-3">
                   <button
+                    onClick={() => handleStop(it.id, true)}
+                    className="flex-1 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
+                  >
+                    오늘 학습 완료!!
+                  </button>
+                  <button
                     onClick={() => handleStop(it.id, false)}
                     title="이따가 이어서 할 거예요"
                     className="text-xs font-semibold text-on-surface-variant px-3 py-2.5 rounded-full bg-surface-container"
                   >
                     정지
-                  </button>
-                  <button
-                    onClick={() => handleStop(it.id, true)}
-                    className="flex-1 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
-                  >
-                    오늘 학습 완료!!
                   </button>
                 </div>
               )}
