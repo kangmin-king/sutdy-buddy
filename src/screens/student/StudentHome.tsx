@@ -121,7 +121,6 @@ export default function StudentHomeScreen() {
                     {getSubject(it.subjectId).label} {it.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
                   </p>
                   <p className="text-xs text-on-surface-variant">{it.material || '할 일'}</p>
-                  {session && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
                 </div>
                 {!session && (
                   <button
@@ -134,21 +133,24 @@ export default function StudentHomeScreen() {
                 )}
               </div>
               {session && (
-                <div className="flex gap-2 mt-3">
+                <>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-lg font-mono font-bold text-primary">{formatElapsed(elapsed)}</p>
+                    <button
+                      onClick={() => handleStop(it.id, false)}
+                      title="이따가 이어서 할 거예요"
+                      className="text-[11px] font-semibold text-on-surface-variant px-2.5 py-1 rounded-full bg-surface-container shrink-0"
+                    >
+                      정지
+                    </button>
+                  </div>
                   <button
                     onClick={() => handleStop(it.id, true)}
-                    className="flex-1 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
+                    className="w-full mt-2 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
                   >
                     오늘 학습 완료!!
                   </button>
-                  <button
-                    onClick={() => handleStop(it.id, false)}
-                    title="이따가 이어서 할 거예요"
-                    className="text-xs font-semibold text-on-surface-variant px-3 py-2.5 rounded-full bg-surface-container"
-                  >
-                    정지
-                  </button>
-                </div>
+                </>
               )}
             </Card>
           );
