@@ -114,31 +114,41 @@ export default function StudentHomeScreen() {
           const session = sessionId ? (state.studySessions[it.id] ?? []).find((s) => s.id === sessionId) : null;
           const elapsed = session ? Math.floor((now - Date.parse(session.startedAt)) / 1000) : 0;
           return (
-            <Card key={it.id} className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold">
-                  {getSubject(it.subjectId).label} {it.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
-                </p>
-                <p className="text-xs text-on-surface-variant">{it.material || '할 일'}</p>
-                {session && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
+            <Card key={it.id}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold">
+                    {getSubject(it.subjectId).label} {it.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">{it.material || '할 일'}</p>
+                  {session && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
+                </div>
+                {!session && (
+                  <button
+                    onClick={() => handleStart(it.id)}
+                    disabled={!!startPending[it.id]}
+                    className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1 disabled:opacity-50 shrink-0"
+                  >
+                    <Icon name="play_arrow" className="!text-[16px]" /> 시작하기
+                  </button>
+                )}
               </div>
-              {session ? (
-                <div className="flex gap-2">
-                  <button onClick={() => handleStop(it.id, false)} className="text-xs font-semibold text-on-surface-variant px-3 py-2 rounded-full bg-surface-container">
+              {session && (
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => handleStop(it.id, false)}
+                    title="이따가 이어서 할 거예요"
+                    className="text-xs font-semibold text-on-surface-variant px-3 py-2.5 rounded-full bg-surface-container"
+                  >
                     정지
                   </button>
-                  <button onClick={() => handleStop(it.id, true)} className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary">
-                    완료
+                  <button
+                    onClick={() => handleStop(it.id, true)}
+                    className="flex-1 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
+                  >
+                    오늘 학습 완료!!
                   </button>
                 </div>
-              ) : (
-                <button
-                  onClick={() => handleStart(it.id)}
-                  disabled={!!startPending[it.id]}
-                  className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1 disabled:opacity-50"
-                >
-                  <Icon name="play_arrow" className="!text-[16px]" /> 시작하기
-                </button>
               )}
             </Card>
           );
