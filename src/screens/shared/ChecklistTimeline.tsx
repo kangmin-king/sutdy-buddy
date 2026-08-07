@@ -8,6 +8,9 @@ const DOT_CLASSES: Record<string, string> = {
   primary: 'bg-primary',
   secondary: 'bg-secondary',
   tertiary: 'bg-tertiary',
+  rose: 'bg-rose-500',
+  amber: 'bg-amber-500',
+  slate: 'bg-slate-500',
 };
 
 // 모트모트 다이어리 속지처럼, 왼쪽에 할 일 체크리스트(과목 색 점 + 내용 + 완료 표시)를 두고

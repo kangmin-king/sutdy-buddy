@@ -8,13 +8,15 @@ import type {
   RestPatternId,
 } from './types';
 
+// color는 타임라인(오늘 타임라인/캘린더 시간대 그리드)에서 과목별로 구분되는 색으로만 쓰인다
+// (ChecklistTimeline/TimelineColumn) — 과목마다 겹치지 않게 6개 전부 다른 값을 준다.
 export const SUBJECTS: { id: SubjectId; label: string; color: string }[] = [
   { id: 'korean', label: '국어', color: 'tertiary' },
   { id: 'math', label: '수학', color: 'primary' },
-  { id: 'english', label: '영어', color: 'tertiary' },
+  { id: 'english', label: '영어', color: 'rose' },
   { id: 'science', label: '과학', color: 'secondary' },
-  { id: 'social', label: '사회', color: 'secondary' },
-  { id: 'etc', label: '기타', color: 'secondary' },
+  { id: 'social', label: '사회', color: 'amber' },
+  { id: 'etc', label: '기타', color: 'slate' },
 ];
 
 export function getSubject(id: SubjectId) {

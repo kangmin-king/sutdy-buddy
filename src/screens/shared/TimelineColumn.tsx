@@ -4,6 +4,9 @@ const BAR_CLASSES: Record<string, string> = {
   primary: 'bg-primary/80',
   secondary: 'bg-secondary/80',
   tertiary: 'bg-tertiary/80',
+  rose: 'bg-rose-500/80',
+  amber: 'bg-amber-500/80',
+  slate: 'bg-slate-500/80',
 };
 
 export interface TimelineSegment {
