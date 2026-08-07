@@ -23,7 +23,8 @@ import StudentSelector from './screens/manager/StudentSelector';
 import ManagerHomeScreen from './screens/manager/ManagerHome';
 import ManagerProgressScreen from './screens/manager/ManagerProgress';
 import ManagerCalendarScreen from './screens/manager/ManagerCalendar';
-import { useOpenDistractionStopRequest } from './native/distractionStop';
+import { App as CapacitorApp } from '@capacitor/app';
+import { useOpenDistractionStopRequest, isNativePlatform } from './native/distractionStop';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
@@ -69,6 +70,16 @@ function StudentAppShell() {
   // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
   // 탭 전환 대신 이 오버레이를 띄운다.
   useOpenDistractionStopRequest(React.useCallback(() => setShowDistractionStop(true), []));
+
+  // 이 오버레이가 떠 있는 동안은 휴대폰 뒤로 가기 버튼도 왼쪽 위 화살표랑 똑같이 오버레이만
+  // 닫아야 한다 — 기본 동작대로 두면 뒤로 가기가 앱을 통째로 나가버린다.
+  React.useEffect(() => {
+    if (!showDistractionStop || !isNativePlatform()) return;
+    const listenerPromise = CapacitorApp.addListener('backButton', () => setShowDistractionStop(false));
+    return () => {
+      listenerPromise.then((handle) => handle.remove());
+    };
+  }, [showDistractionStop]);
 
   if (showDistractionStop) {
     return (
