@@ -1,8 +1,9 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName } from '../../lib';
+import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
 import { getSubject } from '../../constants';
 import { Icon, Card, TopAppBar } from '../../primitives';
+import { DayProgressRing } from '../shared/DayProgressRing';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -65,29 +66,32 @@ export default function StudentCalendarScreen() {
           const dayItems = itemsByDate[d.key] ?? [];
           const hasItems = dayItems.length > 0;
           const hasExam = examsByDate.has(d.key);
+          const percent = d.key < today && dayItems.length > 0 ? getPlannerProgress(dayItems).percent : null;
           return (
             <button key={d.key} onClick={() => setSelectedDate(d.key)} className="flex flex-col items-center py-1.5">
-              <span
-                className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm ${
-                  isSelected
-                    ? 'bg-primary text-on-primary font-bold'
-                    : isTutoringDay
-                      ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
-                      : isToday
-                        ? 'border border-primary text-primary font-semibold'
-                        : d.inCurrentMonth
-                          ? isRedDay
-                            ? 'text-error'
-                            : 'text-on-surface'
-                          : isRedDay
-                            ? 'text-error/40'
-                            : 'text-outline-variant'
-                } ${hasExam ? 'ring-2 ring-error' : ''}`}
-              >
-                {d.date}
-              </span>
+              <DayProgressRing percent={percent}>
+                <span
+                  className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm ${
+                    isSelected
+                      ? 'bg-primary text-on-primary font-bold'
+                      : isTutoringDay
+                        ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
+                        : isToday
+                          ? 'border border-primary text-primary font-semibold'
+                          : d.inCurrentMonth
+                            ? isRedDay
+                              ? 'text-error'
+                              : 'text-on-surface'
+                            : isRedDay
+                              ? 'text-error/40'
+                              : 'text-outline-variant'
+                  } ${hasExam ? 'ring-2 ring-error' : ''}`}
+                >
+                  {d.date}
+                </span>
+              </DayProgressRing>
               <span className="flex items-center gap-0.5 mt-0.5 h-1">
-                {hasItems && <span className="w-1 h-1 rounded-full bg-secondary" />}
+                {hasItems && d.key >= today && <span className="w-1 h-1 rounded-full bg-secondary" />}
                 {hasExam && <span className="w-1 h-1 rounded-full bg-error" />}
               </span>
             </button>
