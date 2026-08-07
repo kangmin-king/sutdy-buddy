@@ -189,21 +189,23 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
           </div>
         </div>
       )}
-      <button
-        onClick={() => setShowTodo(true)}
-        className="mt-3 mb-4 relative inline-flex items-center gap-1.5 rounded-tl-sm rounded-tr-sm rounded-br-2xl rounded-bl-sm bg-[#fff4a8] text-[#4a3f10] pl-4 pr-8 py-2.5 text-xs font-bold shadow-md -rotate-3"
-      >
-        <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-sm rotate-[8deg]">🥕</span>
-        오늘의 할 일
-        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col opacity-80">
-          <svg width="12" height="7" viewBox="0 0 12 7">
-            <path d="M1 1 L6 6 L11 1" stroke="#4a3f10" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <svg width="12" height="7" viewBox="0 0 12 7" style={{ marginTop: -3, opacity: 0.5 }}>
-            <path d="M1 1 L6 6 L11 1" stroke="#4a3f10" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      </button>
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowTodo(true)}
+          className="mt-3 mb-4 relative inline-flex items-center gap-1.5 rounded-tl-sm rounded-tr-sm rounded-br-2xl rounded-bl-sm bg-[#fff4a8] text-[#4a3f10] pl-4 pr-8 py-2.5 text-xs font-bold shadow-md -rotate-3"
+        >
+          <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-sm rotate-[8deg]">🥕</span>
+          오늘의 할 일
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col opacity-80">
+            <svg width="12" height="7" viewBox="0 0 12 7">
+              <path d="M1 1 L6 6 L11 1" stroke="#4a3f10" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <svg width="12" height="7" viewBox="0 0 12 7" style={{ marginTop: -3, opacity: 0.5 }}>
+              <path d="M1 1 L6 6 L11 1" stroke="#4a3f10" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </button>
+      </div>
 
       <div className="space-y-2">
         {items.length === 0 && <p className="text-sm text-on-surface-variant text-center py-10">오늘 할 일이 없어요.</p>}
@@ -252,8 +254,11 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
       </div>
 
       {showTodo && (
-        <div className="fixed inset-0 z-40 bg-black/60 flex items-end" onClick={() => setShowTodo(false)}>
-          <div className="w-full bg-[#1e2b1e] text-white rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 bg-black/60 flex items-start" onClick={() => setShowTodo(false)}>
+          <div
+            className="w-full bg-[#1e2b1e] text-white rounded-b-2xl p-5 max-h-[70vh] overflow-y-auto pt-[calc(1.25rem+env(safe-area-inset-top))]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-base font-bold mb-3">오늘의 할 일</h2>
             {allTodayItems.map((it) => (
               <div key={it.id} className="py-1.5 border-b border-white/10">

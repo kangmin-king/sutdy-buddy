@@ -1,7 +1,7 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
-import { BottomNav, Card, Button, Icon } from './primitives';
+import { BottomNav, Card, Button } from './primitives';
 import type { TabId } from './primitives';
 import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
@@ -17,6 +17,7 @@ import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import StudentPlannerScreen from './screens/student/StudentPlanner';
 import StudentCalendarScreen from './screens/student/StudentCalendar';
+import DistractionFab from './screens/shared/DistractionFab';
 import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
 import StudentSelector from './screens/manager/StudentSelector';
 import ManagerHomeScreen from './screens/manager/ManagerHome';
@@ -84,18 +85,7 @@ function StudentAppShell() {
       {activeTab === 'home' && <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} />}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
-      <button
-        onClick={() => setShowDistractionStop(true)}
-        className="fixed z-30 right-4 flex flex-col items-center gap-1"
-        style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
-      >
-        <span className="w-12 h-12 rounded-full bg-on-surface text-surface flex items-center justify-center shadow-card">
-          <Icon name="phonelink_lock" className="!text-[22px]" />
-        </span>
-        <span className="text-[10px] font-semibold text-on-surface-variant bg-surface-container-lowest px-1.5 py-0.5 rounded-full shadow-card">
-          딴짓멈춰
-        </span>
-      </button>
+      <DistractionFab onOpen={() => setShowDistractionStop(true)} />
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
   );
