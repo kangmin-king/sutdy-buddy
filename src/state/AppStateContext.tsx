@@ -1327,7 +1327,30 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
           return;
         }
-        const grouped = groupByDate((data ?? []).map(plannerItemFromRow));
+        let grouped = groupByDate((data ?? []).map(plannerItemFromRow));
+
+        // 밀린 숙제 자동 재분배: 매니저가 이 학생 화면을 열 때도 학생 본인이 열 때와 동일하게 계산한다.
+        const studentRanges = state.examSubjectRanges.filter((r) => {
+          const subject = state.examSubjects.find((s) => s.id === r.examSubjectId);
+          const exam = subject ? state.examRecords.find((e) => e.id === subject.examId) : undefined;
+          return exam?.studentId === studentId;
+        });
+        const updates = computeMissedHomeworkRedistribution(Object.values(grouped).flat(), studentRanges, todayKey());
+        if (updates.length > 0) {
+          const updatesById = new Map(updates.map((u) => [u.id, u.pageRange]));
+          grouped = Object.fromEntries(
+            Object.entries(grouped).map(([date, dateItems]) => [
+              date,
+              dateItems.map((i) => (updatesById.has(i.id) ? { ...i, pageRange: updatesById.get(i.id)! } : i)),
+            ])
+          );
+          const results = await Promise.all(
+            updates.map(({ id, pageRange }) => supabase.from('sb_planner_items').update({ page_range: pageRange }).eq('id', id))
+          );
+          if (results.some((r) => r.error)) console.error('loadStudentPlannerItems (redistribute) failed');
+        }
+
+        studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: grouped };
         setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: grouped } }));
       },
 
