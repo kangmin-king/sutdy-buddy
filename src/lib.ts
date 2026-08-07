@@ -1,4 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession, ExamSubjectRange } from './types';
 import { QuickTimeChipId } from './constants';
 
 function pad2(n: number): string {
@@ -39,6 +39,10 @@ export function daysBetween(fromKey: DateKey, toKeyValue: DateKey): number {
   return Math.round((to - from) / 86400000);
 }
 
+export function shouldGenerateHomeworkItem(assignment: HomeworkAssignment, date: DateKey): boolean {
+  return date >= assignment.startDate && date <= assignment.endDate;
+}
+
 export function formatDateKorean(dateKey: DateKey): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
@@ -56,6 +60,7 @@ export interface MonthDay {
   key: DateKey;
   date: number;
   inCurrentMonth: boolean;
+  isSunday: boolean;
 }
 
 // dateKey는 보고 싶은 달의 아무 날짜나 넘기면 된다(보통 1일). 항상 월~일 6주(42일) 그리드를 반환해
@@ -70,9 +75,39 @@ export function monthGrid(dateKey: DateKey): MonthDay[] {
   for (let i = 0; i < 42; i++) {
     const day = new Date(gridStart);
     day.setDate(gridStart.getDate() + i);
-    days.push({ key: toDateKey(day), date: day.getDate(), inCurrentMonth: day.getMonth() === m - 1 });
+    days.push({ key: toDateKey(day), date: day.getDate(), inCurrentMonth: day.getMonth() === m - 1, isSunday: day.getDay() === 0 });
   }
   return days;
+}
+
+// 2026년 대한민국 법정공휴일(관공서/학교 기준, 근로자의 날 제외 — 학생은 그날도 등교한다).
+// 대체공휴일 포함. 해가 바뀌면 이 표를 갱신해야 한다.
+const KOREAN_HOLIDAYS_2026: Record<DateKey, string> = {
+  '2026-01-01': '신정',
+  '2026-02-16': '설날 연휴',
+  '2026-02-17': '설날',
+  '2026-02-18': '설날 연휴',
+  '2026-03-01': '삼일절',
+  '2026-03-02': '삼일절 대체공휴일',
+  '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날',
+  '2026-05-25': '부처님오신날 대체공휴일',
+  '2026-06-03': '전국동시지방선거',
+  '2026-06-06': '현충일',
+  '2026-07-17': '제헌절',
+  '2026-08-15': '광복절',
+  '2026-08-17': '광복절 대체공휴일',
+  '2026-09-24': '추석 연휴',
+  '2026-09-25': '추석',
+  '2026-09-26': '추석 연휴',
+  '2026-10-03': '개천절',
+  '2026-10-05': '개천절 대체공휴일',
+  '2026-10-09': '한글날',
+  '2026-12-25': '크리스마스',
+};
+
+export function getHolidayName(dateKey: DateKey): string | null {
+  return KOREAN_HOLIDAYS_2026[dateKey] ?? null;
 }
 
 export function weekStrip(dateKey: DateKey) {
@@ -199,6 +234,157 @@ export function resolveQuickTimeChip(chipId: QuickTimeChipId, blocks: ScheduleBl
     return minutesToTime(latestEnd + 10);
   }
   return QUICK_TIME_FALLBACK[chipId];
+}
+
+export interface TimelineBlock {
+  startTime: string;
+  endTime: string;
+  subjectLabel: string;
+  deviated: boolean;
+}
+
+// 세션 시각은 timestamptz(ISO/UTC)로 저장되지만, 타임라인은 사용자가 실제로 겪은 시각을
+// 보여줘야 한다(todayKey()·날짜 선택기도 전부 로컬 기준). 문자열을 그대로 잘라 쓰면 KST에서
+// 9시간 어긋나므로 로컬 시각으로 변환한 뒤 시/분을 뽑는다.
+function toHHMM(isoString: string): string {
+  const d = new Date(isoString);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// 관리자 홈의 과목별 학습 타임라인 차트가 세션을 자정 기준 분 단위 위치로 배치할 때 쓴다.
+// toHHMM과 같은 이유로 로컬 시각 기준이어야 한다.
+export function toMinutesOfDay(isoString: string): number {
+  const d = new Date(isoString);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+export function sessionsToTimelineBlocks(
+  entries: { session: StudySession; subjectLabel: string }[],
+  nowIso: string = new Date().toISOString()
+): TimelineBlock[] {
+  return entries
+    .map(({ session, subjectLabel }) => ({
+      startTime: toHHMM(session.startedAt),
+      endTime: toHHMM(session.endedAt ?? nowIso),
+      subjectLabel,
+      deviated: session.deviated,
+    }))
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+}
+
+// 선택된 날짜(오름차순 정렬) 수만큼 [startPage, endPage] 총 페이지를 균등 분배한다.
+// 나머지는 마지막 날짜에 몰아준다. 진도관리 탭에서 교재+범위 등록 시, 관리자가 미니 캘린더에서
+// 탭으로 고른 날짜들에 이 결과를 그대로 sb_planner_items로 즉시 일괄 생성한다(지연 생성 없음).
+export function splitPagesAcrossDates(startPage: number, endPage: number, selectedDates: DateKey[]): { date: DateKey; pageRange: string }[] {
+  if (selectedDates.length === 0) return [];
+  const sorted = [...selectedDates].sort();
+  const totalPages = endPage - startPage + 1;
+  const base = Math.floor(totalPages / sorted.length);
+  const remainder = totalPages - base * sorted.length;
+
+  const result: { date: DateKey; pageRange: string }[] = [];
+  let cursor = startPage;
+  sorted.forEach((date, idx) => {
+    const isLast = idx === sorted.length - 1;
+    const count = base + (isLast ? remainder : 0);
+    const rangeStart = cursor;
+    const rangeEnd = cursor + count - 1;
+    result.push({ date, pageRange: `${rangeStart}~${rangeEnd}페이지` });
+    cursor = rangeEnd + 1;
+  });
+  return result;
+}
+
+export interface MissedHomeworkUpdate {
+  id: string;
+  pageRange: string;
+}
+
+// 놓친 날(과거 날짜인데 완료 안 된) 페이지 범위 숙제가 있으면, 완료된 항목들 중 가장 뒤 페이지를
+// "실제 도달 지점"으로 보고 남은 분량을 아직 완료 안 된 오늘/미래 날짜에 다시 나눠 담는다.
+// 자유입력(페이지 형식이 아닌) 범위는 대상이 아니다. 놓친 날 항목 자체는 절대 건드리지 않는다 —
+// 캘린더에 남을 미완료 기록이자 "어제 못한 숙제" 배너의 원본이다. 계산 결과가 이미 저장된 값과
+// 같으면 그 항목은 결과에서 빠진다(멱등성 — 매 로드마다 돌아도 안전).
+export function computeMissedHomeworkRedistribution(
+  items: PlannerItem[],
+  ranges: ExamSubjectRange[],
+  today: DateKey
+): MissedHomeworkUpdate[] {
+  const updates: MissedHomeworkUpdate[] = [];
+
+  for (const range of ranges) {
+    const totalMatch = range.rangeLabel.match(/^(\d+)~(\d+)페이지$/);
+    if (!totalMatch) continue;
+    const totalStart = Number(totalMatch[1]);
+    const totalEnd = Number(totalMatch[2]);
+
+    const rangeItems = items.filter((i) => i.examSubjectRangeId === range.id);
+    if (rangeItems.length === 0) continue;
+
+    const hasMissedPastDay = rangeItems.some((i) => i.date < today && i.status !== 'completed');
+    if (!hasMissedPastDay) continue;
+
+    let progressPoint = totalStart - 1;
+    for (const item of rangeItems) {
+      if (item.status !== 'completed') continue;
+      const nums = item.pageRange.match(/\d+/g);
+      if (!nums || nums.length === 0) continue;
+      const end = Number(nums[nums.length - 1]);
+      if (end > progressPoint) progressPoint = end;
+    }
+    if (progressPoint >= totalEnd) continue;
+
+    const futureItems = rangeItems.filter((i) => i.date >= today && i.status !== 'completed');
+    if (futureItems.length === 0) continue;
+
+    const futureDates = Array.from(new Set(futureItems.map((i) => i.date))).sort();
+    const distribution = splitPagesAcrossDates(progressPoint + 1, totalEnd, futureDates);
+
+    for (const { date, pageRange } of distribution) {
+      for (const item of futureItems.filter((i) => i.date === date)) {
+        if (item.pageRange !== pageRange) updates.push({ id: item.id, pageRange });
+      }
+    }
+  }
+
+  return updates;
+}
+
+export interface TutoringScheduleExceptionInput {
+  originalDate: DateKey;
+  newDate: DateKey | null;
+}
+
+// 요일 패턴(0=일..6=토)으로 기간 안의 과외 날짜를 계산한 뒤 예외를 적용한다.
+// 취소(newDate: null)는 그 날짜를 빼고, 변경(newDate가 있음)은 원래 날짜를 빼고 새 날짜를 추가한다.
+// 관리자 캘린더 탭에서 매번 계산해서 보여주며, DB에 미래 날짜 행을 미리 만들지 않는다.
+export function getTutoringDaysInRange(
+  weekdays: number[],
+  exceptions: TutoringScheduleExceptionInput[],
+  startDate: DateKey,
+  endDate: DateKey
+): DateKey[] {
+  const weekdaySet = new Set(weekdays);
+  const dates = new Set<DateKey>();
+
+  if (weekdaySet.size > 0) {
+    let cursor = startDate;
+    while (cursor <= endDate) {
+      const [y, m, d] = cursor.split('-').map(Number);
+      const dow = new Date(y, m - 1, d).getDay();
+      if (weekdaySet.has(dow)) dates.add(cursor);
+      cursor = addDaysToKey(cursor, 1);
+    }
+  }
+
+  for (const exception of exceptions) {
+    dates.delete(exception.originalDate);
+    if (exception.newDate && exception.newDate >= startDate && exception.newDate <= endDate) {
+      dates.add(exception.newDate);
+    }
+  }
+
+  return Array.from(dates).sort();
 }
 
 export interface MaterialPace {

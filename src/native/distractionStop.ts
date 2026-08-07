@@ -12,6 +12,8 @@ interface DistractionStopPlugin {
   setLockoutDurationMillis(opts: { durationMillis: number }): Promise<DistractionState>;
   setAppEnabled(opts: { app: BlockedAppId; enabled: boolean }): Promise<DistractionState>;
   setFeatureEnabled(opts: { enabled: boolean }): Promise<DistractionState>;
+  setAllowedApps(opts: { apps: string[] }): Promise<DistractionState>;
+  setSessionActive(opts: { active: boolean }): Promise<DistractionState>;
   isAccessibilityServiceEnabled(): Promise<{ enabled: boolean }>;
   isOverlayPermissionGranted(): Promise<{ granted: boolean }>;
   openAccessibilitySettings(): Promise<void>;
@@ -25,10 +27,12 @@ interface DistractionStopPlugin {
 
 export const DistractionStop = registerPlugin<DistractionStopPlugin>('DistractionStop');
 
-// 딴짓 멈춰는 Android 접근성 서비스가 필요해 Capacitor로 감싼 네이티브 앱에서만 동작한다.
-// 브라우저(Vercel 웹 배포 등)에서는 이 값이 false이며, 화면 쪽에서 안내 문구만 보여준다.
+// 딴짓 멈춰는 Android 접근성 서비스로만 구현돼 있다 — iOS는 스크린타임/Family Controls 같은
+// 완전히 다른 API가 필요해서 아직 없다. 그래서 이 값은 "네이티브냐"가 아니라 "안드로이드
+// 네이티브냐"를 뜻한다. 브라우저(웹 배포)나 iOS 앱에서는 false이며, 화면 쪽에서 안내 문구만
+// 보여준다.
 export function isNativePlatform(): boolean {
-  return Capacitor.isNativePlatform();
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 }
 
 export function useDistractionState() {

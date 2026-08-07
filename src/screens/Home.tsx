@@ -41,7 +41,7 @@ export default function HomeScreen({
 
       <p className="text-xs font-semibold text-on-surface-variant mt-2">{formatDateKorean(date)}</p>
       <h1 className="text-xl font-bold text-on-surface mt-1 mb-5 leading-snug">
-        안녕하세요{profile && profile.mainSubjects[0] ? `, ${getSubject(profile.mainSubjects[0]).label} 학습자님` : ''}!<br />
+        안녕하세요{profile?.mainSubjects?.[0] ? `, ${getSubject(profile.mainSubjects[0]).label} 학습자님` : ''}!<br />
         오늘 하루도 화이팅해요.
       </h1>
 

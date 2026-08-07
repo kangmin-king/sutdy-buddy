@@ -1,4 +1,4 @@
-import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId, PlannerItemStatus } from './index';
+import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId, PlannerItemStatus, Role } from './index';
 
 // 아래 Row 타입들은 반드시 `type`(object literal type)으로 선언한다. `interface`로 선언하면
 // TypeScript가 암묵적 문자열 인덱스 시그니처를 추론하지 않아 `Record<string, unknown>`에
@@ -6,12 +6,15 @@ import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId
 // Record<string, unknown>를 만족해야 함)을 통과하지 못해 모든 쿼리의 타입이 `never`로 붕괴한다.
 export type SbProfileRow = {
   id: string;
-  grade: Grade;
-  main_subjects: SubjectId[];
-  goal: string;
+  grade: Grade | null;
+  main_subjects: SubjectId[] | null;
+  goal: string | null;
   exam_date: string | null;
-  workbooks: string;
+  workbooks: string | null;
   onboarded_at: string;
+  role: Role;
+  invite_code: string | null;
+  subject_colors: Record<string, string> | null;
 };
 
 export type SbDailyConditionRow = {
@@ -55,6 +58,9 @@ export type SbPlannerItemRow = {
   understanding: 'low' | 'medium' | 'high' | null;
   partial_reason: string | null;
   incomplete_reason: string | null;
+  source: 'homework' | 'self';
+  homework_assignment_id: string | null;
+  exam_subject_range_id: string | null;
 };
 
 export type SbStudyLogRow = {
@@ -82,6 +88,83 @@ export type SbStudyMaterialRow = {
   created_at: string;
 };
 
+export type SbHomeworkAssignmentRow = {
+  id: string;
+  student_id: string;
+  created_by: string;
+  subject_id: SubjectId;
+  material: string;
+  amount_per_day: string;
+  start_date: string;
+  end_date: string;
+  updated_at: string;
+};
+
+export type SbStudySessionRow = {
+  id: string;
+  user_id: string;
+  planner_item_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  deviated: boolean;
+};
+
+export type SbStudentManagerLinkRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  linked_at: string;
+  label: string | null;
+};
+
+export type SbExamRecordRow = {
+  id: string;
+  student_id: string;
+  created_by: string;
+  title: string;
+  exam_date: string;
+  is_main: boolean;
+  created_at: string;
+};
+
+export type SbExamSubjectRow = {
+  id: string;
+  exam_id: string;
+  subject_id: SubjectId;
+  target_grade: string;
+  target_score: string;
+  target_rank: string;
+  created_at: string;
+};
+
+export type SbExamSubjectRangeRow = {
+  id: string;
+  exam_subject_id: string;
+  material: string;
+  range_label: string;
+  assigned_dates: string[];
+  created_at: string;
+};
+
+export type SbTutoringScheduleRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  weekdays: number[];
+  updated_at: string;
+};
+
+export type SbTutoringScheduleExceptionRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  original_date: string;
+  new_date: string | null;
+  note: string;
+  created_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -104,8 +187,23 @@ export interface Database {
         Update: Partial<SbStudyMaterialRow>;
         Relationships: [];
       };
+      sb_homework_assignments: { Row: SbHomeworkAssignmentRow; Insert: Omit<SbHomeworkAssignmentRow, 'updated_at'>; Update: Partial<SbHomeworkAssignmentRow>; Relationships: [] };
+      sb_study_sessions: { Row: SbStudySessionRow; Insert: SbStudySessionRow; Update: Partial<SbStudySessionRow>; Relationships: [] };
+      sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at' | 'label'>; Update: Partial<Pick<SbStudentManagerLinkRow, 'label'>>; Relationships: [] };
+      sb_exam_records: { Row: SbExamRecordRow; Insert: Omit<SbExamRecordRow, 'created_at'>; Update: Partial<SbExamRecordRow>; Relationships: [] };
+      sb_exam_subjects: { Row: SbExamSubjectRow; Insert: Omit<SbExamSubjectRow, 'created_at'>; Update: Partial<SbExamSubjectRow>; Relationships: [] };
+      sb_exam_subject_ranges: { Row: SbExamSubjectRangeRow; Insert: Omit<SbExamSubjectRangeRow, 'created_at'>; Update: Partial<SbExamSubjectRangeRow>; Relationships: [] };
+      sb_tutoring_schedules: { Row: SbTutoringScheduleRow; Insert: Omit<SbTutoringScheduleRow, 'id' | 'updated_at'>; Update: Partial<SbTutoringScheduleRow>; Relationships: [] };
+      sb_tutoring_schedule_exceptions: { Row: SbTutoringScheduleExceptionRow; Insert: Omit<SbTutoringScheduleExceptionRow, 'id' | 'created_at'>; Update: Partial<SbTutoringScheduleExceptionRow>; Relationships: [] };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // 초대코드로 학생 id를 찾는 security definer 함수 (0006 마이그레이션).
+      // 관리자는 연결 전이라 학생 프로필 행을 RLS로 읽을 수 없으므로 직접 select 대신 이 RPC를 쓴다.
+      find_student_by_invite_code: {
+        Args: { code: string };
+        Returns: string | null;
+      };
+    };
   };
 }

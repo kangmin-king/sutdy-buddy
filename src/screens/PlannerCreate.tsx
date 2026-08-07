@@ -55,6 +55,9 @@ export default function PlannerCreateScreen({ date: dateProp, onBack }: { date?:
       understanding: null,
       partialReason: null,
       incompleteReason: null,
+      source: 'self',
+      homeworkAssignmentId: null,
+      examSubjectRangeId: null,
     });
     setShowForm(false);
   };

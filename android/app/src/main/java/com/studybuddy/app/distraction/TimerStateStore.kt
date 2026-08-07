@@ -60,6 +60,14 @@ class TimerStateStore(context: Context) {
         save(currentState().copy(featureEnabled = enabled))
     }
 
+    suspend fun setAllowedApps(apps: Set<String>) {
+        save(currentState().copy(allowedApps = apps))
+    }
+
+    suspend fun setSessionActive(active: Boolean) {
+        save(currentState().copy(sessionActive = active))
+    }
+
     private suspend fun currentState(): TimerState = observeState().first()
 
     private fun save(state: TimerState) {
@@ -80,6 +88,8 @@ class TimerStateStore(context: Context) {
         json.put("enabledApps", JSONArray(state.enabledApps.map { it.name }))
         json.put("lockoutDurationMillis", state.lockoutDurationMillis)
         json.put("featureEnabled", state.featureEnabled)
+        json.put("allowedApps", JSONArray(state.allowedApps.toList()))
+        json.put("sessionActive", state.sessionActive)
         return json.toString()
     }
 
@@ -90,13 +100,22 @@ class TimerStateStore(context: Context) {
         for (i in 0 until appsArray.length()) {
             runCatching { BlockedApp.valueOf(appsArray.getString(i)) }.getOrNull()?.let { apps.add(it) }
         }
+        val allowedApps = mutableSetOf<String>()
+        if (json.has("allowedApps")) {
+            val allowedArray = json.getJSONArray("allowedApps")
+            for (i in 0 until allowedArray.length()) {
+                allowedApps.add(allowedArray.getString(i))
+            }
+        }
         return TimerState(
             endTimeMillis = if (json.isNull("endTimeMillis")) null else json.getLong("endTimeMillis"),
             exitMode = runCatching { ExitMode.valueOf(json.getString("exitMode")) }.getOrDefault(ExitMode.GRACE_PERIOD),
             gracePeriodSeconds = json.getInt("gracePeriodSeconds"),
             enabledApps = apps,
             lockoutDurationMillis = json.getLong("lockoutDurationMillis"),
-            featureEnabled = json.getBoolean("featureEnabled")
+            featureEnabled = json.getBoolean("featureEnabled"),
+            allowedApps = allowedApps,
+            sessionActive = json.optBoolean("sessionActive", false)
         )
     }
 

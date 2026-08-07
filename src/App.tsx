@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { BottomNav, Card, Button } from './primitives';
 import type { TabId } from './primitives';
+import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/Onboarding';
 import HomeScreen from './screens/Home';
@@ -13,13 +14,110 @@ import ConditionInputScreen from './screens/ConditionInput';
 import StudyLogScreen from './screens/StudyLog';
 import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
 import DistractionStopScreen from './screens/DistractionStop';
+import StudentHomeScreen from './screens/student/StudentHome';
+import StudentPlannerScreen from './screens/student/StudentPlanner';
+import StudentCalendarScreen from './screens/student/StudentCalendar';
+import DistractionFab from './screens/shared/DistractionFab';
+import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
+import StudentSelector from './screens/manager/StudentSelector';
+import ManagerHomeScreen from './screens/manager/ManagerHome';
+import ManagerProgressScreen from './screens/manager/ManagerProgress';
+import ManagerCalendarScreen from './screens/manager/ManagerCalendar';
 import { useOpenDistractionStopRequest } from './native/distractionStop';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
 
-function AppShell() {
+const MANAGER_TABS = [
+  { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
+  { id: 'home', label: '홈', icon: 'home' },
+  { id: 'progress', label: '진도관리', icon: 'trending_up' },
+] as const;
+
+// 쓰기 실패/초대코드 오류 같은 전역 오류는 어느 셸(학생/관리자/레거시)에 있든 보여야 한다.
+function ErrorBanner() {
   const { state, actions } = useAppState();
+  if (!state.error) return null;
+  return (
+    <Card className="mx-5 mt-4 flex items-center justify-between gap-3 border border-error/40">
+      <p className="text-sm text-error">{state.error}</p>
+      <Button variant="error" onClick={actions.dismissError} className="!px-3 !py-1.5 shrink-0">
+        닫기
+      </Button>
+    </Card>
+  );
+}
+
+function AppShell() {
+  const { state } = useAppState();
+
+  if (state.loading || !state.profile) {
+    return <LegacyStudentAppShell />;
+  }
+
+  if (state.profile.role === 'manager') {
+    return <ManagerAppShell />;
+  }
+
+  return <StudentAppShell />;
+}
+
+function StudentAppShell() {
+  const [activeTab, setActiveTab] = React.useState<(typeof STUDENT_NAV_TABS)[number]['id']>('home');
+  const [showDistractionStop, setShowDistractionStop] = React.useState(false);
+
+  // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
+  // 탭 전환 대신 이 오버레이를 띄운다.
+  useOpenDistractionStopRequest(React.useCallback(() => setShowDistractionStop(true), []));
+
+  if (showDistractionStop) {
+    return (
+      <div id="app-shell">
+        <ErrorBanner />
+        <DistractionStopScreen onClose={() => setShowDistractionStop(false)} />
+      </div>
+    );
+  }
+
+  return (
+    <div id="app-shell">
+      <ErrorBanner />
+      {activeTab === 'home' && <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} />}
+      {activeTab === 'calendar' && <StudentCalendarScreen />}
+      {activeTab === 'planner' && <StudentPlannerScreen />}
+      <DistractionFab onOpen={() => setShowDistractionStop(true)} />
+      <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
+    </div>
+  );
+}
+
+function ManagerAppShell() {
+  const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<(typeof MANAGER_TABS)[number]['id']>('home');
+
+  if (!selectedStudentId) {
+    return (
+      <div id="app-shell">
+        <ErrorBanner />
+        <ManagerStudentListScreen onSelectStudent={setSelectedStudentId} />
+      </div>
+    );
+  }
+
+  return (
+    <div id="app-shell">
+      <ErrorBanner />
+      <StudentSelector selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />
+      {tab === 'calendar' && <ManagerCalendarScreen studentId={selectedStudentId} />}
+      {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
+      {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
+      <BottomNav tabs={MANAGER_TABS} active={tab} onChange={setTab} />
+    </div>
+  );
+}
+
+function LegacyStudentAppShell() {
+  const { state } = useAppState();
   const [activeTab, setActiveTab] = React.useState<TabId>('home');
   const [overlay, setOverlay] = React.useState<Overlay>(null);
   const [studyLogItem, setStudyLogItem] = React.useState<PlannerItem | null>(null);
@@ -59,14 +157,7 @@ function AppShell() {
 
   return (
     <div id="app-shell">
-      {state.error && (
-        <Card className="mx-5 mt-4 flex items-center justify-between gap-3 border border-error/40">
-          <p className="text-sm text-error">{state.error}</p>
-          <Button variant="error" onClick={actions.dismissError} className="!px-3 !py-1.5 shrink-0">
-            닫기
-          </Button>
-        </Card>
-      )}
+      <ErrorBanner />
       {overlayScreen ?? (
         <>
           {activeTab === 'home' && <HomeScreen onNavigate={setActiveTab} onOpenOverlay={setOverlay} />}
@@ -74,7 +165,7 @@ function AppShell() {
           {activeTab === 'planner' && <PlannerCreateScreen />}
           {activeTab === 'check' && <ExecutionCheckScreen onOpenStudyLog={openStudyLog} onOpenAiRecommendation={() => setOverlay('aiRecommendation')} />}
           {activeTab === 'distractionStop' && <DistractionStopScreen />}
-          <BottomNav active={activeTab} onChange={setActiveTab} />
+          <BottomNav tabs={NAV_TABS} active={activeTab} onChange={setActiveTab} />
         </>
       )}
     </div>

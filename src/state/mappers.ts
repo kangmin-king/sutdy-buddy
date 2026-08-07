@@ -1,4 +1,18 @@
-import type { Profile, DailyCondition, ScheduleBlock, PlannerItem, StudyLogEntry, StudyMaterial } from '../types';
+import type {
+  Profile,
+  DailyCondition,
+  ScheduleBlock,
+  PlannerItem,
+  StudyLogEntry,
+  StudyMaterial,
+  HomeworkAssignment,
+  StudySession,
+  ExamRecord,
+  ExamSubject,
+  ExamSubjectRange,
+  TutoringSchedule,
+  TutoringScheduleException,
+} from '../types';
 import type {
   SbProfileRow,
   SbDailyConditionRow,
@@ -6,16 +20,27 @@ import type {
   SbPlannerItemRow,
   SbStudyLogRow,
   SbStudyMaterialRow,
+  SbHomeworkAssignmentRow,
+  SbStudySessionRow,
+  SbExamRecordRow,
+  SbExamSubjectRow,
+  SbExamSubjectRangeRow,
+  SbTutoringScheduleRow,
+  SbTutoringScheduleExceptionRow,
 } from '../types/db';
 
 export function profileFromRow(row: SbProfileRow): Profile {
   return {
+    id: row.id,
     grade: row.grade,
     mainSubjects: row.main_subjects,
     goal: row.goal,
     examDate: row.exam_date,
     workbooks: row.workbooks,
     onboardedAt: row.onboarded_at,
+    role: row.role,
+    inviteCode: row.invite_code,
+    subjectColors: row.subject_colors ?? {},
   };
 }
 
@@ -47,6 +72,9 @@ export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
     understanding: row.understanding,
     partialReason: row.partial_reason,
     incompleteReason: row.incomplete_reason,
+    source: row.source,
+    homeworkAssignmentId: row.homework_assignment_id,
+    examSubjectRangeId: row.exam_subject_range_id,
   };
 }
 
@@ -75,6 +103,51 @@ export function studyMaterialFromRow(row: SbStudyMaterialRow): StudyMaterial {
     sessionIntervalDays: row.session_interval_days,
     createdAt: row.created_at,
   };
+}
+
+export function homeworkAssignmentFromRow(row: SbHomeworkAssignmentRow): HomeworkAssignment {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    createdBy: row.created_by,
+    subjectId: row.subject_id,
+    material: row.material,
+    amountPerDay: row.amount_per_day,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function studySessionFromRow(row: SbStudySessionRow): StudySession {
+  return {
+    id: row.id,
+    plannerItemId: row.planner_item_id,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationSeconds: row.duration_seconds,
+    deviated: row.deviated,
+  };
+}
+
+export function examRecordFromRow(row: SbExamRecordRow): ExamRecord {
+  return { id: row.id, studentId: row.student_id, createdBy: row.created_by, title: row.title, examDate: row.exam_date, isMain: row.is_main, createdAt: row.created_at };
+}
+
+export function examSubjectFromRow(row: SbExamSubjectRow): ExamSubject {
+  return { id: row.id, examId: row.exam_id, subjectId: row.subject_id, targetGrade: row.target_grade, targetScore: row.target_score, targetRank: row.target_rank, createdAt: row.created_at };
+}
+
+export function examSubjectRangeFromRow(row: SbExamSubjectRangeRow): ExamSubjectRange {
+  return { id: row.id, examSubjectId: row.exam_subject_id, material: row.material, rangeLabel: row.range_label, assignedDates: row.assigned_dates, createdAt: row.created_at };
+}
+
+export function tutoringScheduleFromRow(row: SbTutoringScheduleRow): TutoringSchedule {
+  return { id: row.id, studentId: row.student_id, managerId: row.manager_id, weekdays: row.weekdays, updatedAt: row.updated_at };
+}
+
+export function tutoringScheduleExceptionFromRow(row: SbTutoringScheduleExceptionRow): TutoringScheduleException {
+  return { id: row.id, studentId: row.student_id, managerId: row.manager_id, originalDate: row.original_date, newDate: row.new_date, note: row.note, createdAt: row.created_at };
 }
 
 export function groupByDate<T extends { date: string }>(rows: T[]): Record<string, T[]> {

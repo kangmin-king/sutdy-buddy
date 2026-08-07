@@ -1,11 +1,16 @@
 import React from 'react';
 import { NAV_TABS, MOODS } from './constants';
+import { useAuth } from './state/AuthContext';
 
 export function Icon({ name, className = '', filled = false }: { name: string; className?: string; filled?: boolean }) {
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
 }
 
 export function TopAppBar({ title = '스터디 버디', onBell }: { title?: string; onBell?: () => void }) {
+  const { signOut } = useAuth();
+  const handleLogout = () => {
+    if (window.confirm('로그아웃 하시겠어요?')) void signOut();
+  };
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 py-4">
       <div className="flex items-center gap-2.5">
@@ -14,9 +19,14 @@ export function TopAppBar({ title = '스터디 버디', onBell }: { title?: stri
         </div>
         <span className="text-lg font-bold text-primary">{title}</span>
       </div>
-      <button onClick={onBell} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
-        <Icon name="notifications" />
-      </button>
+      <div className="flex items-center gap-1">
+        <button onClick={onBell} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
+          <Icon name="notifications" />
+        </button>
+        <button onClick={handleLogout} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
+          <Icon name="logout" />
+        </button>
+      </div>
     </header>
   );
 }
@@ -34,10 +44,18 @@ export function BackBar({ title, onBack }: { title: string; onBack: () => void }
 
 export type TabId = (typeof NAV_TABS)[number]['id'];
 
-export function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
+export function BottomNav<T extends { id: string; label: string; icon: string }>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: readonly T[];
+  active: T['id'];
+  onChange: (id: T['id']) => void;
+}) {
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-surface-container-lowest border-t border-outline-variant/50 flex justify-around pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-30">
-      {NAV_TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = tab.id === active;
         return (
           <button

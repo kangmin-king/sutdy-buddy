@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 interface AuthValue {
   session: Session | null;
   loading: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthValue | null>(null);
@@ -24,7 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  return <AuthContext.Provider value={{ session, loading }}>{children}</AuthContext.Provider>;
+  const signOut = React.useCallback(async () => {
+    await supabase.auth.signOut();
+  }, []);
+
+  return <AuthContext.Provider value={{ session, loading, signOut }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthValue {

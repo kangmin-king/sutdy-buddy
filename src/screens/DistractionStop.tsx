@@ -1,5 +1,5 @@
 import React from 'react';
-import { TopAppBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon } from '../primitives';
+import { TopAppBar, BackBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon, TextField } from '../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../native/distractionStop';
 import type { BlockedAppId, DistractionState, ExitModeId } from '../types/distraction';
 
@@ -22,6 +22,28 @@ const LOCKOUT_OPTIONS = [
   { id: '1800000', label: '30분' },
 ];
 
+function AllowedAppAdder({ onAdd }: { onAdd: (pkg: string) => void }) {
+  const [pkg, setPkg] = React.useState('');
+
+  const handleAdd = () => {
+    const trimmed = pkg.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setPkg('');
+  };
+
+  return (
+    <div className="flex items-end gap-2">
+      <div className="flex-1">
+        <TextField value={pkg} onChange={setPkg} placeholder="com.android.calculator2" />
+      </div>
+      <Button variant="secondary" className="!px-4" onClick={handleAdd}>
+        추가
+      </Button>
+    </div>
+  );
+}
+
 function formatRemaining(endTimeMillis: number | null, nowMillis: number): string | null {
   if (endTimeMillis == null) return null;
   const remainingMs = Math.max(0, endTimeMillis - nowMillis);
@@ -29,9 +51,12 @@ function formatRemaining(endTimeMillis: number | null, nowMillis: number): strin
   return remainingMs === 0 ? '종료됨' : `${minutes}분 남음`;
 }
 
-export default function DistractionStopScreen() {
+// onClose가 있으면(오른쪽 아래 떠 있는 버튼으로 연 오버레이) 뒤로가기 헤더를 쓰고, 없으면
+// (레거시 하단 탭 등 기존 자리) 기존 TopAppBar를 그대로 쓴다.
+export default function DistractionStopScreen({ onClose }: { onClose?: () => void } = {}) {
   const { state: remoteState, permissions } = useDistractionState();
   const [now, setNow] = React.useState(0);
+  const header = onClose ? <BackBar title="딴짓 멈춰" onBack={onClose} /> : <TopAppBar />;
 
   // 버튼/칩을 누르면 네이티브 왕복이 끝나기 전까지 화면이 그대로라 "안 눌린다"고 느껴지기
   // 쉽다. 로컬 상태를 즉시 반영(낙관적 업데이트)하고, 네이티브에서 확정된 상태가 오면
@@ -51,7 +76,7 @@ export default function DistractionStopScreen() {
   if (!isNativePlatform()) {
     return (
       <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
-        <TopAppBar />
+        {header}
         <div className="pt-6">
           <Card className="text-center">
             <Icon name="phonelink_lock" className="!text-[32px] text-on-surface-variant mb-2" />
@@ -65,7 +90,7 @@ export default function DistractionStopScreen() {
   if (!state) {
     return (
       <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
-        <TopAppBar />
+        {header}
         <div className="pt-6 text-center text-sm text-on-surface-variant">불러오는 중...</div>
       </div>
     );
@@ -75,7 +100,7 @@ export default function DistractionStopScreen() {
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
-      <TopAppBar />
+      {header}
       <div className="pt-2 space-y-5">
         <Card className="flex items-center justify-between">
           <div>
@@ -186,6 +211,34 @@ export default function DistractionStopScreen() {
               DistractionStop.setLockoutDurationMillis({ durationMillis });
             }}
           />
+        </div>
+
+        <div>
+          <SectionTitle>허용앱 (학습 실행 중 이탈 감지 예외)</SectionTitle>
+          <Card className="space-y-2">
+            {state.allowedApps.map((pkg) => (
+              <div key={pkg} className="flex items-center justify-between">
+                <span className="text-sm">{pkg}</span>
+                <button
+                  onClick={() => {
+                    const next = state.allowedApps.filter((p) => p !== pkg);
+                    setLocal((s) => s && { ...s, allowedApps: next });
+                    DistractionStop.setAllowedApps({ apps: next });
+                  }}
+                >
+                  <Icon name="close" className="!text-[16px]" />
+                </button>
+              </div>
+            ))}
+            <AllowedAppAdder
+              onAdd={(pkg) => {
+                if (state.allowedApps.includes(pkg)) return;
+                const next = [...state.allowedApps, pkg];
+                setLocal((s) => s && { ...s, allowedApps: next });
+                DistractionStop.setAllowedApps({ apps: next });
+              }}
+            />
+          </Card>
         </div>
       </div>
     </div>

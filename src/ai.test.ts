@@ -11,7 +11,7 @@ function item(overrides: Partial<PlannerItem>): PlannerItem {
     id: 'p1', date: '2026-07-30', order: 1, subjectId: 'math', startTime: '19:00',
     studyType: null, material: '', unit: '', pageRange: '', endTime: null, difficulty: null,
     restPattern: null, mustDo: false, status: 'planned', actualMinutes: null, understanding: null,
-    partialReason: null, incompleteReason: null, ...overrides,
+    partialReason: null, incompleteReason: null, source: 'self', homeworkAssignmentId: null, examSubjectRangeId: null, ...overrides,
   };
 }
 
