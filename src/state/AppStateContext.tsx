@@ -1,7 +1,7 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { uid, addDaysToKey, todayKey, shouldGenerateHomeworkItem, splitPagesAcrossDates } from '../lib';
+import { uid, addDaysToKey, todayKey, shouldGenerateHomeworkItem, splitPagesAcrossDates, computeMissedHomeworkRedistribution } from '../lib';
 import {
   profileFromRow,
   conditionFromRow,
@@ -1376,6 +1376,30 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       });
     });
   }, [state.loading, state.profile, state.plannerItems, state.homeworkAssignments, actions]);
+
+  // 밀린 숙제 자동 재분배: 학생 본인 계정에서, 과거 날짜에 놓친 페이지 범위 숙제가 있으면 남은
+  // 분량을 오늘/미래 날짜에 자동으로 다시 나눠 담는다. 계산 결과가 기존과 같으면(이미 반영됨)
+  // updates가 비어 있어 아무 것도 쓰지 않는다 — 매 렌더마다 돌아도 안전하다.
+  React.useEffect(() => {
+    if (state.loading || !state.profile || state.profile.role !== 'student') return;
+    const items = Object.values(state.plannerItems).flat();
+    const updates = computeMissedHomeworkRedistribution(items, state.examSubjectRanges, todayKey());
+    if (updates.length === 0) return;
+
+    const updatesById = new Map(updates.map((u) => [u.id, u.pageRange]));
+    const nextPlannerItems: Record<DateKey, PlannerItem[]> = {};
+    for (const [date, dateItems] of Object.entries(state.plannerItems)) {
+      nextPlannerItems[date] = dateItems.map((i) => (updatesById.has(i.id) ? { ...i, pageRange: updatesById.get(i.id)! } : i));
+    }
+    setState((s) => ({ ...s, plannerItems: nextPlannerItems }));
+
+    Promise.all(
+      updates.map(({ id, pageRange }) => supabase.from('sb_planner_items').update({ page_range: pageRange }).eq('id', id))
+    ).then((results) => {
+      if (results.some((r) => r.error)) console.error('missed-homework redistribute failed');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.loading, state.profile, state.plannerItems, state.examSubjectRanges]);
 
   return <AppStateContext.Provider value={{ state, actions }}>{children}</AppStateContext.Provider>;
 }
