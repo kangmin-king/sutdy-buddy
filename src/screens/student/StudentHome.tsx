@@ -1,9 +1,10 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey } from '../../lib';
+import { todayKey, addDaysToKey } from '../../lib';
 import { getSubject } from '../../constants';
 import { TopAppBar, Card, Icon } from '../../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../../native/distractionStop';
+import type { PlannerItem } from '../../types';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -25,12 +26,42 @@ function elapsedTodaySeconds(sessions: { id: string; startedAt: string; duration
   return total;
 }
 
-export default function StudentHomeScreen() {
+export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigateToCalendar?: () => void } = {}) {
   const { state, actions } = useAppState();
   const today = todayKey();
+  const yesterday = addDaysToKey(today, -1);
   // 완료 처리한 항목은 홈 목록에서 사라진다 — "📌 오늘의 할 일" 오버레이에서는 체크 표시로 계속 보인다.
   const items = (state.plannerItems[today] ?? []).filter((it) => it.status !== 'completed').slice().sort((a, b) => a.order - b.order);
   const allTodayItems = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
+  const missedYesterday = (state.plannerItems[yesterday] ?? []).filter((it) => it.status !== 'completed');
+  const isPageRangeItem = (it: PlannerItem) => {
+    if (!it.examSubjectRangeId) return false;
+    const range = state.examSubjectRanges.find((r) => r.id === it.examSubjectRangeId);
+    return !!range && /^\d+~\d+페이지$/.test(range.rangeLabel);
+  };
+  const handleAddToToday = (it: PlannerItem) => {
+    actions.addPlannerItem(today, {
+      date: today,
+      subjectId: it.subjectId,
+      startTime: it.startTime,
+      studyType: it.studyType,
+      material: it.material,
+      unit: it.unit,
+      pageRange: it.pageRange,
+      endTime: it.endTime,
+      difficulty: it.difficulty,
+      restPattern: it.restPattern,
+      mustDo: it.mustDo,
+      status: 'planned',
+      actualMinutes: null,
+      understanding: null,
+      partialReason: null,
+      incompleteReason: null,
+      source: it.source,
+      homeworkAssignmentId: null,
+      examSubjectRangeId: null,
+    });
+  };
   const [runningSessionId, setRunningSessionId] = React.useState<Record<string, string>>({});
   const [startPending, setStartPending] = React.useState<Record<string, boolean>>({});
   const [now, setNow] = React.useState(Date.now());
@@ -124,6 +155,30 @@ export default function StudentHomeScreen() {
         <p className="mt-2 text-xs text-on-surface-variant">
           내 초대코드 <span className="font-mono font-bold text-on-surface tracking-wider">{state.profile.inviteCode}</span> · 과외쌤/학부모께 알려주세요
         </p>
+      )}
+      {missedYesterday.length > 0 && (
+        <div className="mt-3 rounded-xl bg-error/10 border border-error/30 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-error">어제 못한 숙제</p>
+            <button onClick={onNavigateToCalendar} className="text-[11px] text-on-surface-variant underline">
+              지금까지 밀린 과제 보기
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {missedYesterday.map((it) => (
+              <div key={it.id} className="flex items-center justify-between gap-2">
+                <p className="text-xs">
+                  {getSubject(it.subjectId).label} · {it.material || '할 일'}
+                </p>
+                {!isPageRangeItem(it) && (
+                  <button onClick={() => handleAddToToday(it)} className="text-[11px] font-semibold text-primary shrink-0">
+                    오늘 일정에 추가하기
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
       <button
         onClick={() => setShowTodo(true)}
