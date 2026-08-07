@@ -1,0 +1,2 @@
+// 이 프로젝트는 Cordova 플러그인을 쓰지 않는다(딴짓멈춰는 순수 Capacitor 네이티브 플러그인).
+// capacitor.build.gradle이 이 파일을 무조건 apply하길래, 존재만 하도록 빈 파일로 둔다.
