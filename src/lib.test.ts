@@ -20,8 +20,9 @@ import {
   getTutoringDaysInRange,
   getHolidayName,
   toMinutesOfDay,
+  computeMissedHomeworkRedistribution,
 } from './lib';
-import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession, ExamSubjectRange } from './types';
 
 describe('timeToMinutes / minutesToTime', () => {
   it('converts HH:MM to minutes and back', () => {
@@ -360,6 +361,84 @@ describe('splitPagesAcrossDates', () => {
 
   it('returns an empty array when no dates are selected', () => {
     expect(splitPagesAcrossDates(1, 40, [])).toEqual([]);
+  });
+});
+
+function examSubjectRange(overrides: Partial<ExamSubjectRange>): ExamSubjectRange {
+  return {
+    id: 'r1',
+    examSubjectId: 'es1',
+    material: '쎈 수학',
+    rangeLabel: '1~30페이지',
+    assignedDates: ['2026-08-07', '2026-08-08', '2026-08-09'],
+    createdAt: '2026-08-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('computeMissedHomeworkRedistribution', () => {
+  it('returns nothing when no past day was missed', () => {
+    const range = examSubjectRange({});
+    const items = [
+      plannerItem({ id: 'a', date: '2026-08-07', pageRange: '1~10페이지', examSubjectRangeId: 'r1', status: 'completed' }),
+      plannerItem({ id: 'b', date: '2026-08-08', pageRange: '11~20페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+      plannerItem({ id: 'c', date: '2026-08-09', pageRange: '21~30페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+    ];
+    expect(computeMissedHomeworkRedistribution(items, [range], '2026-08-08')).toEqual([]);
+  });
+
+  it('redistributes the full range when the missed day made zero progress', () => {
+    const range = examSubjectRange({});
+    const items = [
+      plannerItem({ id: 'a', date: '2026-08-07', pageRange: '1~10페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+      plannerItem({ id: 'b', date: '2026-08-08', pageRange: '11~20페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+      plannerItem({ id: 'c', date: '2026-08-09', pageRange: '21~30페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+    ];
+    const result = computeMissedHomeworkRedistribution(items, [range], '2026-08-08');
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { id: 'b', pageRange: '1~15페이지' },
+        { id: 'c', pageRange: '16~30페이지' },
+      ])
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it('only redistributes what is left past the last completed page', () => {
+    const range = examSubjectRange({});
+    const items = [
+      plannerItem({ id: 'a', date: '2026-08-07', pageRange: '1~10페이지', examSubjectRangeId: 'r1', status: 'completed' }),
+      plannerItem({ id: 'b', date: '2026-08-08', pageRange: '11~20페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+      plannerItem({ id: 'c', date: '2026-08-09', pageRange: '21~30페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+    ];
+    const result = computeMissedHomeworkRedistribution(items, [range], '2026-08-09');
+    expect(result).toEqual([{ id: 'c', pageRange: '11~30페이지' }]);
+  });
+
+  it('is idempotent: computing again after applying the updates returns nothing', () => {
+    const range = examSubjectRange({});
+    const items = [
+      plannerItem({ id: 'a', date: '2026-08-07', pageRange: '1~10페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+      plannerItem({ id: 'b', date: '2026-08-08', pageRange: '1~15페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+      plannerItem({ id: 'c', date: '2026-08-09', pageRange: '16~30페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+    ];
+    expect(computeMissedHomeworkRedistribution(items, [range], '2026-08-08')).toEqual([]);
+  });
+
+  it('ignores free-input ranges (not a page-range label)', () => {
+    const range = examSubjectRange({ rangeLabel: '1회 모의고사 풀이 및 채점' });
+    const items = [
+      plannerItem({ id: 'a', date: '2026-08-07', pageRange: '1회 모의고사 풀이 및 채점', examSubjectRangeId: 'r1', status: 'planned' }),
+    ];
+    expect(computeMissedHomeworkRedistribution(items, [range], '2026-08-08')).toEqual([]);
+  });
+
+  it('returns nothing when there are no future dates left to redistribute into', () => {
+    const range = examSubjectRange({ assignedDates: ['2026-08-07'] });
+    const items = [
+      plannerItem({ id: 'a', date: '2026-08-07', pageRange: '1~30페이지', examSubjectRangeId: 'r1', status: 'planned' }),
+    ];
+    expect(computeMissedHomeworkRedistribution(items, [range], '2026-08-08')).toEqual([]);
   });
 });
 

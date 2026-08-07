@@ -1,4 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession, ExamSubjectRange } from './types';
 import { QuickTimeChipId } from './constants';
 
 function pad2(n: number): string {
@@ -293,6 +293,61 @@ export function splitPagesAcrossDates(startPage: number, endPage: number, select
     cursor = rangeEnd + 1;
   });
   return result;
+}
+
+export interface MissedHomeworkUpdate {
+  id: string;
+  pageRange: string;
+}
+
+// 놓친 날(과거 날짜인데 완료 안 된) 페이지 범위 숙제가 있으면, 완료된 항목들 중 가장 뒤 페이지를
+// "실제 도달 지점"으로 보고 남은 분량을 아직 완료 안 된 오늘/미래 날짜에 다시 나눠 담는다.
+// 자유입력(페이지 형식이 아닌) 범위는 대상이 아니다. 놓친 날 항목 자체는 절대 건드리지 않는다 —
+// 캘린더에 남을 미완료 기록이자 "어제 못한 숙제" 배너의 원본이다. 계산 결과가 이미 저장된 값과
+// 같으면 그 항목은 결과에서 빠진다(멱등성 — 매 로드마다 돌아도 안전).
+export function computeMissedHomeworkRedistribution(
+  items: PlannerItem[],
+  ranges: ExamSubjectRange[],
+  today: DateKey
+): MissedHomeworkUpdate[] {
+  const updates: MissedHomeworkUpdate[] = [];
+
+  for (const range of ranges) {
+    const totalMatch = range.rangeLabel.match(/^(\d+)~(\d+)페이지$/);
+    if (!totalMatch) continue;
+    const totalStart = Number(totalMatch[1]);
+    const totalEnd = Number(totalMatch[2]);
+
+    const rangeItems = items.filter((i) => i.examSubjectRangeId === range.id);
+    if (rangeItems.length === 0) continue;
+
+    const hasMissedPastDay = rangeItems.some((i) => i.date < today && i.status !== 'completed');
+    if (!hasMissedPastDay) continue;
+
+    let progressPoint = totalStart - 1;
+    for (const item of rangeItems) {
+      if (item.status !== 'completed') continue;
+      const nums = item.pageRange.match(/\d+/g);
+      if (!nums || nums.length === 0) continue;
+      const end = Number(nums[nums.length - 1]);
+      if (end > progressPoint) progressPoint = end;
+    }
+    if (progressPoint >= totalEnd) continue;
+
+    const futureItems = rangeItems.filter((i) => i.date >= today && i.status !== 'completed');
+    if (futureItems.length === 0) continue;
+
+    const futureDates = Array.from(new Set(futureItems.map((i) => i.date))).sort();
+    const distribution = splitPagesAcrossDates(progressPoint + 1, totalEnd, futureDates);
+
+    for (const { date, pageRange } of distribution) {
+      for (const item of futureItems.filter((i) => i.date === date)) {
+        if (item.pageRange !== pageRange) updates.push({ id: item.id, pageRange });
+      }
+    }
+  }
+
+  return updates;
 }
 
 export interface TutoringScheduleExceptionInput {
