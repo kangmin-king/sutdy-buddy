@@ -17,7 +17,14 @@ export function DayProgressRing({
     percent == null ? {} : { background: `conic-gradient(#366095 0% ${percent}%, #e5e5e5 ${percent}% 100%)` };
   return (
     <span className="flex items-center justify-center rounded-full shrink-0" style={{ width: size, height: size, ...style }}>
-      {children}
+      {/* percent가 있을 때만 안쪽에 불투명 배경을 깔아, 날짜 숫자가 conic-gradient 채움 위에 바로 얹혀
+          대비가 떨어지는 일 없이 항상 중립 배경 위에서 렌더되게 한다(도큐 코멘트의 "얇은 링"과 일치). */}
+      <span
+        className={percent == null ? 'flex items-center justify-center rounded-full' : 'flex items-center justify-center rounded-full bg-surface'}
+        style={percent == null ? undefined : { width: size - 4, height: size - 4 }}
+      >
+        {children}
+      </span>
     </span>
   );
 }

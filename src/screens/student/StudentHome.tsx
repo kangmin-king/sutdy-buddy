@@ -39,6 +39,15 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
     const range = state.examSubjectRanges.find((r) => r.id === it.examSubjectRangeId);
     return !!range && /^\d+~\d+페이지$/.test(range.rangeLabel);
   };
+  // 페이지 범위 숙제는 보통 밀린 만큼이 자동으로 오늘/미래 날짜에 재분배된다(computeMissedHomeworkRedistribution).
+  // 하지만 그 범위에 남은 미완료 미래/오늘 날짜가 하나도 없으면(예: 마지막 배정일이 어제) 재분배될
+  // 곳이 없어 조용히 누락된다 — 이 경우엔 자유 입력 항목과 동일하게 "오늘 일정에 추가하기" 버튼을 보여준다.
+  const hasFutureIncompleteInSameRange = (it: PlannerItem) => {
+    if (!it.examSubjectRangeId) return false;
+    return Object.values(state.plannerItems)
+      .flat()
+      .some((other) => other.examSubjectRangeId === it.examSubjectRangeId && other.date >= today && other.status !== 'completed');
+  };
   const handleAddToToday = (it: PlannerItem) => {
     actions.addPlannerItem(today, {
       date: today,
@@ -170,7 +179,7 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
                 <p className="text-xs">
                   {getSubject(it.subjectId).label} · {it.material || '할 일'}
                 </p>
-                {!isPageRangeItem(it) && (
+                {(!isPageRangeItem(it) || !hasFutureIncompleteInSameRange(it)) && (
                   <button onClick={() => handleAddToToday(it)} className="text-[11px] font-semibold text-primary shrink-0">
                     오늘 일정에 추가하기
                   </button>

@@ -1347,7 +1347,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           const results = await Promise.all(
             updates.map(({ id, pageRange }) => supabase.from('sb_planner_items').update({ page_range: pageRange }).eq('id', id))
           );
-          if (results.some((r) => r.error)) console.error('loadStudentPlannerItems (redistribute) failed');
+          const failed = results.filter((r) => r.error);
+          if (failed.length > 0) {
+            console.error('loadStudentPlannerItems (redistribute) failed:', failed.map((r) => r.error?.message));
+            setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          }
         }
 
         studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: grouped };
@@ -1410,16 +1414,28 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (updates.length === 0) return;
 
     const updatesById = new Map(updates.map((u) => [u.id, u.pageRange]));
-    const nextPlannerItems: Record<DateKey, PlannerItem[]> = {};
-    for (const [date, dateItems] of Object.entries(state.plannerItems)) {
-      nextPlannerItems[date] = dateItems.map((i) => (updatesById.has(i.id) ? { ...i, pageRange: updatesById.get(i.id)! } : i));
-    }
-    setState((s) => ({ ...s, plannerItems: nextPlannerItems }));
+    // nextPlannerItems must be derived inside the functional updater from the fresh `s`, not the
+    // outer `state.plannerItems` closure — this effect can land in the same passive-effect flush
+    // as the "지연 숙제 생성" effect above (which calls addPlannerItem with a functional updater).
+    // Reading the outer closure here would let this wholesale replacement silently discard a
+    // homework item that effect just added, causing it to look "not yet generated" on the next
+    // run and get re-inserted as a duplicate DB row.
+    setState((s) => {
+      const nextPlannerItems: Record<DateKey, PlannerItem[]> = {};
+      for (const [date, dateItems] of Object.entries(s.plannerItems)) {
+        nextPlannerItems[date] = dateItems.map((i) => (updatesById.has(i.id) ? { ...i, pageRange: updatesById.get(i.id)! } : i));
+      }
+      return { ...s, plannerItems: nextPlannerItems };
+    });
 
     Promise.all(
       updates.map(({ id, pageRange }) => supabase.from('sb_planner_items').update({ page_range: pageRange }).eq('id', id))
     ).then((results) => {
-      if (results.some((r) => r.error)) console.error('missed-homework redistribute failed');
+      const failed = results.filter((r) => r.error);
+      if (failed.length > 0) {
+        console.error('missed-homework redistribute failed:', failed.map((r) => r.error?.message));
+        setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.loading, state.profile, state.plannerItems, state.examSubjectRanges]);
