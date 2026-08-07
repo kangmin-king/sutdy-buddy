@@ -89,6 +89,7 @@ type HomeworkScope = { mode: 'pages'; startPage: number; endPage: number } | { m
 
 interface AppStateActions {
   saveProfile: (profile: Profile) => Promise<void>;
+  updateSubjectColor: (subjectId: SubjectId, color: string) => Promise<void>;
   saveCondition: (date: DateKey, condition: DailyCondition) => Promise<void>;
   upsertScheduleBlock: (date: DateKey, block: ScheduleBlock) => Promise<void>;
   deleteScheduleBlock: (date: DateKey, id: string) => Promise<void>;
@@ -354,10 +355,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           onboarded_at: profile.onboardedAt,
           role: profile.role,
           invite_code: profile.inviteCode,
+          subject_colors: profile.subjectColors,
         });
         if (error) {
           console.error('saveProfile failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async updateSubjectColor(subjectId, color) {
+        const previous = state.profile;
+        if (!previous) return;
+        const nextColors = { ...previous.subjectColors, [subjectId]: color };
+        setState((s) => (s.profile ? { ...s, profile: { ...s.profile, subjectColors: nextColors } } : s));
+        const { error } = await supabase.from('sb_profiles').update({ subject_colors: nextColors }).eq('id', userId);
+        if (error) {
+          console.error('updateSubjectColor failed:', error.message);
+          setState((s) => (s.profile ? { ...s, profile: { ...s.profile, subjectColors: previous.subjectColors }, error: WRITE_FAILURE_MESSAGE } : s));
         }
       },
 

@@ -17,11 +17,12 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
   const items = (state.studentPlannerItems[studentId]?.[today] ?? []).slice().sort((a, b) => a.order - b.order);
   const homeworkItems = items.filter((it) => it.source === 'homework');
   const selfItems = items.filter((it) => it.source === 'self');
+  const studentProfile = state.managedStudents.find((s) => s.id === studentId);
 
   return (
     <div className="px-5 pt-2 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <h2 className="text-base font-bold mt-2 mb-2">오늘 학습 타임라인</h2>
-      <ChecklistTimeline items={items} studySessions={state.studySessions} />
+      <ChecklistTimeline items={items} studySessions={state.studySessions} customColors={studentProfile?.subjectColors} />
 
       <h2 className="text-base font-bold mt-6 mb-2">오늘 숙제</h2>
       {homeworkItems.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">오늘 등록된 숙제가 없어요.</p>}

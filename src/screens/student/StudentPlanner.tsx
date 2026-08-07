@@ -108,7 +108,13 @@ export default function StudentPlannerScreen() {
 
       <div className="mt-6">
         <SectionTitle>오늘 타임라인</SectionTitle>
-        <ChecklistTimeline items={todayItems} studySessions={state.studySessions} />
+        <ChecklistTimeline
+          items={todayItems}
+          studySessions={state.studySessions}
+          customColors={state.profile?.subjectColors}
+          editable
+          onChangeSubjectColor={(subjectId, color) => actions.updateSubjectColor(subjectId, color)}
+        />
       </div>
 
       {completedItems.length > 0 && (

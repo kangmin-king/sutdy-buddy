@@ -1,14 +1,3 @@
-// SUBJECTS(constants.ts)의 색 토큰(primary/secondary/tertiary)만 쓴다. Tailwind는 파일에 그대로
-// 등장하는 클래스 문자열만 뽑아내므로 동적 템플릿 문자열 대신 완전한 문자열을 나열한다.
-const BAR_CLASSES: Record<string, string> = {
-  primary: 'bg-primary/80',
-  secondary: 'bg-secondary/80',
-  tertiary: 'bg-tertiary/80',
-  rose: 'bg-rose-500/80',
-  amber: 'bg-amber-500/80',
-  slate: 'bg-slate-500/80',
-};
-
 export interface TimelineSegment {
   subjectLabel: string;
   color: string;
@@ -51,7 +40,8 @@ export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
                 <div
                   key={c}
                   title={seg?.subjectLabel}
-                  className={seg ? (seg.deviated ? 'bg-error/80' : (BAR_CLASSES[seg.color] ?? 'bg-primary/80')) : 'bg-surface-container'}
+                  className={seg ? undefined : 'bg-surface-container'}
+                  style={seg ? { backgroundColor: seg.deviated ? '#ba1a1a' : seg.color, opacity: 0.8 } : undefined}
                 />
               );
             })}

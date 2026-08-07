@@ -8,19 +8,42 @@ import type {
   RestPatternId,
 } from './types';
 
-// color는 타임라인(오늘 타임라인/캘린더 시간대 그리드)에서 과목별로 구분되는 색으로만 쓰인다
-// (ChecklistTimeline/TimelineColumn) — 과목마다 겹치지 않게 6개 전부 다른 값을 준다.
+// 색상 선택기(오늘 타임라인 점 클릭)에서 고를 수 있는 기본 12색. 과목 기본색도 전부 이 팔레트
+// 안에서 고른다 — 커스텀 색과 같은 톤으로 섞여도 어색하지 않게.
+export const SUBJECT_COLOR_PALETTE: string[] = [
+  '#ef4444', // 빨강
+  '#f97316', // 주황
+  '#f59e0b', // 호박
+  '#eab308', // 노랑
+  '#84cc16', // 라임
+  '#22c55e', // 초록
+  '#14b8a6', // 청록
+  '#06b6d4', // 하늘
+  '#3b82f6', // 파랑
+  '#6366f1', // 남색
+  '#a855f7', // 보라
+  '#ec4899', // 분홍
+];
+
+// color는 타임라인(오늘 타임라인/캘린더 시간대 그리드)에서 과목별로 구분되는 기본 색(hex)이다
+// (ChecklistTimeline/TimelineColumn) — 과목마다 겹치지 않게 6개 전부 다른 값을 준다. 학생이
+// 직접 고른 색(Profile.subjectColors)이 있으면 resolveSubjectColor에서 이 기본값을 덮어쓴다.
 export const SUBJECTS: { id: SubjectId; label: string; color: string }[] = [
-  { id: 'korean', label: '국어', color: 'tertiary' },
-  { id: 'math', label: '수학', color: 'primary' },
-  { id: 'english', label: '영어', color: 'rose' },
-  { id: 'science', label: '과학', color: 'secondary' },
-  { id: 'social', label: '사회', color: 'amber' },
-  { id: 'etc', label: '기타', color: 'slate' },
+  { id: 'korean', label: '국어', color: '#a855f7' },
+  { id: 'math', label: '수학', color: '#3b82f6' },
+  { id: 'english', label: '영어', color: '#ec4899' },
+  { id: 'science', label: '과학', color: '#22c55e' },
+  { id: 'social', label: '사회', color: '#f97316' },
+  { id: 'etc', label: '기타', color: '#6366f1' },
 ];
 
 export function getSubject(id: SubjectId) {
-  return SUBJECTS.find((s) => s.id === id) ?? { id, label: id, color: 'primary' };
+  return SUBJECTS.find((s) => s.id === id) ?? { id, label: id, color: '#3b82f6' };
+}
+
+// 학생이 직접 고른 색이 있으면 그걸, 없으면 과목 기본색을 쓴다.
+export function resolveSubjectColor(id: SubjectId, customColors?: Record<string, string>): string {
+  return customColors?.[id] ?? getSubject(id).color;
 }
 
 export const STUDY_TYPES: { id: StudyTypeId; label: string; icon: string }[] = [

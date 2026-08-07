@@ -40,6 +40,7 @@ export function profileFromRow(row: SbProfileRow): Profile {
     onboardedAt: row.onboarded_at,
     role: row.role,
     inviteCode: row.invite_code,
+    subjectColors: row.subject_colors ?? {},
   };
 }
 

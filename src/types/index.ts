@@ -21,6 +21,8 @@ export interface Profile {
   onboardedAt: string;
   role: Role;
   inviteCode: string | null;
+  // 오늘 타임라인에서 과목별로 직접 고른 색(hex). 없는 과목은 기본 색을 쓴다.
+  subjectColors: Record<string, string>;
 }
 
 export interface DailyCondition {

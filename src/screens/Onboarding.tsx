@@ -31,6 +31,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
       onboardedAt: new Date().toISOString(),
       role: 'student',
       inviteCode: crypto.randomUUID().slice(0, 8).toUpperCase(),
+      subjectColors: {},
     });
     setSubmitting(false);
     onComplete();
@@ -49,6 +50,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
       onboardedAt: new Date().toISOString(),
       role: 'manager',
       inviteCode: null,
+      subjectColors: {},
     });
     const code = inviteCodeInput.trim();
     if (code) {

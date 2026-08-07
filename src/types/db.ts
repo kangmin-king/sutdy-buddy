@@ -14,6 +14,7 @@ export type SbProfileRow = {
   onboarded_at: string;
   role: Role;
   invite_code: string | null;
+  subject_colors: Record<string, string> | null;
 };
 
 export type SbDailyConditionRow = {
