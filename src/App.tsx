@@ -81,7 +81,7 @@ function StudentAppShell() {
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {activeTab === 'home' && <StudentHomeScreen />}
+      {activeTab === 'home' && <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} />}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
       <button
