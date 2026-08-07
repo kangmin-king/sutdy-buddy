@@ -182,9 +182,18 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
       )}
       <button
         onClick={() => setShowTodo(true)}
-        className="mt-3 mb-4 inline-flex items-center gap-1 rounded-lg bg-tertiary-container/30 px-3 py-1.5 text-xs font-semibold text-on-surface"
+        className="mt-3 mb-4 relative inline-flex items-center gap-1.5 rounded-tl-sm rounded-tr-sm rounded-br-2xl rounded-bl-sm bg-[#fff4a8] text-[#4a3f10] pl-4 pr-8 py-2.5 text-xs font-bold shadow-md -rotate-3"
       >
-        📌 오늘의 할 일
+        <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-sm rotate-[8deg]">🥕</span>
+        오늘의 할 일
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col opacity-80">
+          <svg width="12" height="7" viewBox="0 0 12 7">
+            <path d="M1 1 L6 6 L11 1" stroke="#4a3f10" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <svg width="12" height="7" viewBox="0 0 12 7" style={{ marginTop: -3, opacity: 0.5 }}>
+            <path d="M1 1 L6 6 L11 1" stroke="#4a3f10" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </button>
 
       <div className="space-y-2">
