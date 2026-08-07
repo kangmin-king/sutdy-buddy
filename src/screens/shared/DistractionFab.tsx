@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../../primitives';
 
 const STORAGE_KEY = 'distractionFabY';
 const SIZE = 56; // 원 지름
@@ -76,11 +77,8 @@ export default function DistractionFab({ onOpen }: { onOpen: () => void }) {
       className="fixed z-30 rounded-full bg-on-surface text-surface shadow-card touch-none"
       style={{ width: SIZE, height: SIZE, right: -SIZE * HIDDEN_FRACTION, top: y - SIZE / 2 }}
     >
-      <span
-        className="absolute text-xl"
-        style={{ left: visibleWidth / 2, top: '50%', transform: 'translate(-50%, -50%)' }}
-      >
-        🔒
+      <span className="absolute flex items-center justify-center" style={{ left: visibleWidth / 2, top: '50%', transform: 'translate(-50%, -50%)' }}>
+        <Icon name="lock" filled className="!text-[22px]" />
       </span>
     </button>
   );
