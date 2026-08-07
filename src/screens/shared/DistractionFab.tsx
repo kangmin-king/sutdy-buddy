@@ -74,11 +74,11 @@ export default function DistractionFab({ onOpen }: { onOpen: () => void }) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      className="fixed z-30 rounded-full bg-on-surface text-surface shadow-card touch-none"
+      className="fixed z-30 rounded-full bg-primary text-on-primary shadow-card touch-none"
       style={{ width: SIZE, height: SIZE, right: -SIZE * HIDDEN_FRACTION, top: y - SIZE / 2 }}
     >
-      <span className="absolute flex items-center justify-center" style={{ left: visibleWidth / 2, top: '50%', transform: 'translate(-50%, -50%)' }}>
-        <Icon name="lock" filled className="!text-[22px]" />
+      <span className="absolute flex items-center justify-center" style={{ left: visibleWidth / 2 + 2, top: '50%', transform: 'translate(-50%, -50%)' }}>
+        <Icon name="lock" filled className="!text-[24px]" />
       </span>
     </button>
   );
