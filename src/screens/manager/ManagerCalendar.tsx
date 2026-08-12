@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
-import { Icon, BottomSheet, Button, TextField, ChipGroup } from '../../primitives';
+import { Icon, BottomSheet, Button, TextField, ChipGroup, useConfirm } from '../../primitives';
 import PlannerItemRow from './PlannerItemRow';
 import { DayProgressRing } from '../shared/DayProgressRing';
 
@@ -9,6 +9,7 @@ const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
 export default function ManagerCalendarScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
+  const { confirm, confirmDialog } = useConfirm();
   const today = todayKey();
   const [selectedDate, setSelectedDate] = React.useState(today);
   const [viewMonthKey, setViewMonthKey] = React.useState(today);
@@ -148,8 +149,8 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             key={item.id}
             item={item}
             onSaveAmount={(value) => actions.updateHomeworkAmountForDate(studentId, item.id, selectedDate, item.examSubjectRangeId, value)}
-            onDelete={() => {
-              if (window.confirm('이 숙제를 삭제할까요?')) actions.deleteStudentHomeworkItem(studentId, selectedDate, item.id);
+            onDelete={async () => {
+              if (await confirm('이 숙제를 삭제할까요?')) actions.deleteStudentHomeworkItem(studentId, selectedDate, item.id);
             }}
           />
         ))}
@@ -211,6 +212,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           </Button>
         </div>
       </BottomSheet>
+      {confirmDialog}
     </div>
   );
 }

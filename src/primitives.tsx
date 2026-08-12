@@ -9,8 +9,9 @@ export function Icon({ name, className = '', filled = false }: { name: string; c
 
 export function TopAppBar({ title = '스터디 버디', onBell }: { title?: string; onBell?: () => void }) {
   const { signOut } = useAuth();
-  const handleLogout = () => {
-    if (window.confirm('로그아웃 하시겠어요?')) void signOut();
+  const { confirm, confirmDialog } = useConfirm();
+  const handleLogout = async () => {
+    if (await confirm('로그아웃 하시겠어요?')) void signOut();
   };
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 py-4">
@@ -28,6 +29,7 @@ export function TopAppBar({ title = '스터디 버디', onBell }: { title?: stri
           <Icon name="logout" />
         </button>
       </div>
+      {confirmDialog}
     </header>
   );
 }
@@ -286,6 +288,38 @@ export function BottomSheet({ open, onClose, title, children }: { open: boolean;
       </div>
     </div>
   );
+}
+
+// window.confirm()은 안드로이드 WebView에서 조용히 아무 반응 없이 무시되는 경우가 있어(네이티브
+// 동기 JS 다이얼로그가 막힘) 확인이 필요한 모든 곳에서 이 훅으로 대체한다. confirm()을 호출하면
+// 바텀시트가 뜨고, 사용자가 확인/취소를 누를 때 Promise가 resolve된다.
+export function useConfirm() {
+  const [pending, setPending] = React.useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+
+  const confirm = React.useCallback((message: string) => {
+    return new Promise<boolean>((resolve) => setPending({ message, resolve }));
+  }, []);
+
+  const settle = (value: boolean) => {
+    pending?.resolve(value);
+    setPending(null);
+  };
+
+  const confirmDialog = (
+    <BottomSheet open={pending != null} onClose={() => settle(false)}>
+      <p className="text-sm text-on-surface mb-4">{pending?.message}</p>
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={() => settle(false)}>
+          취소
+        </Button>
+        <Button variant="error" className="flex-1" onClick={() => settle(true)}>
+          확인
+        </Button>
+      </div>
+    </BottomSheet>
+  );
+
+  return { confirm, confirmDialog };
 }
 
 export function AiTipCard({ text, icon = 'auto_awesome', tint = 'tertiary' }: { text: string; icon?: string; tint?: string }) {

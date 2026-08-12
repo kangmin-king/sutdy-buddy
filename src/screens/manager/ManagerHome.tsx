@@ -1,11 +1,13 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey } from '../../lib';
+import { useConfirm } from '../../primitives';
 import PlannerItemRow from './PlannerItemRow';
 import ChecklistTimeline from '../shared/ChecklistTimeline';
 
 export default function ManagerHomeScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
+  const { confirm, confirmDialog } = useConfirm();
   const today = todayKey();
 
   React.useEffect(() => {
@@ -31,8 +33,8 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
           key={item.id}
           item={item}
           onSaveAmount={(value) => actions.updateHomeworkAmountForDate(studentId, item.id, today, item.examSubjectRangeId, value)}
-          onDelete={() => {
-            if (window.confirm('이 숙제를 삭제할까요?')) actions.deleteStudentHomeworkItem(studentId, today, item.id);
+          onDelete={async () => {
+            if (await confirm('이 숙제를 삭제할까요?')) actions.deleteStudentHomeworkItem(studentId, today, item.id);
           }}
         />
       ))}
@@ -42,6 +44,7 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
       {selfItems.map((item) => (
         <PlannerItemRow key={item.id} item={item} />
       ))}
+      {confirmDialog}
     </div>
   );
 }

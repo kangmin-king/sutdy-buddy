@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName } from '../../lib';
 import { SUBJECTS, getSubject } from '../../constants';
-import { Card, Button, TextField, ToggleSwitch, ChipGroup, SectionTitle, Icon } from '../../primitives';
+import { Card, Button, TextField, ToggleSwitch, ChipGroup, SectionTitle, Icon, useConfirm } from '../../primitives';
 import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -111,6 +111,7 @@ function CompactMonthPicker({
 
 export default function ManagerProgressScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
+  const { confirm, confirmDialog } = useConfirm();
   const today = todayKey();
   const [showExamForm, setShowExamForm] = React.useState(false);
   const [examTitle, setExamTitle] = React.useState('');
@@ -291,8 +292,8 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
               <p className="text-xs opacity-80">{exam.examDate}</p>
             </button>
             <button
-              onClick={() => {
-                if (window.confirm(`"${exam.title}" 시험을 삭제할까요? 등록된 과목별 목표와 교재 등록 정보도 함께 삭제돼요.`)) {
+              onClick={async () => {
+                if (await confirm(`"${exam.title}" 시험을 삭제할까요? 등록된 과목별 목표와 교재 등록 정보도 함께 삭제돼요.`)) {
                   if (selectedExamId === exam.id) setSelectedExamId(null);
                   actions.deleteExamRecord(studentId, exam.id);
                 }
@@ -337,8 +338,8 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                         교재 등록
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm(`${getSubject(subject.subjectId).label} 과목 목표를 삭제할까요? 등록된 교재 정보도 함께 삭제돼요.`)) {
+                        onClick={async () => {
+                          if (await confirm(`${getSubject(subject.subjectId).label} 과목 목표를 삭제할까요? 등록된 교재 정보도 함께 삭제돼요.`)) {
                             if (rangeSubjectId === subject.id) closeRangeForm();
                             actions.deleteExamSubject(studentId, selectedExam.id, subject.id);
                           }
@@ -408,8 +409,8 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                               {editingRangeId === r.id && rangeSubjectId === subject.id ? '취소' : '수정'}
                             </button>
                             <button
-                              onClick={() => {
-                                if (window.confirm('이 교재 등록을 삭제할까요? 아직 하지 않은 날짜의 숙제는 함께 지워지고, 이미 지났거나 완료된 기록은 그대로 남아요.')) {
+                              onClick={async () => {
+                                if (await confirm('이 교재 등록을 삭제할까요? 아직 하지 않은 날짜의 숙제는 함께 지워지고, 이미 지났거나 완료된 기록은 그대로 남아요.')) {
                                   if (editingRangeId === r.id) closeRangeForm();
                                   actions.deleteExamRange(studentId, r.id);
                                 }
@@ -429,6 +430,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
           </div>
         </>
       )}
+      {confirmDialog}
     </div>
   );
 }
