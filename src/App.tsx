@@ -1,7 +1,7 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
-import { BottomNav, Card, Button } from './primitives';
+import { BottomNav, Card, Button, TopAppBar } from './primitives';
 import type { TabId } from './primitives';
 import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
@@ -118,6 +118,7 @@ function ManagerAppShell() {
   return (
     <div id="app-shell">
       <ErrorBanner />
+      <TopAppBar />
       <StudentSelector selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />
       {tab === 'calendar' && <ManagerCalendarScreen studentId={selectedStudentId} />}
       {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
