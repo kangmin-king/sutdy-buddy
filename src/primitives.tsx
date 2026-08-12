@@ -11,7 +11,7 @@ export function TopAppBar({ title = '스터디 버디', onBell }: { title?: stri
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 py-4">
+    <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
           <img src={mascotFaceUrl} alt="" className="w-full h-full object-cover" />
