@@ -1,6 +1,15 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 
+// 학생들에게 배포할 release APK 서명 정보. keystore.properties/*.jks는 git에 올리지 않는다
+// (android/.gitignore) — 이 파일이 없으면(다른 컴퓨터 등) release 서명 없이 빌드만 되게 한다.
+def keystorePropertiesFile = rootProject.file('app/keystore.properties')
+def keystoreProperties = new Properties()
+def hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.studybuddy.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -17,10 +26,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     compileOptions {
