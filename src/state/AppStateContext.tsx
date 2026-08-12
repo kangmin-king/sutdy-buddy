@@ -708,7 +708,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 아직 링크가 없는 상태라 RLS상 학생 프로필 행을 직접 select할 수 없다.
         // 정확한 코드를 아는 경우에만 id 하나를 돌려주는 security definer RPC를 쓴다(0006 마이그레이션).
         const { data: studentId, error: lookupError } = await supabase.rpc('find_student_by_invite_code', {
-          code: code.toUpperCase(),
+          code: code.trim().toUpperCase(),
         });
         if (lookupError) {
           console.error('linkByInviteCode (lookup) failed:', lookupError.message);
