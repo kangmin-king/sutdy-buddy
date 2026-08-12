@@ -1,9 +1,10 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, addDaysToKey } from '../../lib';
+import { todayKey, addDaysToKey, resolvePlannerItemManagerId, managerDisplayLabel } from '../../lib';
 import { getSubject } from '../../constants';
 import { TopAppBar, Card, Icon } from '../../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../../native/distractionStop';
+import LinkedManagerChips from './LinkedManagerChips';
 import type { PlannerItem } from '../../types';
 
 function formatElapsed(seconds: number): string {
@@ -75,6 +76,15 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
   const [startPending, setStartPending] = React.useState<Record<string, boolean>>({});
   const [now, setNow] = React.useState(Date.now());
   const [showTodo, setShowTodo] = React.useState(false);
+  // 선생님이 여러 명일 때만 의미가 있는 정렬 토글 — 세션 안에서만 기억하고 서버엔 저장하지 않는다.
+  const [sortMode, setSortMode] = React.useState<'time' | 'manager'>('time');
+  const managerIdFor = (it: PlannerItem) => resolvePlannerItemManagerId(it, state);
+  const managerLabelFor = (it: PlannerItem) => {
+    const managerId = managerIdFor(it);
+    if (!managerId) return null;
+    const index = state.linkedManagers.findIndex((m) => m.id === managerId);
+    return managerDisplayLabel(managerId, state.managerLabels, index);
+  };
 
   // 네이티브가 허용앱 밖 이탈을 감지하면 스스로 sessionActive를 false로 내리고 stateChanged로
   // 알려준다(DistractionStop 화면과 같은 구독 훅). 웹은 그 전환을 보고 타이머를 이탈로 끝낸다.
@@ -157,6 +167,19 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
     }
   };
 
+  // 선생님별 정렬을 고르면 항목을 선생님 단위로 묶는다(같은 선생님 항목은 원래 시간순 그대로 유지).
+  // 시간순일 때는 지금처럼 그룹 헤더 없이 하나의 목록으로 보여준다.
+  const itemGroups: { header: string | null; items: PlannerItem[] }[] =
+    sortMode === 'time'
+      ? [{ header: null, items }]
+      : [
+          ...state.linkedManagers.map((manager, index) => ({
+            header: managerDisplayLabel(manager.id, state.managerLabels, index),
+            items: items.filter((it) => managerIdFor(it) === manager.id),
+          })),
+          { header: '직접 추가', items: items.filter((it) => managerIdFor(it) === null) },
+        ].filter((group) => group.items.length > 0);
+
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
@@ -165,6 +188,7 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
           내 초대코드 <span className="font-mono font-bold text-on-surface tracking-wider">{state.profile.inviteCode}</span> · 과외쌤/학부모께 알려주세요
         </p>
       )}
+      <LinkedManagerChips />
       {missedYesterday.length > 0 && (
         <div className="mt-3 rounded-xl bg-error/10 border border-error/30 p-3">
           <div className="flex items-center justify-between mb-2">
@@ -178,6 +202,7 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
               <div key={it.id} className="flex items-center justify-between gap-2">
                 <p className="text-xs">
                   {getSubject(it.subjectId).label} · {it.material || '할 일'}
+                  {managerLabelFor(it) && <span className="text-[10px] text-tertiary ml-1">· {managerLabelFor(it)}</span>}
                 </p>
                 {(!isPageRangeItem(it) || !hasFutureIncompleteInSameRange(it)) && (
                   <button onClick={() => handleAddToToday(it)} className="text-[11px] font-semibold text-primary shrink-0">
@@ -207,50 +232,79 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
         </button>
       </div>
 
-      <div className="space-y-2">
+      {state.linkedManagers.length > 1 && (
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] text-on-surface-variant">오늘 할 일</span>
+          <div className="flex bg-surface-container rounded-full p-0.5">
+            {(['time', 'manager'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setSortMode(mode)}
+                className={`text-[10px] font-semibold rounded-full px-2.5 py-1 ${
+                  sortMode === mode ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
+                }`}
+              >
+                {mode === 'time' ? '시간순' : '선생님별'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
         {items.length === 0 && <p className="text-sm text-on-surface-variant text-center py-10">오늘 할 일이 없어요.</p>}
-        {items.map((it) => {
-          const sessionId = runningSessionId[it.id];
-          const isRunning = !!sessionId;
-          const sessions = state.studySessions[it.id] ?? [];
-          const elapsed = elapsedTodaySeconds(sessions, sessionId, now);
-          return (
-            <Card key={it.id}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-bold">
-                    {getSubject(it.subjectId).label} {it.source === 'homework' && <span className="text-[10px] text-tertiary ml-1">숙제</span>}
-                  </p>
-                  {elapsed > 0 && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
-                </div>
-                {isRunning ? (
-                  <button
-                    onClick={() => handleStop(it.id, false)}
-                    className="text-sm font-semibold text-on-surface-variant px-4 py-2.5 rounded-full bg-surface-container flex items-center gap-1 shrink-0"
-                  >
-                    <Icon name="pause" className="!text-[16px]" /> 일시정지
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleStart(it.id)}
-                    disabled={!!startPending[it.id]}
-                    className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1 disabled:opacity-50 shrink-0"
-                  >
-                    <Icon name="play_arrow" className="!text-[16px]" /> 시작
-                  </button>
-                )}
-              </div>
-              {elapsed > 0 && (
-                <button
-                  onClick={() => handleComplete(it.id)}
-                  className="w-full mt-2 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
-                >
-                  오늘 학습 완료!!
-                </button>
-              )}
-            </Card>
-          );
-        })}
+        {itemGroups.map((group) => (
+          <div key={group.header ?? 'all'} className="space-y-2">
+            {group.header && <p className="text-[11px] font-semibold text-tertiary">{group.header}</p>}
+            {group.items.map((it) => {
+              const sessionId = runningSessionId[it.id];
+              const isRunning = !!sessionId;
+              const sessions = state.studySessions[it.id] ?? [];
+              const elapsed = elapsedTodaySeconds(sessions, sessionId, now);
+              return (
+                <Card key={it.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-bold">
+                        {getSubject(it.subjectId).label}{' '}
+                        {it.source === 'homework' && (
+                          <span className="text-[10px] text-tertiary ml-1">
+                            숙제{managerLabelFor(it) && ` · ${managerLabelFor(it)}`}
+                          </span>
+                        )}
+                      </p>
+                      {elapsed > 0 && <p className="text-lg font-mono font-bold text-primary mt-1">{formatElapsed(elapsed)}</p>}
+                    </div>
+                    {isRunning ? (
+                      <button
+                        onClick={() => handleStop(it.id, false)}
+                        className="text-sm font-semibold text-on-surface-variant px-4 py-2.5 rounded-full bg-surface-container flex items-center gap-1 shrink-0"
+                      >
+                        <Icon name="pause" className="!text-[16px]" /> 일시정지
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStart(it.id)}
+                        disabled={!!startPending[it.id]}
+                        className="text-xs font-semibold text-on-primary px-3 py-2 rounded-full bg-primary flex items-center gap-1 disabled:opacity-50 shrink-0"
+                      >
+                        <Icon name="play_arrow" className="!text-[16px]" /> 시작
+                      </button>
+                    )}
+                  </div>
+                  {elapsed > 0 && (
+                    <button
+                      onClick={() => handleComplete(it.id)}
+                      className="w-full mt-2 text-sm font-bold text-on-primary px-3 py-2.5 rounded-full bg-primary"
+                    >
+                      오늘 학습 완료!!
+                    </button>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {showTodo && (

@@ -55,6 +55,8 @@ interface AppState {
   tutoringScheduleExceptions: TutoringScheduleException[];
   studentLabels: Record<string, string>;
   studentPlannerItems: Record<string, Record<DateKey, PlannerItem[]>>;
+  linkedManagers: Profile[];
+  managerLabels: Record<string, string>;
   loading: boolean;
   error: string | null;
 }
@@ -76,6 +78,8 @@ const EMPTY_STATE: AppState = {
   tutoringScheduleExceptions: [],
   studentLabels: {},
   studentPlannerItems: {},
+  linkedManagers: [],
+  managerLabels: {},
   loading: true,
   error: null,
 };
@@ -111,6 +115,7 @@ interface AppStateActions {
   startStudySession: (plannerItemId: string) => Promise<string>;
   endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean) => Promise<void>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
+  updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
   deleteExamRecord: (studentId: string, examId: string) => Promise<void>;
   addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
@@ -168,6 +173,25 @@ async function fetchStudentLabels(managerId: string): Promise<Record<string, str
   const labels: Record<string, string> = {};
   for (const row of data ?? []) {
     if (row.label) labels[row.student_id] = row.label;
+  }
+  return labels;
+}
+
+// 학생이 연결된 관리자(선생님/학부모) 프로필 목록. fetchManagedStudents의 방향을 뒤집은 버전.
+async function fetchLinkedManagers(studentId: string): Promise<Profile[]> {
+  const linksRes = await supabase.from('sb_student_manager_links').select('*').eq('student_id', studentId);
+  const managerIds = (linksRes.data ?? []).map((link) => link.manager_id);
+  if (managerIds.length === 0) return [];
+  const managersRes = await supabase.from('sb_profiles').select('*').in('id', managerIds);
+  return ((managersRes.data ?? []) as SbProfileRow[]).map(profileFromRow);
+}
+
+// 학생이 자기 화면에서만 보는 관리자 별칭. sb_student_manager_links.student_label에서 읽는다(0014 마이그레이션).
+async function fetchManagerLabels(studentId: string): Promise<Record<string, string>> {
+  const { data } = await supabase.from('sb_student_manager_links').select('manager_id, student_label').eq('student_id', studentId);
+  const labels: Record<string, string> = {};
+  for (const row of data ?? []) {
+    if (row.student_label) labels[row.manager_id] = row.student_label;
   }
   return labels;
 }
@@ -232,6 +256,8 @@ async function loadAll(userId: string): Promise<AppState> {
   let tutoringSchedules: TutoringSchedule[] = [];
   let tutoringScheduleExceptions: TutoringScheduleException[] = [];
   let studentLabels: Record<string, string> = {};
+  let linkedManagers: Profile[] = [];
+  let managerLabels: Record<string, string> = {};
 
   if (profile?.role === 'manager') {
     managedStudents = await fetchManagedStudents(userId);
@@ -269,11 +295,15 @@ async function loadAll(userId: string): Promise<AppState> {
     }
   } else if (profile?.role === 'student') {
     // 학생 본인 계정: 선생님/학부모가 등록해준 시험 일정·과목별 목표·교재 범위·과외 요일을 읽기 전용으로 본다.
-    const [examRes, scheduleRes, exceptionRes] = await Promise.all([
+    const [examRes, scheduleRes, exceptionRes, managersRes, managerLabelsResult] = await Promise.all([
       supabase.from('sb_exam_records').select('*').eq('student_id', userId),
       supabase.from('sb_tutoring_schedules').select('*').eq('student_id', userId),
       supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('student_id', userId),
+      fetchLinkedManagers(userId),
+      fetchManagerLabels(userId),
     ]);
+    linkedManagers = managersRes;
+    managerLabels = managerLabelsResult;
     examRecords = (examRes.data ?? []).map(examRecordFromRow);
     tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
     tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
@@ -306,6 +336,8 @@ async function loadAll(userId: string): Promise<AppState> {
     tutoringScheduleExceptions,
     studentLabels,
     studentPlannerItems: {},
+    linkedManagers,
+    managerLabels,
     loading: false,
     error: null,
   };
@@ -838,6 +870,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           .eq('manager_id', userId);
         if (error) {
           console.error('updateStudentLabel failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async updateManagerLabel(managerId, label) {
+        setState((s) => ({ ...s, managerLabels: { ...s.managerLabels, [managerId]: label } }));
+        const { error } = await supabase
+          .from('sb_student_manager_links')
+          .update({ student_label: label })
+          .eq('manager_id', managerId)
+          .eq('student_id', userId);
+        if (error) {
+          console.error('updateManagerLabel failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
       },

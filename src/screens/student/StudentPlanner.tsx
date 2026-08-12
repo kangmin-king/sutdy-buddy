@@ -1,15 +1,21 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, getPlannerProgress } from '../../lib';
+import { todayKey, getPlannerProgress, resolvePlannerItemManagerId, managerDisplayLabel } from '../../lib';
 import { getSubject, SUBJECTS } from '../../constants';
 import { TopAppBar, Card, Button, Icon, SectionTitle, ChipGroup, TextField, ProgressRing } from '../../primitives';
 import ExamSchedule from './ExamSchedule';
 import ChecklistTimeline from '../shared/ChecklistTimeline';
-import type { SubjectId } from '../../types';
+import type { PlannerItem, SubjectId } from '../../types';
 
 export default function StudentPlannerScreen() {
   const { state, actions } = useAppState();
   const today = todayKey();
+  const managerLabelFor = (it: PlannerItem) => {
+    const managerId = resolvePlannerItemManagerId(it, state);
+    if (!managerId) return null;
+    const index = state.linkedManagers.findIndex((m) => m.id === managerId);
+    return managerDisplayLabel(managerId, state.managerLabels, index);
+  };
   const todayItems = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
   const selfItems = todayItems.filter((i) => i.source === 'self');
   const items = selfItems.filter((i) => i.status !== 'completed');
@@ -114,6 +120,7 @@ export default function StudentPlannerScreen() {
           customColors={state.profile?.subjectColors}
           editable
           onChangeSubjectColor={(subjectId, color) => actions.updateSubjectColor(subjectId, color)}
+          managerLabelFor={managerLabelFor}
         />
       </div>
 

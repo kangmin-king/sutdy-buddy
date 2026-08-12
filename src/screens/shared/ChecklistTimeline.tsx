@@ -16,12 +16,14 @@ export default function ChecklistTimeline({
   customColors,
   editable = false,
   onChangeSubjectColor,
+  managerLabelFor,
 }: {
   items: PlannerItem[];
   studySessions: Record<string, StudySession[]>;
   customColors?: Record<string, string>;
   editable?: boolean;
   onChangeSubjectColor?: (subjectId: SubjectId, color: string) => void;
+  managerLabelFor?: (item: PlannerItem) => string | null;
 }) {
   const [pickerSubjectId, setPickerSubjectId] = React.useState<SubjectId | null>(null);
 
@@ -72,6 +74,7 @@ export default function ChecklistTimeline({
               <p className="flex-1 min-w-0 truncate">
                 <span className="text-base font-bold">{subject.label}</span>{' '}
                 <span className="text-sm text-on-surface-variant">{item.material || item.pageRange || '할 일'}</span>
+                {managerLabelFor?.(item) && <span className="text-[10px] text-tertiary ml-1">· {managerLabelFor(item)}</span>}
                 {elapsedSeconds > 0 && (
                   <span className="text-sm text-primary font-semibold ml-1">{formatMinutes(Math.round(elapsedSeconds / 60))}</span>
                 )}

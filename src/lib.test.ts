@@ -21,8 +21,10 @@ import {
   getHolidayName,
   toMinutesOfDay,
   computeMissedHomeworkRedistribution,
+  resolvePlannerItemManagerId,
+  managerDisplayLabel,
 } from './lib';
-import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession, ExamSubjectRange } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, StudySession, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
 
 describe('timeToMinutes / minutesToTime', () => {
   it('converts HH:MM to minutes and back', () => {
@@ -132,6 +134,57 @@ describe('getPlannerProgress', () => {
   it('computes percent completed', () => {
     const items = [plannerItem({ id: 'a', status: 'completed' }), plannerItem({ id: 'b', status: 'planned' })];
     expect(getPlannerProgress(items)).toEqual({ percent: 50, completed: 1, total: 2 });
+  });
+});
+
+function examSubject(overrides: Partial<ExamSubject>): ExamSubject {
+  return {
+    id: 'es1', examId: 'e1', subjectId: 'math', targetGrade: '1', targetScore: '100', targetRank: '1',
+    createdAt: '2026-08-01T00:00:00Z', ...overrides,
+  };
+}
+
+function examRecord(overrides: Partial<ExamRecord>): ExamRecord {
+  return {
+    id: 'e1', studentId: 's1', createdBy: 'm2', title: '중간고사', examDate: '2026-09-01', isMain: true,
+    createdAt: '2026-08-01T00:00:00Z', ...overrides,
+  };
+}
+
+describe('resolvePlannerItemManagerId', () => {
+  it('resolves via the homework assignment chain', () => {
+    const item = plannerItem({ source: 'homework', homeworkAssignmentId: 'h1' });
+    const slices = { homeworkAssignments: [homework({ id: 'h1', createdBy: 'm1' })], examSubjectRanges: [], examSubjects: [], examRecords: [] };
+    expect(resolvePlannerItemManagerId(item, slices)).toBe('m1');
+  });
+
+  it('resolves via the exam subject range chain', () => {
+    const item = plannerItem({ source: 'homework', examSubjectRangeId: 'r1' });
+    const slices = {
+      homeworkAssignments: [],
+      examSubjectRanges: [examSubjectRange({ id: 'r1', examSubjectId: 'es1' })],
+      examSubjects: [examSubject({ id: 'es1', examId: 'e1' })],
+      examRecords: [examRecord({ id: 'e1', createdBy: 'm2' })],
+    };
+    expect(resolvePlannerItemManagerId(item, slices)).toBe('m2');
+  });
+
+  it('returns null for a self-added item with no chain', () => {
+    const item = plannerItem({ source: 'self' });
+    const slices = { homeworkAssignments: [], examSubjectRanges: [], examSubjects: [], examRecords: [] };
+    expect(resolvePlannerItemManagerId(item, slices)).toBeNull();
+  });
+});
+
+describe('managerDisplayLabel', () => {
+  it('returns null-safe empty string when there is no manager', () => {
+    expect(managerDisplayLabel(null, {}, 0)).toBe('');
+  });
+  it('returns the student-chosen label when present', () => {
+    expect(managerDisplayLabel('m1', { m1: '수학쌤' }, 0)).toBe('수학쌤');
+  });
+  it('falls back to 선생님 N when unlabeled', () => {
+    expect(managerDisplayLabel('m1', {}, 2)).toBe('선생님 3');
   });
 });
 

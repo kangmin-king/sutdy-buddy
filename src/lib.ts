@@ -1,4 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession, ExamSubjectRange } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
 import { QuickTimeChipId } from './constants';
 
 function pad2(n: number): string {
@@ -199,6 +199,38 @@ export function getPlannerProgress(items: PlannerItem[]) {
   const completed = items.filter((i) => i.status === 'completed').length;
   const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
   return { percent, completed, total };
+}
+
+// PlannerItem에는 관리자 컬럼이 없다. 숙제 체인(homeworkAssignmentId → createdBy) 또는 시험 체인
+// (examSubjectRangeId → examSubjectId → examId → examRecord.createdBy) 중 있는 쪽을 타고 이 항목을
+// 배정한 관리자의 id를 찾는다. 둘 다 없으면(source: 'self') null.
+export function resolvePlannerItemManagerId(
+  item: PlannerItem,
+  slices: {
+    homeworkAssignments: HomeworkAssignment[];
+    examSubjectRanges: ExamSubjectRange[];
+    examSubjects: ExamSubject[];
+    examRecords: ExamRecord[];
+  }
+): string | null {
+  if (item.homeworkAssignmentId) {
+    const assignment = slices.homeworkAssignments.find((a) => a.id === item.homeworkAssignmentId);
+    return assignment?.createdBy ?? null;
+  }
+  if (item.examSubjectRangeId) {
+    const range = slices.examSubjectRanges.find((r) => r.id === item.examSubjectRangeId);
+    const subject = range ? slices.examSubjects.find((s) => s.id === range.examSubjectId) : undefined;
+    const exam = subject ? slices.examRecords.find((e) => e.id === subject.examId) : undefined;
+    return exam?.createdBy ?? null;
+  }
+  return null;
+}
+
+// managerId가 labels(학생이 직접 붙인 별칭)에 있으면 그대로, 없으면 "선생님 N"으로 폴백한다
+// (StudentSelector의 "학생 N" 폴백 패턴과 동일).
+export function managerDisplayLabel(managerId: string | null, labels: Record<string, string>, index: number): string {
+  if (!managerId) return '';
+  return labels[managerId] ?? `선생님 ${index + 1}`;
 }
 
 export function withEul(word: string): string {

@@ -116,6 +116,7 @@ export type SbStudentManagerLinkRow = {
   manager_id: string;
   linked_at: string;
   label: string | null;
+  student_label: string | null;
 };
 
 export type SbExamRecordRow = {
@@ -189,7 +190,7 @@ export interface Database {
       };
       sb_homework_assignments: { Row: SbHomeworkAssignmentRow; Insert: Omit<SbHomeworkAssignmentRow, 'updated_at'>; Update: Partial<SbHomeworkAssignmentRow>; Relationships: [] };
       sb_study_sessions: { Row: SbStudySessionRow; Insert: SbStudySessionRow; Update: Partial<SbStudySessionRow>; Relationships: [] };
-      sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at' | 'label'>; Update: Partial<Pick<SbStudentManagerLinkRow, 'label'>>; Relationships: [] };
+      sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at' | 'label' | 'student_label'>; Update: Partial<Pick<SbStudentManagerLinkRow, 'label' | 'student_label'>>; Relationships: [] };
       sb_exam_records: { Row: SbExamRecordRow; Insert: Omit<SbExamRecordRow, 'created_at'>; Update: Partial<SbExamRecordRow>; Relationships: [] };
       sb_exam_subjects: { Row: SbExamSubjectRow; Insert: Omit<SbExamSubjectRow, 'created_at'>; Update: Partial<SbExamSubjectRow>; Relationships: [] };
       sb_exam_subject_ranges: { Row: SbExamSubjectRangeRow; Insert: Omit<SbExamSubjectRangeRow, 'created_at'>; Update: Partial<SbExamSubjectRangeRow>; Relationships: [] };

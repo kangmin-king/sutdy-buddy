@@ -1,9 +1,19 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
-import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
+import {
+  todayKey,
+  monthGrid,
+  addMonthsToKey,
+  getTutoringDaysInRange,
+  getHolidayName,
+  getPlannerProgress,
+  resolvePlannerItemManagerId,
+  managerDisplayLabel,
+} from '../../lib';
 import { getSubject } from '../../constants';
 import { Icon, Card, TopAppBar } from '../../primitives';
 import { DayProgressRing } from '../shared/DayProgressRing';
+import type { PlannerItem } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -17,10 +27,29 @@ export default function StudentCalendarScreen() {
   const [viewMonthKey, setViewMonthKey] = React.useState(today);
 
   const grid = monthGrid(viewMonthKey);
-  const schedule = state.tutoringSchedules.find((sch) => sch.studentId === studentId);
-  const tutoringDays = new Set(
-    getTutoringDaysInRange(schedule?.weekdays ?? [], state.tutoringScheduleExceptions, grid[0].key, grid[grid.length - 1].key)
-  );
+  // 학생 한 명에게 선생님이 여러 명 연결될 수 있으므로, 과외 요일도 선생님별로 따로 계산해서 합친다
+  // (예외도 그 선생님이 낸 것만 반영 — 안 그러면 다른 선생님의 취소/변경이 잘못 섞여 들어간다).
+  const schedules = state.tutoringSchedules.filter((sch) => sch.studentId === studentId);
+  const tutoringDaysByManager = new Map<string, Set<string>>();
+  for (const schedule of schedules) {
+    const managerExceptions = state.tutoringScheduleExceptions.filter((ex) => ex.managerId === schedule.managerId);
+    const days = getTutoringDaysInRange(schedule.weekdays, managerExceptions, grid[0].key, grid[grid.length - 1].key);
+    tutoringDaysByManager.set(schedule.managerId, new Set(days));
+  }
+  const tutoringDays = new Set<string>();
+  for (const days of tutoringDaysByManager.values()) {
+    for (const day of days) tutoringDays.add(day);
+  }
+  const managerLabelFor = (item: PlannerItem) => {
+    const managerId = resolvePlannerItemManagerId(item, state);
+    if (!managerId) return null;
+    const index = state.linkedManagers.findIndex((m) => m.id === managerId);
+    return managerDisplayLabel(managerId, state.managerLabels, index);
+  };
+  const tutoringManagerLabelsFor = (dateKey: string) =>
+    schedules
+      .filter((sch) => tutoringDaysByManager.get(sch.managerId)?.has(dateKey))
+      .map((sch) => managerDisplayLabel(sch.managerId, state.managerLabels, state.linkedManagers.findIndex((m) => m.id === sch.managerId)));
 
   const examsByDate = new Map<string, typeof state.examRecords>();
   for (const exam of state.examRecords) {
@@ -101,7 +130,7 @@ export default function StudentCalendarScreen() {
 
       <p className="text-xs font-semibold text-primary mb-3">
         {selY}년 {Number(selM)}월 {Number(selD)}일{selectedDate === today ? ' (오늘)' : ''}
-        {tutoringDays.has(selectedDate) ? ' · 과외 날' : ''}
+        {tutoringDays.has(selectedDate) ? ` · 과외 날 · ${tutoringManagerLabelsFor(selectedDate).join(', ')}` : ''}
         {getHolidayName(selectedDate) && <span className="text-error"> · {getHolidayName(selectedDate)}</span>}
         {selectedExams.length > 0 && (
           <span className="text-error"> · {selectedExams.map((e) => `📝 ${e.title}`).join(', ')}</span>
@@ -113,7 +142,10 @@ export default function StudentCalendarScreen() {
         {selectedItems.map((item) => (
           <Card key={item.id} className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold">{getSubject(item.subjectId).label}</p>
+              <p className="text-sm font-bold">
+                {getSubject(item.subjectId).label}
+                {managerLabelFor(item) && <span className="text-[10px] text-tertiary ml-1">· {managerLabelFor(item)}</span>}
+              </p>
               <p className="text-xs text-on-surface-variant">{item.material || item.pageRange || '할 일'}</p>
             </div>
             <div
