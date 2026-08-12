@@ -166,6 +166,15 @@ export type SbTutoringScheduleExceptionRow = {
   created_at: string;
 };
 
+export type SbDeviceTokenRow = {
+  id: string;
+  user_id: string;
+  fcm_token: string;
+  platform: 'android';
+  created_at: string;
+  updated_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -196,6 +205,7 @@ export interface Database {
       sb_exam_subject_ranges: { Row: SbExamSubjectRangeRow; Insert: Omit<SbExamSubjectRangeRow, 'created_at'>; Update: Partial<SbExamSubjectRangeRow>; Relationships: [] };
       sb_tutoring_schedules: { Row: SbTutoringScheduleRow; Insert: Omit<SbTutoringScheduleRow, 'id' | 'updated_at'>; Update: Partial<SbTutoringScheduleRow>; Relationships: [] };
       sb_tutoring_schedule_exceptions: { Row: SbTutoringScheduleExceptionRow; Insert: Omit<SbTutoringScheduleExceptionRow, 'id' | 'created_at'>; Update: Partial<SbTutoringScheduleExceptionRow>; Relationships: [] };
+      sb_device_tokens: { Row: SbDeviceTokenRow; Insert: Omit<SbDeviceTokenRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbDeviceTokenRow>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: {

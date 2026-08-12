@@ -25,6 +25,7 @@ import ManagerProgressScreen from './screens/manager/ManagerProgress';
 import ManagerCalendarScreen from './screens/manager/ManagerCalendar';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useOpenDistractionStopRequest, isNativePlatform } from './native/distractionStop';
+import { usePushRegistration } from './native/push';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
@@ -50,7 +51,10 @@ function ErrorBanner() {
 }
 
 function AppShell() {
-  const { state } = useAppState();
+  const { state, actions } = useAppState();
+
+  // 학생/선생님 셸 공통 진입점이라 여기 한 번만 등록하면 역할과 무관하게 기기 토큰이 저장된다.
+  usePushRegistration(React.useCallback((token: string) => actions.registerDeviceToken(token), [actions]));
 
   if (state.loading || !state.profile) {
     return <LegacyStudentAppShell />;

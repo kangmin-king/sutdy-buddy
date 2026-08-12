@@ -1,7 +1,15 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { uid, addDaysToKey, todayKey, shouldGenerateHomeworkItem, splitPagesAcrossDates, computeMissedHomeworkRedistribution } from '../lib';
+import {
+  uid,
+  addDaysToKey,
+  todayKey,
+  shouldGenerateHomeworkItem,
+  splitPagesAcrossDates,
+  computeMissedHomeworkRedistribution,
+  resolvePlannerItemManagerId,
+} from '../lib';
 import {
   profileFromRow,
   conditionFromRow,
@@ -86,6 +94,17 @@ const EMPTY_STATE: AppState = {
 
 const WRITE_FAILURE_MESSAGE = '저장하지 못했어요. 다시 시도해주세요.';
 
+// 푸시알림은 이미 DB 저장이 끝난 뒤에 보내는 부가 동작이라, 실패해도 "저장 실패"처럼 보이는
+// WRITE_FAILURE_MESSAGE는 띄우지 않고 콘솔에만 남긴다.
+async function notifyUser(userId: string, title: string, body: string): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke('send-push-notification', { body: { userId, title, body } });
+    if (error) console.error('send-push-notification failed:', error.message);
+  } catch (err) {
+    console.error('send-push-notification threw:', err);
+  }
+}
+
 // 숙제 범위는 대부분 "몇 페이지부터 몇 페이지"지만, 모의고사처럼 페이지 단위가 아닌 학습도 있다.
 // mode: 'pages'면 날짜별로 자동 분배(splitPagesAcrossDates), 'custom'이면 선택한 모든 날짜에
 // customLabel을 그대로 반복해서 넣는다(분배 없음 — 관리자가 직접 쓴 문구 그대로).
@@ -116,6 +135,7 @@ interface AppStateActions {
   endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean) => Promise<void>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
+  registerDeviceToken: (token: string) => Promise<void>;
   createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
   deleteExamRecord: (studentId: string, examId: string) => Promise<void>;
   addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
@@ -493,10 +513,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('addPlannerItem failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        } else if (fullItem.source === 'self') {
+          for (const manager of state.linkedManagers) {
+            notifyUser(manager.id, '학생이 스스로 계획을 세웠어요', fullItem.material ? `${fullItem.material} 계획을 새로 추가했어요` : '새 계획을 추가했어요');
+          }
         }
       },
 
       async updatePlannerItem(date, id, patch) {
+        const previousItem = (state.plannerItems[date] ?? []).find((i) => i.id === id);
         setState((s) => {
           const list = s.plannerItems[date] ?? [];
           return {
@@ -527,6 +552,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('updatePlannerItem failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        } else if (patch.status === 'completed' && previousItem && previousItem.status !== 'completed') {
+          const managerId = resolvePlannerItemManagerId(previousItem, state);
+          if (managerId) {
+            notifyUser(managerId, '학생이 숙제를 완료했어요', previousItem.material ? `${previousItem.material} 학습을 완료했어요` : '배정한 학습을 완료했어요');
+          }
         }
       },
 
@@ -785,10 +815,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('createHomeworkAssignment failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        } else {
+          notifyUser(studentId, '숙제가 등록됐어요', assignment.material ? `${assignment.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
         }
       },
 
       async updateHomeworkAssignment(id, patch) {
+        const studentId = state.homeworkAssignments.find((a) => a.id === id)?.studentId;
         setState((s) => ({
           ...s,
           homeworkAssignments: s.homeworkAssignments.map((a) => (a.id === id ? { ...a, ...patch } : a)),
@@ -805,6 +838,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('updateHomeworkAssignment failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        } else if (studentId) {
+          notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
         }
       },
 
@@ -885,6 +920,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('updateManagerLabel failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
+      },
+
+      async registerDeviceToken(token) {
+        const { error } = await supabase
+          .from('sb_device_tokens')
+          .upsert({ user_id: userId, fcm_token: token, platform: 'android' }, { onConflict: 'user_id,fcm_token' });
+        if (error) console.error('registerDeviceToken failed:', error.message);
       },
 
       async createExamRecord(studentId, exam) {
