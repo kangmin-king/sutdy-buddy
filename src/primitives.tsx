@@ -9,10 +9,6 @@ export function Icon({ name, className = '', filled = false }: { name: string; c
 
 export function TopAppBar({ title = '스터디 버디', onBell }: { title?: string; onBell?: () => void }) {
   const { signOut } = useAuth();
-  const { confirm, confirmDialog } = useConfirm();
-  const handleLogout = async () => {
-    if (await confirm('로그아웃 하시겠어요?')) void signOut();
-  };
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 py-4">
       <div className="flex items-center gap-2.5">
@@ -25,11 +21,10 @@ export function TopAppBar({ title = '스터디 버디', onBell }: { title?: stri
         <button onClick={onBell} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
           <Icon name="notifications" />
         </button>
-        <button onClick={handleLogout} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
+        <button onClick={() => void signOut()} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
           <Icon name="logout" />
         </button>
       </div>
-      {confirmDialog}
     </header>
   );
 }
