@@ -1,7 +1,7 @@
 import React from 'react';
 import { NAV_TABS, MOODS } from './constants';
 import { useAuth } from './state/AuthContext';
-import mascotUrl from './assets/mascot-bunny-color.png';
+import mascotFaceUrl from './assets/mascot-face.png';
 
 export function Icon({ name, className = '', filled = false }: { name: string; className?: string; filled?: boolean }) {
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
@@ -16,7 +16,7 @@ export function TopAppBar({ title = '스터디 버디', onBell }: { title?: stri
     <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 py-4">
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
-          <img src={mascotUrl} alt="" className="w-[140%] h-[140%] object-cover" />
+          <img src={mascotFaceUrl} alt="" className="w-full h-full object-cover" />
         </div>
         <span className="text-lg font-bold text-primary">{title}</span>
       </div>
