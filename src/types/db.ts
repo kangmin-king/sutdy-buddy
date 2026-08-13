@@ -235,7 +235,7 @@ export interface Database {
       sb_banners: { Row: SbBannerRow; Insert: Omit<SbBannerRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbBannerRow>; Relationships: [] };
       sb_homework_proposals: {
         Row: SbHomeworkProposalRow;
-        Insert: Omit<SbHomeworkProposalRow, 'id' | 'created_at' | 'responded_at'>;
+        Insert: Omit<SbHomeworkProposalRow, 'created_at' | 'responded_at'>;
         Update: Partial<SbHomeworkProposalRow>;
         Relationships: [];
       };

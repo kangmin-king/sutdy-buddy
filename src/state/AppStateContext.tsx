@@ -68,6 +68,7 @@ interface AppState {
   linkedManagers: Profile[];
   managerLabels: Record<string, string>;
   homeworkProposals: HomeworkProposal[];
+  sentHomeworkProposals: Record<string, HomeworkProposal[]>;
   loading: boolean;
   error: string | null;
 }
@@ -92,6 +93,7 @@ const EMPTY_STATE: AppState = {
   linkedManagers: [],
   managerLabels: {},
   homeworkProposals: [],
+  sentHomeworkProposals: {},
   loading: true,
   error: null,
 };
@@ -145,6 +147,7 @@ interface AppStateActions {
     proposal: { date: DateKey; subjectId: SubjectId; material: string; pageRange: string }
   ) => Promise<void>;
   respondToHomeworkProposal: (proposalId: string, accept: boolean) => Promise<void>;
+  loadSentHomeworkProposals: (studentId: string) => Promise<void>;
   createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
   deleteExamRecord: (studentId: string, examId: string) => Promise<void>;
   addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
@@ -371,6 +374,7 @@ async function loadAll(userId: string): Promise<AppState> {
     linkedManagers,
     managerLabels,
     homeworkProposals,
+    sentHomeworkProposals: {},
     loading: false,
     error: null,
   };
@@ -943,7 +947,30 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async createHomeworkProposal(studentId, proposal) {
+        const id = uid();
+        const createdAt = new Date().toISOString();
+        const fullProposal: HomeworkProposal = {
+          id,
+          studentId,
+          managerId: userId,
+          date: proposal.date,
+          subjectId: proposal.subjectId,
+          material: proposal.material,
+          pageRange: proposal.pageRange,
+          status: 'pending',
+          createdAt,
+          respondedAt: null,
+        };
+        setState((s) => ({
+          ...s,
+          sentHomeworkProposals: {
+            ...s.sentHomeworkProposals,
+            [studentId]: [...(s.sentHomeworkProposals[studentId] ?? []), fullProposal],
+          },
+        }));
+
         const { error } = await supabase.from('sb_homework_proposals').insert({
+          id,
           student_id: studentId,
           manager_id: userId,
           date: proposal.date,
@@ -954,7 +981,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         });
         if (error) {
           console.error('createHomeworkProposal failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => ({
+            ...s,
+            sentHomeworkProposals: {
+              ...s.sentHomeworkProposals,
+              [studentId]: (s.sentHomeworkProposals[studentId] ?? []).filter((p) => p.id !== id),
+            },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
         }
       },
 
@@ -996,6 +1030,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             examSubjectRangeId: null,
           });
         }
+      },
+
+      async loadSentHomeworkProposals(studentId) {
+        const { data, error } = await supabase
+          .from('sb_homework_proposals')
+          .select('*')
+          .eq('student_id', studentId)
+          .eq('manager_id', userId)
+          .order('created_at', { ascending: false });
+        if (error) {
+          console.error('loadSentHomeworkProposals failed:', error.message);
+          return;
+        }
+        const proposals = (data ?? []).map(homeworkProposalFromRow);
+        setState((s) => ({ ...s, sentHomeworkProposals: { ...s.sentHomeworkProposals, [studentId]: proposals } }));
       },
 
       async createExamRecord(studentId, exam) {
