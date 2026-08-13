@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
 import { Icon, BottomSheet, Button, TextField, ChipGroup, useConfirm } from '../../primitives';
-import { SUBJECTS } from '../../constants';
+import { SUBJECTS, getSubject } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
 import { DayProgressRing } from '../shared/DayProgressRing';
 import type { SubjectId } from '../../types';
@@ -26,6 +26,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
+    actions.loadSentHomeworkProposals(studentId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 
@@ -45,6 +46,9 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
 
   const itemsByDate = state.studentPlannerItems[studentId] ?? {};
   const selectedItems = (itemsByDate[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
+  const selectedDateProposals = (state.sentHomeworkProposals[studentId] ?? []).filter((p) => p.date === selectedDate);
+  const proposalStatusLabel = { pending: '대기중', accepted: '수락됨', rejected: '거절됨' } as const;
+  const proposalStatusColor = { pending: 'text-tertiary', accepted: 'text-secondary', rejected: 'text-error' } as const;
 
   const [viewY, viewM] = viewMonthKey.split('-');
   const [selY, selM, selD] = selectedDate.split('-');
@@ -174,6 +178,20 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           />
         ))}
       </div>
+
+      {selectedDateProposals.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-semibold text-on-surface-variant">이 날 제안한 숙제</p>
+          {selectedDateProposals.map((p) => (
+            <div key={p.id} className="rounded-xl bg-surface-container-high px-4 py-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold min-w-0 truncate">
+                {getSubject(p.subjectId).label} · {p.material || p.pageRange || '할 일'}
+              </p>
+              <span className={`text-xs font-semibold shrink-0 ${proposalStatusColor[p.status]}`}>{proposalStatusLabel[p.status]}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <BottomSheet open={exceptionSheetOpen} onClose={() => setExceptionSheetOpen(false)} title="과외 일정 변경">
         <div className="space-y-3">
