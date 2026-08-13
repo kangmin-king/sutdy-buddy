@@ -2,8 +2,10 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
 import { Icon, BottomSheet, Button, TextField, ChipGroup, useConfirm } from '../../primitives';
+import { SUBJECTS } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
 import { DayProgressRing } from '../shared/DayProgressRing';
+import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -17,6 +19,10 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const [exceptionAction, setExceptionAction] = React.useState<'cancel' | 'move'>('cancel');
   const [exceptionNewDate, setExceptionNewDate] = React.useState(today);
   const [scheduleSheetOpen, setScheduleSheetOpen] = React.useState(false);
+  const [proposalSheetOpen, setProposalSheetOpen] = React.useState(false);
+  const [proposalSubjectId, setProposalSubjectId] = React.useState<SubjectId>('math');
+  const [proposalMaterial, setProposalMaterial] = React.useState('');
+  const [proposalPageRange, setProposalPageRange] = React.useState('');
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
@@ -128,18 +134,31 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             <span className="text-error"> · {selectedExams.map((e) => `📝 ${e.title}`).join(', ')}</span>
           )}
         </p>
-        {tutoringDays.has(selectedDate) && (
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => {
-              setExceptionAction('cancel');
-              setExceptionNewDate(selectedDate);
-              setExceptionSheetOpen(true);
+              setProposalSubjectId('math');
+              setProposalMaterial('');
+              setProposalPageRange('');
+              setProposalSheetOpen(true);
             }}
-            className="text-[11px] text-error font-semibold"
+            className="text-[11px] text-primary font-semibold"
           >
-            이 날 일정 변경
+            숙제 제안하기
           </button>
-        )}
+          {tutoringDays.has(selectedDate) && (
+            <button
+              onClick={() => {
+                setExceptionAction('cancel');
+                setExceptionNewDate(selectedDate);
+                setExceptionSheetOpen(true);
+              }}
+              className="text-[11px] text-error font-semibold"
+            >
+              이 날 일정 변경
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -209,6 +228,30 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             }}
           >
             저장
+          </Button>
+        </div>
+      </BottomSheet>
+      <BottomSheet open={proposalSheetOpen} onClose={() => setProposalSheetOpen(false)} title="숙제 제안하기">
+        <div className="space-y-3">
+          <p className="text-xs text-on-surface-variant">
+            {selY}년 {Number(selM)}월 {Number(selD)}일에 추가로 할 숙제를 제안해요. 학생이 수락하면 그날 할 일에 들어가요.
+          </p>
+          <ChipGroup options={SUBJECTS} value={proposalSubjectId} onChange={setProposalSubjectId} />
+          <TextField label="교재/내용" value={proposalMaterial} onChange={setProposalMaterial} placeholder="예: 쎈 수학" />
+          <TextField label="범위 (선택)" value={proposalPageRange} onChange={setProposalPageRange} placeholder="예: 30~40페이지" />
+          <Button
+            className="w-full"
+            onClick={() => {
+              actions.createHomeworkProposal(studentId, {
+                date: selectedDate,
+                subjectId: proposalSubjectId,
+                material: proposalMaterial,
+                pageRange: proposalPageRange,
+              });
+              setProposalSheetOpen(false);
+            }}
+          >
+            제안 보내기
           </Button>
         </div>
       </BottomSheet>

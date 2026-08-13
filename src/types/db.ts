@@ -166,6 +166,19 @@ export type SbTutoringScheduleExceptionRow = {
   created_at: string;
 };
 
+export type SbHomeworkProposalRow = {
+  id: string;
+  student_id: string;
+  manager_id: string;
+  date: string;
+  subject_id: SubjectId;
+  material: string;
+  page_range: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  responded_at: string | null;
+};
+
 export type SbDeviceTokenRow = {
   id: string;
   user_id: string;
@@ -220,6 +233,12 @@ export interface Database {
       sb_tutoring_schedule_exceptions: { Row: SbTutoringScheduleExceptionRow; Insert: Omit<SbTutoringScheduleExceptionRow, 'id' | 'created_at'>; Update: Partial<SbTutoringScheduleExceptionRow>; Relationships: [] };
       sb_device_tokens: { Row: SbDeviceTokenRow; Insert: Omit<SbDeviceTokenRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbDeviceTokenRow>; Relationships: [] };
       sb_banners: { Row: SbBannerRow; Insert: Omit<SbBannerRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbBannerRow>; Relationships: [] };
+      sb_homework_proposals: {
+        Row: SbHomeworkProposalRow;
+        Insert: Omit<SbHomeworkProposalRow, 'id' | 'created_at' | 'responded_at'>;
+        Update: Partial<SbHomeworkProposalRow>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

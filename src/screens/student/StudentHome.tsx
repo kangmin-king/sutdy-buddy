@@ -86,6 +86,10 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
     const index = state.linkedManagers.findIndex((m) => m.id === managerId);
     return managerDisplayLabel(managerId, state.managerLabels, index);
   };
+  const proposalManagerLabel = (managerId: string) => {
+    const index = state.linkedManagers.findIndex((m) => m.id === managerId);
+    return managerDisplayLabel(managerId, state.managerLabels, index);
+  };
 
   // 네이티브가 허용앱 밖 이탈을 감지하면 스스로 sessionActive를 false로 내리고 stateChanged로
   // 알려준다(DistractionStop 화면과 같은 구독 훅). 웹은 그 전환을 보고 타이머를 이탈로 끝낸다.
@@ -191,6 +195,37 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
         </p>
       )}
       <LinkedManagerChips />
+      {state.homeworkProposals.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {state.homeworkProposals.map((p) => (
+            <Card key={p.id} className="flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold">
+                  {getSubject(p.subjectId).label} <span className="text-[10px] text-tertiary ml-1">숙제 제안 · {proposalManagerLabel(p.managerId)}</span>
+                </p>
+                <p className="text-xs text-on-surface-variant">{p.material || p.pageRange || '할 일'}</p>
+                <p className="text-[11px] text-on-surface-variant mt-0.5">{p.date}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => actions.respondToHomeworkProposal(p.id, false)}
+                  aria-label="거절"
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container text-on-surface-variant"
+                >
+                  <Icon name="close" className="!text-[18px]" />
+                </button>
+                <button
+                  onClick={() => actions.respondToHomeworkProposal(p.id, true)}
+                  aria-label="수락"
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-primary text-on-primary"
+                >
+                  <Icon name="check" className="!text-[18px]" />
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
       {missedYesterday.length > 0 && (
         <div className="mt-3 rounded-xl bg-error/10 border border-error/30 p-3">
           <div className="flex items-center justify-between mb-2">

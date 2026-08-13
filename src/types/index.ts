@@ -150,6 +150,19 @@ export interface TutoringScheduleException {
   createdAt: string;
 }
 
+export interface HomeworkProposal {
+  id: string;
+  studentId: string;
+  managerId: string;
+  date: DateKey;
+  subjectId: SubjectId;
+  material: string;
+  pageRange: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  respondedAt: string | null;
+}
+
 export interface StudySession {
   id: string;
   plannerItemId: string;

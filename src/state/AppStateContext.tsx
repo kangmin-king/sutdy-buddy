@@ -25,6 +25,7 @@ import {
   examSubjectRangeFromRow,
   tutoringScheduleFromRow,
   tutoringScheduleExceptionFromRow,
+  homeworkProposalFromRow,
 } from './mappers';
 import type {
   Profile,
@@ -43,6 +44,7 @@ import type {
   TutoringSchedule,
   TutoringScheduleException,
   SubjectId,
+  HomeworkProposal,
 } from '../types';
 import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
 
@@ -65,6 +67,7 @@ interface AppState {
   studentPlannerItems: Record<string, Record<DateKey, PlannerItem[]>>;
   linkedManagers: Profile[];
   managerLabels: Record<string, string>;
+  homeworkProposals: HomeworkProposal[];
   loading: boolean;
   error: string | null;
 }
@@ -88,6 +91,7 @@ const EMPTY_STATE: AppState = {
   studentPlannerItems: {},
   linkedManagers: [],
   managerLabels: {},
+  homeworkProposals: [],
   loading: true,
   error: null,
 };
@@ -136,6 +140,11 @@ interface AppStateActions {
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   registerDeviceToken: (token: string) => Promise<void>;
+  createHomeworkProposal: (
+    studentId: string,
+    proposal: { date: DateKey; subjectId: SubjectId; material: string; pageRange: string }
+  ) => Promise<void>;
+  respondToHomeworkProposal: (proposalId: string, accept: boolean) => Promise<void>;
   createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
   deleteExamRecord: (studentId: string, examId: string) => Promise<void>;
   addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
@@ -278,6 +287,7 @@ async function loadAll(userId: string): Promise<AppState> {
   let studentLabels: Record<string, string> = {};
   let linkedManagers: Profile[] = [];
   let managerLabels: Record<string, string> = {};
+  let homeworkProposals: HomeworkProposal[] = [];
 
   if (profile?.role === 'manager') {
     managedStudents = await fetchManagedStudents(userId);
@@ -315,15 +325,17 @@ async function loadAll(userId: string): Promise<AppState> {
     }
   } else if (profile?.role === 'student') {
     // 학생 본인 계정: 선생님/학부모가 등록해준 시험 일정·과목별 목표·교재 범위·과외 요일을 읽기 전용으로 본다.
-    const [examRes, scheduleRes, exceptionRes, managersRes, managerLabelsResult] = await Promise.all([
+    const [examRes, scheduleRes, exceptionRes, managersRes, managerLabelsResult, proposalsRes] = await Promise.all([
       supabase.from('sb_exam_records').select('*').eq('student_id', userId),
       supabase.from('sb_tutoring_schedules').select('*').eq('student_id', userId),
       supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('student_id', userId),
       fetchLinkedManagers(userId),
       fetchManagerLabels(userId),
+      supabase.from('sb_homework_proposals').select('*').eq('student_id', userId).eq('status', 'pending'),
     ]);
     linkedManagers = managersRes;
     managerLabels = managerLabelsResult;
+    homeworkProposals = (proposalsRes.data ?? []).map(homeworkProposalFromRow);
     examRecords = (examRes.data ?? []).map(examRecordFromRow);
     tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
     tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
@@ -358,6 +370,7 @@ async function loadAll(userId: string): Promise<AppState> {
     studentPlannerItems: {},
     linkedManagers,
     managerLabels,
+    homeworkProposals,
     loading: false,
     error: null,
   };
@@ -927,6 +940,62 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           .from('sb_device_tokens')
           .upsert({ user_id: userId, fcm_token: token, platform: 'android' }, { onConflict: 'user_id,fcm_token' });
         if (error) console.error('registerDeviceToken failed:', error.message);
+      },
+
+      async createHomeworkProposal(studentId, proposal) {
+        const { error } = await supabase.from('sb_homework_proposals').insert({
+          student_id: studentId,
+          manager_id: userId,
+          date: proposal.date,
+          subject_id: proposal.subjectId,
+          material: proposal.material,
+          page_range: proposal.pageRange,
+          status: 'pending',
+        });
+        if (error) {
+          console.error('createHomeworkProposal failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async respondToHomeworkProposal(proposalId, accept) {
+        const proposal = state.homeworkProposals.find((p) => p.id === proposalId);
+        if (!proposal) return;
+        setState((s) => ({ ...s, homeworkProposals: s.homeworkProposals.filter((p) => p.id !== proposalId) }));
+
+        const { error } = await supabase
+          .from('sb_homework_proposals')
+          .update({ status: accept ? 'accepted' : 'rejected', responded_at: new Date().toISOString() })
+          .eq('id', proposalId);
+        if (error) {
+          console.error('respondToHomeworkProposal failed:', error.message);
+          setState((s) => ({ ...s, homeworkProposals: [...s.homeworkProposals, proposal], error: WRITE_FAILURE_MESSAGE }));
+          return;
+        }
+
+        if (accept) {
+          await actions.addPlannerItem(proposal.date, {
+            date: proposal.date,
+            subjectId: proposal.subjectId,
+            startTime: '09:00',
+            studyType: null,
+            material: proposal.material,
+            unit: '',
+            pageRange: proposal.pageRange,
+            endTime: null,
+            difficulty: null,
+            restPattern: null,
+            mustDo: false,
+            status: 'planned',
+            actualMinutes: null,
+            understanding: null,
+            partialReason: null,
+            incompleteReason: null,
+            source: 'homework',
+            homeworkAssignmentId: null,
+            examSubjectRangeId: null,
+          });
+        }
       },
 
       async createExamRecord(studentId, exam) {

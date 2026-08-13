@@ -12,6 +12,7 @@ import type {
   ExamSubjectRange,
   TutoringSchedule,
   TutoringScheduleException,
+  HomeworkProposal,
 } from '../types';
 import type {
   SbProfileRow,
@@ -23,6 +24,7 @@ import type {
   SbHomeworkAssignmentRow,
   SbStudySessionRow,
   SbExamRecordRow,
+  SbHomeworkProposalRow,
   SbExamSubjectRow,
   SbExamSubjectRangeRow,
   SbTutoringScheduleRow,
@@ -148,6 +150,21 @@ export function tutoringScheduleFromRow(row: SbTutoringScheduleRow): TutoringSch
 
 export function tutoringScheduleExceptionFromRow(row: SbTutoringScheduleExceptionRow): TutoringScheduleException {
   return { id: row.id, studentId: row.student_id, managerId: row.manager_id, originalDate: row.original_date, newDate: row.new_date, note: row.note, createdAt: row.created_at };
+}
+
+export function homeworkProposalFromRow(row: SbHomeworkProposalRow): HomeworkProposal {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    managerId: row.manager_id,
+    date: row.date,
+    subjectId: row.subject_id,
+    material: row.material,
+    pageRange: row.page_range,
+    status: row.status,
+    createdAt: row.created_at,
+    respondedAt: row.responded_at,
+  };
 }
 
 export function groupByDate<T extends { date: string }>(rows: T[]): Record<string, T[]> {
