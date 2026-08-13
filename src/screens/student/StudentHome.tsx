@@ -5,6 +5,7 @@ import { getSubject } from '../../constants';
 import { TopAppBar, Card, Icon } from '../../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../../native/distractionStop';
 import LinkedManagerChips from './LinkedManagerChips';
+import HomeBanner from '../shared/HomeBanner';
 import type { PlannerItem } from '../../types';
 
 function formatElapsed(seconds: number): string {
@@ -183,6 +184,7 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
+      <HomeBanner />
       {state.profile?.inviteCode && (
         <p className="mt-2 text-xs text-on-surface-variant">
           내 초대코드 <span className="font-mono font-bold text-on-surface tracking-wider">{state.profile.inviteCode}</span> · 과외쌤/학부모께 알려주세요

@@ -175,6 +175,19 @@ export type SbDeviceTokenRow = {
   updated_at: string;
 };
 
+export type SbBannerRow = {
+  id: string;
+  title: string;
+  image_url: string | null;
+  link_url: string | null;
+  start_date: string;
+  end_date: string | null;
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -206,6 +219,7 @@ export interface Database {
       sb_tutoring_schedules: { Row: SbTutoringScheduleRow; Insert: Omit<SbTutoringScheduleRow, 'id' | 'updated_at'>; Update: Partial<SbTutoringScheduleRow>; Relationships: [] };
       sb_tutoring_schedule_exceptions: { Row: SbTutoringScheduleExceptionRow; Insert: Omit<SbTutoringScheduleExceptionRow, 'id' | 'created_at'>; Update: Partial<SbTutoringScheduleExceptionRow>; Relationships: [] };
       sb_device_tokens: { Row: SbDeviceTokenRow; Insert: Omit<SbDeviceTokenRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbDeviceTokenRow>; Relationships: [] };
+      sb_banners: { Row: SbBannerRow; Insert: Omit<SbBannerRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbBannerRow>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: {

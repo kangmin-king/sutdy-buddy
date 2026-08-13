@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/admin", "destination": "https://admin-iota-seven-40.vercel.app" },
+    { "source": "/admin/:path*", "destination": "https://admin-iota-seven-40.vercel.app/:path*" }
+  ]
+}
