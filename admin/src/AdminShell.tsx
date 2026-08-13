@@ -5,8 +5,10 @@ import type { AdminUserRow } from './types';
 import BannerManager from './screens/BannerManager';
 import OperatorManager from './screens/OperatorManager';
 import AccountSettings from './screens/AccountSettings';
+import MembersOverview from './screens/MembersOverview';
+import BroadcastNotification from './screens/BroadcastNotification';
 
-type Tab = 'banners' | 'operators' | 'account';
+type Tab = 'banners' | 'members' | 'broadcast' | 'operators' | 'account';
 
 export default function AdminShell({ session }: { session: Session }) {
   const [me, setMe] = React.useState<AdminUserRow | null | undefined>(undefined);
@@ -54,6 +56,22 @@ export default function AdminShell({ session }: { session: Session }) {
         </button>
         {me.role === 'admin' && (
           <button
+            onClick={() => setTab('members')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 ${tab === 'members' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400'}`}
+          >
+            회원 현황
+          </button>
+        )}
+        {me.role === 'admin' && (
+          <button
+            onClick={() => setTab('broadcast')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 ${tab === 'broadcast' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400'}`}
+          >
+            전체 공지
+          </button>
+        )}
+        {me.role === 'admin' && (
+          <button
             onClick={() => setTab('operators')}
             className={`px-4 py-2 text-sm font-semibold border-b-2 ${tab === 'operators' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400'}`}
           >
@@ -70,6 +88,8 @@ export default function AdminShell({ session }: { session: Session }) {
 
       <main className="p-5">
         {tab === 'banners' && <BannerManager userId={session.user.id} />}
+        {tab === 'members' && me.role === 'admin' && <MembersOverview />}
+        {tab === 'broadcast' && me.role === 'admin' && <BroadcastNotification />}
         {tab === 'operators' && me.role === 'admin' && <OperatorManager />}
         {tab === 'account' && <AccountSettings email={session.user.email ?? ''} />}
       </main>

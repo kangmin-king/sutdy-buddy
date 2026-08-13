@@ -38,8 +38,12 @@ export default function OperatorManager() {
   };
 
   const handleRemove = async (id: string) => {
-    if (!window.confirm('이 운영자의 어드민 권한을 없앨까요? (로그인 계정 자체는 남아요)')) return;
-    await supabase.from('sb_admin_users').delete().eq('id', id);
+    if (!window.confirm('이 운영자 계정을 완전히 삭제할까요? (로그인 계정 자체도 함께 삭제돼요)')) return;
+    const { error: invokeError } = await supabase.functions.invoke('delete-admin-user', { body: { userId: id } });
+    if (invokeError) {
+      setError(invokeError.message);
+      return;
+    }
     load();
   };
 
