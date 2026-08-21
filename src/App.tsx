@@ -15,6 +15,7 @@ import StudyLogScreen from './screens/StudyLog';
 import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
 import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
+import MockExamTimerScreen from './screens/student/MockExamTimer';
 import StudentPlannerScreen from './screens/student/StudentPlanner';
 import StudentCalendarScreen from './screens/student/StudentCalendar';
 import DistractionFab from './screens/shared/DistractionFab';
@@ -70,6 +71,7 @@ function AppShell() {
 function StudentAppShell() {
   const [activeTab, setActiveTab] = React.useState<(typeof STUDENT_NAV_TABS)[number]['id']>('home');
   const [showDistractionStop, setShowDistractionStop] = React.useState(false);
+  const [showMockExam, setShowMockExam] = React.useState(false);
 
   // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
   // 탭 전환 대신 이 오버레이를 띄운다.
@@ -94,10 +96,21 @@ function StudentAppShell() {
     );
   }
 
+  if (showMockExam) {
+    return (
+      <div id="app-shell">
+        <ErrorBanner />
+        <MockExamTimerScreen onClose={() => setShowMockExam(false)} />
+      </div>
+    );
+  }
+
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {activeTab === 'home' && <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} />}
+      {activeTab === 'home' && (
+        <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} onOpenMockExam={() => setShowMockExam(true)} />
+      )}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
       <DistractionFab onOpen={() => setShowDistractionStop(true)} />

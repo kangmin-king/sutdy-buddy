@@ -28,7 +28,10 @@ function elapsedTodaySeconds(sessions: { id: string; startedAt: string; duration
   return total;
 }
 
-export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigateToCalendar?: () => void } = {}) {
+export default function StudentHomeScreen({
+  onNavigateToCalendar,
+  onOpenMockExam,
+}: { onNavigateToCalendar?: () => void; onOpenMockExam?: () => void } = {}) {
   const { state, actions } = useAppState();
   const today = todayKey();
   const yesterday = addDaysToKey(today, -1);
@@ -209,6 +212,11 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
         </p>
       )}
       <LinkedManagerChips />
+      {onOpenMockExam && (
+        <button onClick={onOpenMockExam} className="mt-2 flex items-center gap-1 text-[11px] text-primary font-semibold">
+          <Icon name="timer" className="!text-[15px]" /> 모의고사 타이머
+        </button>
+      )}
       {state.homeworkProposals.length > 0 && (
         <div className="mt-3 space-y-2">
           {state.homeworkProposals.map((p) => (
