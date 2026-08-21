@@ -1018,6 +1018,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             },
             error: WRITE_FAILURE_MESSAGE,
           }));
+        } else {
+          notifyUser(studentId, '숙제 제안이 왔어요', proposal.material ? `${proposal.material} 숙제를 제안했어요. 확인해보세요` : '새 숙제를 제안했어요');
         }
       },
 
@@ -1275,6 +1277,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (itemsError) {
           console.error('registerHomeworkRange (items) failed:', itemsError.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        } else {
+          notifyUser(studentId, '숙제가 등록됐어요', params.material ? `${params.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
         }
       },
 
@@ -1394,6 +1398,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
           }
         }
+        notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
       },
 
       async deleteExamRange(studentId, rangeId) {
