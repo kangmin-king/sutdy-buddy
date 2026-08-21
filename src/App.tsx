@@ -5,6 +5,7 @@ import { BottomNav, Card, Button, TopAppBar } from './primitives';
 import type { TabId } from './primitives';
 import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
+import ResetPasswordScreen from './screens/ResetPassword';
 import OnboardingScreen from './screens/Onboarding';
 import HomeScreen from './screens/Home';
 import CalendarScreen from './screens/Calendar';
@@ -202,7 +203,7 @@ function LegacyStudentAppShell() {
 }
 
 function Gate() {
-  const { session, loading } = useAuth();
+  const { session, loading, passwordRecovery } = useAuth();
 
   if (loading) {
     return (
@@ -210,6 +211,11 @@ function Gate() {
         <p className="text-sm text-on-surface-variant">불러오는 중...</p>
       </div>
     );
+  }
+
+  // 비밀번호 재설정 링크로 들어온 세션은 곧바로 앱으로 들여보내지 않고 새 비밀번호부터 받는다.
+  if (passwordRecovery) {
+    return <ResetPasswordScreen />;
   }
 
   if (!session) {
