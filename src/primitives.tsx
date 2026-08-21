@@ -7,7 +7,7 @@ export function Icon({ name, className = '', filled = false }: { name: string; c
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
 }
 
-export function TopAppBar({ title = '스터디 버디', onBell }: { title?: string; onBell?: () => void }) {
+export function TopAppBar({ title = '스터디 벅스', onBell }: { title?: string; onBell?: () => void }) {
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   return (

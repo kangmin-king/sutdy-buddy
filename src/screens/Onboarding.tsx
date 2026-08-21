@@ -63,7 +63,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   if (role === 'manager') {
     return (
       <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
-        <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 버디</h1>
+        <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>
 
         <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
           <div className="text-5xl mb-3">🤝📚</div>
@@ -84,7 +84,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
 
   return (
     <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
-      <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 버디</h1>
+      <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>
 
       <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
         <div className="text-5xl mb-3">🤖📚</div>

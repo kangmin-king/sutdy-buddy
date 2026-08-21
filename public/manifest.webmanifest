@@ -1,6 +1,6 @@
 {
-  "name": "스터디 버디",
-  "short_name": "스터디 버디",
+  "name": "스터디 벅스",
+  "short_name": "스터디 벅스",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f9fb",

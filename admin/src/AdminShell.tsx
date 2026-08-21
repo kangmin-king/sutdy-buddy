@@ -41,7 +41,7 @@ export default function AdminShell({ session }: { session: Session }) {
   return (
     <div className="min-h-screen">
       <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-white">
-        <h1 className="text-base font-bold">스터디 버디 어드민</h1>
+        <h1 className="text-base font-bold">스터디 벅스 어드민</h1>
         <button onClick={() => supabase.auth.signOut()} className="text-sm text-gray-500">
           로그아웃
         </button>

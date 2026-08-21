@@ -20,7 +20,7 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center px-5">
       <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-        <h1 className="text-lg font-bold text-center">스터디 버디 어드민</h1>
+        <h1 className="text-lg font-bold text-center">스터디 벅스 어드민</h1>
         <div>
           <label className="block text-sm font-semibold text-gray-600 mb-1">이메일</label>
           <input
