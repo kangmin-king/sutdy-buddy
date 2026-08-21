@@ -166,6 +166,15 @@ export type SbTutoringScheduleExceptionRow = {
   created_at: string;
 };
 
+export type SbSchoolTimetableSlotRow = {
+  id: string;
+  student_id: string;
+  weekday: number;
+  period: number;
+  subject: string;
+  updated_at: string;
+};
+
 export type SbHomeworkProposalRow = {
   id: string;
   student_id: string;
@@ -237,6 +246,12 @@ export interface Database {
         Row: SbHomeworkProposalRow;
         Insert: Omit<SbHomeworkProposalRow, 'created_at' | 'responded_at'>;
         Update: Partial<SbHomeworkProposalRow>;
+        Relationships: [];
+      };
+      sb_school_timetable_slots: {
+        Row: SbSchoolTimetableSlotRow;
+        Insert: Omit<SbSchoolTimetableSlotRow, 'updated_at'>;
+        Update: Partial<SbSchoolTimetableSlotRow>;
         Relationships: [];
       };
     };

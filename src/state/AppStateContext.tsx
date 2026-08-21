@@ -26,6 +26,7 @@ import {
   tutoringScheduleFromRow,
   tutoringScheduleExceptionFromRow,
   homeworkProposalFromRow,
+  schoolTimetableSlotFromRow,
 } from './mappers';
 import type {
   Profile,
@@ -45,6 +46,7 @@ import type {
   TutoringScheduleException,
   SubjectId,
   HomeworkProposal,
+  SchoolTimetableSlot,
 } from '../types';
 import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
 
@@ -69,6 +71,8 @@ interface AppState {
   managerLabels: Record<string, string>;
   homeworkProposals: HomeworkProposal[];
   sentHomeworkProposals: Record<string, HomeworkProposal[]>;
+  schoolTimetable: SchoolTimetableSlot[];
+  studentSchoolTimetables: Record<string, SchoolTimetableSlot[]>;
   loading: boolean;
   error: string | null;
 }
@@ -94,6 +98,8 @@ const EMPTY_STATE: AppState = {
   managerLabels: {},
   homeworkProposals: [],
   sentHomeworkProposals: {},
+  schoolTimetable: [],
+  studentSchoolTimetables: {},
   loading: true,
   error: null,
 };
@@ -175,6 +181,9 @@ interface AppStateActions {
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
+  upsertSchoolTimetableSlot: (weekday: number, period: number, subject: string) => Promise<void>;
+  deleteSchoolTimetableSlot: (slotId: string) => Promise<void>;
+  loadStudentSchoolTimetable: (studentId: string) => Promise<void>;
   dismissError: () => void;
 }
 
@@ -291,6 +300,7 @@ async function loadAll(userId: string): Promise<AppState> {
   let linkedManagers: Profile[] = [];
   let managerLabels: Record<string, string> = {};
   let homeworkProposals: HomeworkProposal[] = [];
+  let schoolTimetable: SchoolTimetableSlot[] = [];
 
   if (profile?.role === 'manager') {
     managedStudents = await fetchManagedStudents(userId);
@@ -328,17 +338,19 @@ async function loadAll(userId: string): Promise<AppState> {
     }
   } else if (profile?.role === 'student') {
     // 학생 본인 계정: 선생님/학부모가 등록해준 시험 일정·과목별 목표·교재 범위·과외 요일을 읽기 전용으로 본다.
-    const [examRes, scheduleRes, exceptionRes, managersRes, managerLabelsResult, proposalsRes] = await Promise.all([
+    const [examRes, scheduleRes, exceptionRes, managersRes, managerLabelsResult, proposalsRes, timetableRes] = await Promise.all([
       supabase.from('sb_exam_records').select('*').eq('student_id', userId),
       supabase.from('sb_tutoring_schedules').select('*').eq('student_id', userId),
       supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('student_id', userId),
       fetchLinkedManagers(userId),
       fetchManagerLabels(userId),
       supabase.from('sb_homework_proposals').select('*').eq('student_id', userId).eq('status', 'pending'),
+      supabase.from('sb_school_timetable_slots').select('*').eq('student_id', userId),
     ]);
     linkedManagers = managersRes;
     managerLabels = managerLabelsResult;
     homeworkProposals = (proposalsRes.data ?? []).map(homeworkProposalFromRow);
+    schoolTimetable = (timetableRes.data ?? []).map(schoolTimetableSlotFromRow);
     examRecords = (examRes.data ?? []).map(examRecordFromRow);
     tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
     tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
@@ -375,6 +387,8 @@ async function loadAll(userId: string): Promise<AppState> {
     managerLabels,
     homeworkProposals,
     sentHomeworkProposals: {},
+    schoolTimetable,
+    studentSchoolTimetables: {},
     loading: false,
     error: null,
   };
@@ -1575,6 +1589,56 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: grouped };
         setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: grouped } }));
+      },
+
+      async upsertSchoolTimetableSlot(weekday, period, subject) {
+        const trimmed = subject.trim();
+        if (!trimmed) {
+          await actions.deleteSchoolTimetableSlot(
+            state.schoolTimetable.find((slot) => slot.weekday === weekday && slot.period === period)?.id ?? ''
+          );
+          return;
+        }
+        const existing = state.schoolTimetable.find((slot) => slot.weekday === weekday && slot.period === period);
+        const id = existing?.id ?? uid();
+        const updatedAt = new Date().toISOString();
+        const optimisticSlot: SchoolTimetableSlot = { id, studentId: userId, weekday, period, subject: trimmed, updatedAt };
+        setState((s) => ({
+          ...s,
+          schoolTimetable: [...s.schoolTimetable.filter((slot) => slot.id !== id), optimisticSlot],
+        }));
+        const { error } = await supabase
+          .from('sb_school_timetable_slots')
+          .upsert({ id, student_id: userId, weekday, period, subject: trimmed }, { onConflict: 'student_id,weekday,period' });
+        if (error) {
+          console.error('upsertSchoolTimetableSlot failed:', error.message);
+          setState((s) => ({
+            ...s,
+            schoolTimetable: existing ? [...s.schoolTimetable.filter((slot) => slot.id !== id), existing] : s.schoolTimetable.filter((slot) => slot.id !== id),
+            error: WRITE_FAILURE_MESSAGE,
+          }));
+        }
+      },
+
+      async deleteSchoolTimetableSlot(slotId) {
+        if (!slotId) return;
+        const existing = state.schoolTimetable.find((slot) => slot.id === slotId);
+        setState((s) => ({ ...s, schoolTimetable: s.schoolTimetable.filter((slot) => slot.id !== slotId) }));
+        const { error } = await supabase.from('sb_school_timetable_slots').delete().eq('id', slotId);
+        if (error) {
+          console.error('deleteSchoolTimetableSlot failed:', error.message);
+          if (existing) setState((s) => ({ ...s, schoolTimetable: [...s.schoolTimetable, existing], error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      async loadStudentSchoolTimetable(studentId) {
+        const { data, error } = await supabase.from('sb_school_timetable_slots').select('*').eq('student_id', studentId);
+        if (error) {
+          console.error('loadStudentSchoolTimetable failed:', error.message);
+          return;
+        }
+        const slots = (data ?? []).map(schoolTimetableSlotFromRow);
+        setState((s) => ({ ...s, studentSchoolTimetables: { ...s.studentSchoolTimetables, [studentId]: slots } }));
       },
 
       dismissError() {

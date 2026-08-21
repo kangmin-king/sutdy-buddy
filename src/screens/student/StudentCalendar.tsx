@@ -11,8 +11,9 @@ import {
   managerDisplayLabel,
 } from '../../lib';
 import { getSubject } from '../../constants';
-import { Icon, Card, TopAppBar } from '../../primitives';
+import { Icon, Card, TopAppBar, BottomSheet, TextField, Button } from '../../primitives';
 import { DayProgressRing } from '../shared/DayProgressRing';
+import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import type { PlannerItem } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -20,11 +21,13 @@ const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 // 선생님 캘린더 탭과 같은 월간 그리드를 학생 본인 데이터로 읽기 전용 보여준다(과외 요일 설정/일정
 // 변경은 선생님 몫이라 편집 버튼은 없다).
 export default function StudentCalendarScreen() {
-  const { state } = useAppState();
+  const { state, actions } = useAppState();
   const today = todayKey();
   const studentId = state.profile?.id ?? '';
   const [selectedDate, setSelectedDate] = React.useState(today);
   const [viewMonthKey, setViewMonthKey] = React.useState(today);
+  const [timetableSheetOpen, setTimetableSheetOpen] = React.useState(false);
+  const [editingCell, setEditingCell] = React.useState<{ weekday: number; period: number; subject: string } | null>(null);
 
   const grid = monthGrid(viewMonthKey);
   // 학생 한 명에게 선생님이 여러 명 연결될 수 있으므로, 과외 요일도 선생님별로 따로 계산해서 합친다
@@ -75,6 +78,12 @@ export default function StudentCalendarScreen() {
         </p>
         <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
           <Icon name="chevron_right" />
+        </button>
+      </div>
+
+      <div className="flex justify-end mb-2">
+        <button onClick={() => setTimetableSheetOpen(true)} className="text-[11px] text-on-surface-variant underline">
+          학교 시간표
         </button>
       </div>
 
@@ -158,6 +167,41 @@ export default function StudentCalendarScreen() {
           </Card>
         ))}
       </div>
+
+      <BottomSheet open={timetableSheetOpen} onClose={() => setTimetableSheetOpen(false)} title="학교 시간표">
+        <p className="text-xs text-on-surface-variant mb-3">칸을 눌러 과목을 입력하세요. 선생님도 이 시간표를 볼 수 있어요.</p>
+        <SchoolTimetableGrid
+          slots={state.schoolTimetable}
+          editable
+          onEditCell={(weekday, period, subject) => setEditingCell({ weekday, period, subject })}
+        />
+      </BottomSheet>
+
+      <BottomSheet
+        open={editingCell !== null}
+        onClose={() => setEditingCell(null)}
+        title={editingCell ? `${WEEKDAY_LABELS[editingCell.weekday - 1]}요일 ${editingCell.period}교시` : undefined}
+      >
+        {editingCell && (
+          <div className="space-y-3">
+            <TextField
+              label="과목"
+              value={editingCell.subject}
+              onChange={(value) => setEditingCell((c) => c && { ...c, subject: value })}
+              placeholder="예: 수학"
+            />
+            <Button
+              className="w-full"
+              onClick={() => {
+                actions.upsertSchoolTimetableSlot(editingCell.weekday, editingCell.period, editingCell.subject);
+                setEditingCell(null);
+              }}
+            >
+              저장
+            </Button>
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

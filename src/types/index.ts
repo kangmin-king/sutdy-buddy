@@ -150,6 +150,15 @@ export interface TutoringScheduleException {
   createdAt: string;
 }
 
+export interface SchoolTimetableSlot {
+  id: string;
+  studentId: string;
+  weekday: number; // 1=월 .. 5=금
+  period: number; // 1~8교시
+  subject: string;
+  updatedAt: string;
+}
+
 export interface HomeworkProposal {
   id: string;
   studentId: string;

@@ -5,6 +5,7 @@ import { Icon, BottomSheet, Button, TextField, ChipGroup, useConfirm } from '../
 import { SUBJECTS, getSubject } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
 import { DayProgressRing } from '../shared/DayProgressRing';
+import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -23,10 +24,12 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const [proposalSubjectId, setProposalSubjectId] = React.useState<SubjectId>('math');
   const [proposalMaterial, setProposalMaterial] = React.useState('');
   const [proposalPageRange, setProposalPageRange] = React.useState('');
+  const [timetableSheetOpen, setTimetableSheetOpen] = React.useState(false);
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
     actions.loadSentHomeworkProposals(studentId);
+    actions.loadStudentSchoolTimetable(studentId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 
@@ -272,6 +275,13 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             제안 보내기
           </Button>
         </div>
+      </BottomSheet>
+      <BottomSheet open={timetableSheetOpen} onClose={() => setTimetableSheetOpen(false)} title="학교 시간표">
+        {(state.studentSchoolTimetables[studentId] ?? []).length === 0 ? (
+          <p className="text-sm text-on-surface-variant text-center py-6">학생이 아직 시간표를 등록하지 않았어요.</p>
+        ) : (
+          <SchoolTimetableGrid slots={state.studentSchoolTimetables[studentId] ?? []} />
+        )}
       </BottomSheet>
       {confirmDialog}
     </div>
