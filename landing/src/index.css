@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  scroll-behavior: smooth;
+  /* 한글은 음절(글자) 단위로 줄바꿈이 가능해서, 이게 없으면 "안녕하세/요"처럼 한 단어가
+     중간에서 잘려 보일 수 있다. 띄어쓰기 단위로만 줄바꿈되게 사이트 전체에 적용한다. */
+  word-break: keep-all;
+}
+
+/* 그레인 텍스처: 히어로 배경에 아주 옅게 깔아서 완전 평면 느낌을 깬다. */
+.grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
