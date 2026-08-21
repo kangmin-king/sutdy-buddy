@@ -1,6 +1,8 @@
 import React from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { App as CapacitorApp } from '@capacitor/app';
 import { supabase } from '../lib/supabase';
+import { completeNativeSignIn, isNativeApp } from '../lib/socialAuth';
 
 interface AuthValue {
   session: Session | null;
@@ -29,6 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
     return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // 네이티브 앱의 소셜 로그인은 시스템 브라우저에서 끝나고 com.studybuddy.app:// 딥링크로
+  // 돌아온다. 웹처럼 페이지 로드가 일어나지 않으니 detectSessionInUrl이 잡아주지 못해서,
+  // 여기서 직접 받아 세션을 세운다. 세션이 서면 위 onAuthStateChange가 이어받는다.
+  React.useEffect(() => {
+    if (!isNativeApp()) return;
+    const handle = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      void completeNativeSignIn(url);
+    });
+    return () => {
+      void handle.then((h) => h.remove());
+    };
   }, []);
 
   const signOut = React.useCallback(async () => {

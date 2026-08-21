@@ -5,12 +5,40 @@ import { GRADES, SUBJECTS } from '../constants';
 import { Button, ChipGroup, TextField, SelectField } from '../primitives';
 import type { Grade, SubjectId, Role } from '../types';
 
+/**
+ * 구글·카카오로 가입하면 이메일 회원가입 폼을 거치지 않아서 역할 정보가 없다. 예전처럼 그냥
+ * 학생으로 처리하면 소셜로 가입한 과외쌤이 조용히 학생 계정이 되어버리므로, 그 경우에만 물어본다.
+ */
+function RolePicker({ onPick }: { onPick: (role: Role) => void }) {
+  return (
+    <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
+      <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>
+      <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
+        <div className="text-5xl mb-3">👋</div>
+        <h2 className="text-2xl font-extrabold text-on-surface mb-1">어떻게 쓰실 건가요?</h2>
+        <p className="text-sm text-on-surface-variant">선택에 따라 보이는 화면이 달라져요.</p>
+      </div>
+      <div className="space-y-3">
+        <Button className="w-full" onClick={() => onPick('student')}>
+          학생이에요
+        </Button>
+        <Button variant="ghost" className="w-full" onClick={() => onPick('manager')}>
+          과외쌤 · 학부모예요
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
   const { actions } = useAppState();
   const { session } = useAuth();
-  const role: Role = (session?.user.user_metadata.role as Role | undefined) ?? 'student';
+  // 이메일 회원가입은 가입 폼에서 고른 역할이 메타데이터에 들어있다. 소셜 로그인은 비어 있어서
+  // 아래 RolePicker로 직접 받는다.
+  const metadataRole = session?.user.user_metadata.role as Role | undefined;
   const userId = session!.user.id;
 
+  const [chosenRole, setChosenRole] = React.useState<Role | null>(metadataRole ?? null);
   const [grade, setGrade] = React.useState<Grade>(GRADES[2]);
   const [mainSubjects, setMainSubjects] = React.useState<SubjectId[]>(['math']);
   const [goal, setGoal] = React.useState('');
@@ -60,7 +88,11 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
     onComplete();
   };
 
-  if (role === 'manager') {
+  if (!chosenRole) {
+    return <RolePicker onPick={setChosenRole} />;
+  }
+
+  if (chosenRole === 'manager') {
     return (
       <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
         <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>

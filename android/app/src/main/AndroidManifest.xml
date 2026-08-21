@@ -18,6 +18,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- 소셜 로그인(구글·카카오)은 시스템 브라우저에서 끝난 뒤 이 스킴으로 앱에 돌아온다.
+                 Supabase의 Redirect URL 허용목록에도 같은 값이 등록돼 있어야 한다. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.studybuddy.app" android:host="auth-callback" />
+            </intent-filter>
         </activity>
 
         <provider
