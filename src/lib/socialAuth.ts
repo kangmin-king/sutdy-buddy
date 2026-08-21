@@ -46,6 +46,11 @@ export function useEnabledSocialProviders(): SocialProvider[] {
   return providers;
 }
 
+// 카카오 주의: Supabase(GoTrue)가 서버에서 scope에 account_email을 항상 붙인다. 클라이언트에서
+// options.scopes로 줄일 수 없고(덧붙기만 된다), 카카오 앱에 이메일 동의항목 권한이 없으면
+// KOE205로 거절당한다. 이메일 권한은 비즈 앱 전환(본인인증 필요)을 해야 열린다.
+// 그때까지는 대시보드에서 Kakao provider를 꺼두면 버튼도 자동으로 사라진다.
+
 export async function signInWithProvider(provider: SocialProvider): Promise<void> {
   const native = isNativeApp();
   const { data, error } = await supabase.auth.signInWithOAuth({
