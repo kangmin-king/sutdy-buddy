@@ -134,9 +134,17 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
     setStartPending((m) => ({ ...m, [itemId]: true }));
     try {
       const sessionId = await actions.startStudySession(itemId);
+      // now가 1초 간격 setInterval로만 갱신돼서, 재시작 직후 새 세션의 startedAt보다 stale한
+      // now가 남아있으면 경과시간이 순간적으로 음수가 되어 합계가 1초 줄어 보인다. 시작 시점에
+      // 바로 맞춰준다.
+      setNow(Date.now());
       setRunningSessionId((m) => ({ ...m, [itemId]: sessionId }));
       selfInitiatedStop.current = false;
-      if (isNativePlatform()) DistractionStop.setSessionActive({ active: true });
+      // 네이티브 브릿지 호출(DistractionStop 접근성 서비스 쪽 처리)이 실기기에서 동기적으로
+      // 오래 걸릴 수 있는데, 같은 실행 흐름 안에 있으면 위 setState들이 화면에 그려지는 게
+      // 그만큼 늦어져 "재시작해도 잠깐 멈춰있다가 시간이 간다"로 보인다. 화면이 먼저 그려지도록
+      // 다음 틱으로 미룬다.
+      if (isNativePlatform()) setTimeout(() => DistractionStop.setSessionActive({ active: true }), 0);
     } finally {
       setStartPending((m) => {
         const next = { ...m };
@@ -148,12 +156,18 @@ export default function StudentHomeScreen({ onNavigateToCalendar }: { onNavigate
   const handleStop = (itemId: string, completed: boolean) => {
     const sessionId = runningSessionId[itemId];
     if (!sessionId) return;
-    actions.endStudySession(itemId, sessionId, false);
+    const sessions = state.studySessions[itemId] ?? [];
+    const running = sessions.find((s) => s.id === sessionId);
+    // 화면에 이미 보이고 있던 값을 그대로 저장한다. 정지 시각 기준으로 다시 정밀 계산하면
+    // 1초 주기로만 갱신되는 화면 표시값과 어긋나, 정지하는 순간 숫자가 위아래로 튀어 보인다.
+    const displayedSeconds = running ? Math.floor((now - Date.parse(running.startedAt)) / 1000) : undefined;
+    actions.endStudySession(itemId, sessionId, false, displayedSeconds);
     if (isNativePlatform()) {
       // 아래 setSessionActive(false)가 돌려보낼 true -> false 전환을 이탈로 오인하지 않도록
-      // 네이티브에 알리기 전에 동기적으로 표시해둔다.
+      // 네이티브에 알리기 전에 동기적으로 표시해둔다(이 ref 대입 자체는 즉시 실행되어야 한다).
       selfInitiatedStop.current = true;
-      DistractionStop.setSessionActive({ active: false });
+      // 네이티브 호출 자체는 다음 틱으로 미뤄 화면 갱신을 막지 않게 한다 (handleStart와 동일한 이유).
+      setTimeout(() => DistractionStop.setSessionActive({ active: false }), 0);
     }
     setRunningSessionId((m) => {
       const next = { ...m };

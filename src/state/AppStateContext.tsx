@@ -144,7 +144,7 @@ interface AppStateActions {
   ) => Promise<void>;
   updateHomeworkAssignment: (id: string, patch: Partial<HomeworkAssignment>) => Promise<void>;
   startStudySession: (plannerItemId: string) => Promise<string>;
-  endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean) => Promise<void>;
+  endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean, displayedSeconds?: number) => Promise<void>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   registerDeviceToken: (token: string) => Promise<void>;
@@ -887,29 +887,44 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             ],
           },
         }));
-        const { error } = await supabase.from('sb_study_sessions').insert({
-          id,
-          user_id: userId,
-          planner_item_id: plannerItemId,
-          started_at: startedAt,
-          ended_at: null,
-          duration_seconds: null,
-          deviated: false,
-        });
-        if (error) {
-          console.error('startStudySession failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
+        // 호출자(StudentHome의 handleStart)는 이 id를 받아야 실시간 카운터를 돌리는 "실행 중
+        // 세션"으로 등록한다. 여기서 insert 네트워크 왕복을 기다렸다가 id를 돌려주면 응답이 오는
+        // 동안 타이머가 멈춰 있는 것처럼 보인다 — 로컬 상태는 이미 위에서 반영했으니 네트워크는
+        // 백그라운드로 보내고 id는 즉시 돌려준다.
+        supabase
+          .from('sb_study_sessions')
+          .insert({
+            id,
+            user_id: userId,
+            planner_item_id: plannerItemId,
+            started_at: startedAt,
+            ended_at: null,
+            duration_seconds: null,
+            deviated: false,
+          })
+          .then(({ error }) => {
+            if (error) {
+              console.error('startStudySession failed:', error.message);
+              setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+            }
+          });
         return id;
       },
 
-      async endStudySession(plannerItemId, sessionId, deviated) {
+      async endStudySession(plannerItemId, sessionId, deviated, displayedSeconds) {
         const endedAt = new Date().toISOString();
         // startedAt is immutable once a session is created, so reading it from the outer `state`
         // closure (rather than deriving inside the setState updater) is safe here — unlike
         // updatePlannerItem's list derivation, there's no risk of acting on a stale sibling write.
         const existing = (state.studySessions[plannerItemId] ?? []).find((sess) => sess.id === sessionId);
-        const durationSeconds = existing ? Math.round((Date.parse(endedAt) - Date.parse(existing.startedAt)) / 1000) : null;
+        // 화면의 실시간 경과는 1초 주기로만 갱신되는 now를 기준으로 보여준다. 여기서 정지 시각
+        // 기준으로 다시 정밀 계산하면(Date.now() 재조회) 마지막으로 화면에 보이던 값과 어긋나
+        // 정지하는 순간 숫자가 위아래로 튀어 보인다. 호출자가 화면에 보이던 그 값을
+        // displayedSeconds로 넘겨주면 그걸 그대로 저장해서 "보이던 값 = 저장되는 값"을 보장한다.
+        // (자동 이탈 종료처럼 화면 값이 없는 호출은 기존대로 정밀 계산한다.)
+        const durationSeconds = existing
+          ? (displayedSeconds ?? Math.floor((Date.parse(endedAt) - Date.parse(existing.startedAt)) / 1000))
+          : null;
 
         setState((s) => {
           const list = s.studySessions[plannerItemId] ?? [];

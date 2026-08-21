@@ -144,6 +144,10 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
                   className="flex-1 !px-2"
                   onClick={() => {
                     const extraMillis = minutes * 60_000;
+                    // now가 1초 간격 setInterval로만 갱신돼서, 클릭 시점엔 최대 1초 stale한 now가
+                    // 남아있다. 그 상태로 남은시간을 계산하면 실제보다 커 보여 Math.ceil이 1분
+                    // 더 올림되었다가(예: 5분 눌렀는데 6분) 다음 틱에 정정된다. 클릭 즉시 맞춰준다.
+                    setNow(Date.now());
                     setLocal((s) => s && { ...s, endTimeMillis: (s.endTimeMillis ?? Date.now()) + extraMillis });
                     state.endTimeMillis
                       ? DistractionStop.extendTimer({ extraMillis })
