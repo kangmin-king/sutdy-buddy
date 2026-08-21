@@ -70,15 +70,34 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
         </button>
       </div>
 
-      <div className="flex justify-end mb-2">
+      {/* 예전엔 화면마다 작은 밑줄 텍스트 링크로 흩어져 있던 기능들이라 있는지도 잘 몰랐다는
+          피드백을 받았다. 항상 같은 자리, 같은 아이콘으로 보이게 한 줄로 모았다. */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <button
+          onClick={() => {
+            setProposalSubjectId('math');
+            setProposalMaterial('');
+            setProposalPageRange('');
+            setProposalSheetOpen(true);
+          }}
+          className="flex flex-col items-center gap-1 py-2 rounded-2xl bg-surface-container"
+        >
+          <Icon name="assignment_add" className="!text-[20px] text-primary" />
+          <span className="text-[11px] text-on-surface-variant">숙제 제안</span>
+        </button>
+        <button onClick={() => setTimetableSheetOpen(true)} className="flex flex-col items-center gap-1 py-2 rounded-2xl bg-surface-container">
+          <Icon name="schedule" className="!text-[20px] text-primary" />
+          <span className="text-[11px] text-on-surface-variant">시간표</span>
+        </button>
         <button
           onClick={() => {
             setDraftWeekdays(schedule?.weekdays ?? []);
             setScheduleSheetOpen(true);
           }}
-          className="text-[11px] text-on-surface-variant underline"
+          className="flex flex-col items-center gap-1 py-2 rounded-2xl bg-surface-container"
         >
-          과외 요일 설정
+          <Icon name="event_repeat" className="!text-[20px] text-primary" />
+          <span className="text-[11px] text-on-surface-variant">요일 설정</span>
         </button>
       </div>
 
@@ -142,17 +161,6 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           )}
         </p>
         <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => {
-              setProposalSubjectId('math');
-              setProposalMaterial('');
-              setProposalPageRange('');
-              setProposalSheetOpen(true);
-            }}
-            className="text-[11px] text-primary font-semibold"
-          >
-            숙제 제안하기
-          </button>
           {tutoringDays.has(selectedDate) && (
             <button
               onClick={() => {
