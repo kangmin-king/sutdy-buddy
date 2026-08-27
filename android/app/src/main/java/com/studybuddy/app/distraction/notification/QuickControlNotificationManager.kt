@@ -33,7 +33,9 @@ class QuickControlNotificationManager {
             while (true) {
                 delay(30_000L)
                 val state = store.observeState().first()
-                if (state.endTimeMillis != null) {
+                // 남은 시간 표시와 세션 만료는 둘 다 시간이 지나면서 저절로 바뀌는 값이라,
+                // 상태 변경 이벤트만으로는 알림이 굳는다.
+                if (state.endTimeMillis != null || state.sessionActive) {
                     show(context, state)
                 }
             }
@@ -43,14 +45,18 @@ class QuickControlNotificationManager {
     fun show(context: Context, state: TimerState) {
         ensureChannel(context)
 
+        val now = System.currentTimeMillis()
+        val studying = state.isSessionActive(now)
         val remainingMinutes = state.endTimeMillis
-            ?.let { endTime ->
-                val remainingMillis = (endTime - System.currentTimeMillis()).coerceAtLeast(0)
-                (remainingMillis + 59_999L) / 60_000L
-            }
+            ?.let { endTime -> ((endTime - now).coerceAtLeast(0) + 59_999L) / 60_000L }
 
         val title = if (state.featureEnabled) "딴짓 멈춰 On" else "딴짓 멈춰 Off"
-        val content = if (remainingMinutes != null) "쉬는 시간: ${remainingMinutes}분 남음" else "쉬는 시간 꺼짐"
+        val content = when {
+            state.isBreakActive(now) && remainingMinutes != null ->
+                "쉬는 시간 ${remainingMinutes}분 남음 — 이 동안은 공부 시간이 쌓이지 않아요"
+            studying -> "공부 중 — 지금 인스타·유튜브·틱톡을 열면 막혀요"
+            else -> "공부를 시작하면 인스타·유튜브·틱톡이 막혀요"
+        }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -61,14 +67,31 @@ class QuickControlNotificationManager {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(openAppPendingIntent(context))
 
-        // 안드로이드 알림은 보통 액션 버튼을 3개까지만 보여준다. On/Off 토글까지 넣으면
-        // 4번째인 +30분이 밀려서 안 보이므로, 여기서는 시간 연장 버튼 3개만 넣는다.
-        listOf(5, 10, 30).forEach { minutes ->
-            builder.addAction(0, "+${minutes}분", quickSetPendingIntent(context, minutes * 60_000L))
+        // 안드로이드 알림은 액션 버튼을 보통 3개까지만 보여준다. 세 번째 자리는 공부 중일 때
+        // 탈출구(공부 끝내기)로 쓴다 — 앱을 열 수 없는 상황에서도 차단을 풀 수 있어야 한다.
+        // 공부 중이 아니면 그 버튼은 할 일이 없으므로 +10분을 둔다.
+        builder.addAction(0, "+5분", quickSetPendingIntent(context, 5 * 60_000L))
+        builder.addAction(0, "+30분", quickSetPendingIntent(context, 30 * 60_000L))
+        if (studying) {
+            builder.addAction(0, "공부 끝내기", endSessionPendingIntent(context))
+        } else {
+            builder.addAction(0, "+10분", quickSetPendingIntent(context, 10 * 60_000L))
         }
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, builder.build())
+    }
+
+    private fun endSessionPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, QuickActionReceiver::class.java).apply {
+            action = QuickActionReceiver.ACTION_END_SESSION
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            END_SESSION_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     // 알림 본문(버튼 제외)을 탭하면 앱을 열면서 딴짓 멈춰 화면으로 바로 이동시킨다.
@@ -113,6 +136,7 @@ class QuickControlNotificationManager {
         private const val CHANNEL_ID = "quick_control"
         private const val NOTIFICATION_ID = 1001
         private const val OPEN_APP_REQUEST_CODE = -2
+        private const val END_SESSION_REQUEST_CODE = -3
         const val EXTRA_OPEN_DISTRACTION_STOP = "open_distraction_stop"
     }
 }

@@ -65,6 +65,7 @@
         <receiver android:name=".distraction.notification.QuickActionReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="com.studybuddy.app.distraction.ACTION_QUICK_SET" />
+                <action android:name="com.studybuddy.app.distraction.ACTION_END_SESSION" />
             </intent-filter>
         </receiver>
 
