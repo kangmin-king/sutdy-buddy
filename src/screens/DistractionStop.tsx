@@ -2,6 +2,7 @@ import React from 'react';
 import { TopAppBar, BackBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon, TextField } from '../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../native/distractionStop';
 import type { BlockedAppId, DistractionState, ExitModeId } from '../types/distraction';
+import { extendedEndTime, formatRemaining, isBreakActive, statusMessage } from './distractionStopModel';
 
 const BLOCKED_APP_OPTIONS: { id: BlockedAppId; label: string }[] = [
   { id: 'INSTAGRAM', label: '인스타그램' },
@@ -13,13 +14,6 @@ const EXIT_MODE_OPTIONS: { id: ExitModeId; label: string }[] = [
   { id: 'IMMEDIATE', label: '즉시 차단' },
   { id: 'CONFIRM', label: '확인 후 종료' },
   { id: 'GRACE_PERIOD', label: '유예시간 후 종료' },
-];
-
-const LOCKOUT_OPTIONS = [
-  { id: '60000', label: '1분' },
-  { id: '300000', label: '5분' },
-  { id: '600000', label: '10분' },
-  { id: '1800000', label: '30분' },
 ];
 
 function AllowedAppAdder({ onAdd }: { onAdd: (pkg: string) => void }) {
@@ -42,13 +36,6 @@ function AllowedAppAdder({ onAdd }: { onAdd: (pkg: string) => void }) {
       </Button>
     </div>
   );
-}
-
-function formatRemaining(endTimeMillis: number | null, nowMillis: number): string | null {
-  if (endTimeMillis == null) return null;
-  const remainingMs = Math.max(0, endTimeMillis - nowMillis);
-  const minutes = Math.ceil(remainingMs / 60_000);
-  return remainingMs === 0 ? '종료됨' : `${minutes}분 남음`;
 }
 
 // onClose가 있으면(오른쪽 아래 떠 있는 버튼으로 연 오버레이) 뒤로가기 헤더를 쓰고, 없으면
@@ -105,7 +92,7 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
         <Card className="flex items-center justify-between">
           <div>
             <p className="text-sm font-bold">딴짓 멈춰 켜기</p>
-            <p className="text-xs text-on-surface-variant mt-0.5">쉬는 시간이 끝나면 선택한 앱을 자동으로 차단해요</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">공부하는 동안 선택한 앱을 차단해요</p>
           </div>
           <ToggleSwitch
             checked={state.featureEnabled}
@@ -114,6 +101,10 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
               DistractionStop.setFeatureEnabled({ enabled });
             }}
           />
+        </Card>
+
+        <Card className="text-center">
+          <p className="text-sm text-on-surface-variant">{statusMessage(state, now)}</p>
         </Card>
 
         {(!permissions.accessibilityEnabled || !permissions.overlayGranted) && (
@@ -147,9 +138,12 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
                     // now가 1초 간격 setInterval로만 갱신돼서, 클릭 시점엔 최대 1초 stale한 now가
                     // 남아있다. 그 상태로 남은시간을 계산하면 실제보다 커 보여 Math.ceil이 1분
                     // 더 올림되었다가(예: 5분 눌렀는데 6분) 다음 틱에 정정된다. 클릭 즉시 맞춰준다.
-                    setNow(Date.now());
-                    setLocal((s) => s && { ...s, endTimeMillis: (s.endTimeMillis ?? Date.now()) + extraMillis });
-                    state.endTimeMillis
+                    const clickedAt = Date.now();
+                    setNow(clickedAt);
+                    setLocal((s) => s && { ...s, endTimeMillis: extendedEndTime(s.endTimeMillis, extraMillis, clickedAt) });
+                    // "진행 중이냐"는 endTimeMillis가 있느냐가 아니라 그게 아직 미래냐로 판단해야
+                    // 한다 — 끝난 쉬는 시간의 과거 endTime이 그대로 남아 있기 때문이다.
+                    isBreakActive(state.endTimeMillis, clickedAt)
                       ? DistractionStop.extendTimer({ extraMillis })
                       : DistractionStop.startTimer({ durationMillis: extraMillis });
                   }}
@@ -193,26 +187,13 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
         </div>
 
         <div>
-          <SectionTitle>쉬는 시간이 끝나면</SectionTitle>
+          <SectionTitle>공부 중 차단 앱을 열면</SectionTitle>
           <ChipGroup
             options={EXIT_MODE_OPTIONS}
             value={state.exitMode}
             onChange={(mode) => {
               setLocal((s) => s && { ...s, exitMode: mode });
               DistractionStop.setExitMode({ mode });
-            }}
-          />
-        </div>
-
-        <div>
-          <SectionTitle>재차단 유예 시간</SectionTitle>
-          <ChipGroup
-            options={LOCKOUT_OPTIONS}
-            value={String(state.lockoutDurationMillis)}
-            onChange={(id) => {
-              const durationMillis = Number(id);
-              setLocal((s) => s && { ...s, lockoutDurationMillis: durationMillis });
-              DistractionStop.setLockoutDurationMillis({ durationMillis });
             }}
           />
         </div>

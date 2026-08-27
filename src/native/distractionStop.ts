@@ -9,7 +9,6 @@ interface DistractionStopPlugin {
   stopTimer(): Promise<DistractionState>;
   setExitMode(opts: { mode: ExitModeId }): Promise<DistractionState>;
   setGracePeriodSeconds(opts: { seconds: number }): Promise<DistractionState>;
-  setLockoutDurationMillis(opts: { durationMillis: number }): Promise<DistractionState>;
   setAppEnabled(opts: { app: BlockedAppId; enabled: boolean }): Promise<DistractionState>;
   setFeatureEnabled(opts: { enabled: boolean }): Promise<DistractionState>;
   setAllowedApps(opts: { apps: string[] }): Promise<DistractionState>;
