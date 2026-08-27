@@ -16,9 +16,10 @@
 - **네비게이션**: 기존 5탭 BottomNav 유지, 6번째 탭 추가 안 함. 기존 Overlay 패턴(`condition`/`studyLog`/`aiRecommendation`)에 `distractionStop` 추가.
 - **웹 배포 호환**: 모든 진입점 `Capacitor.isNativePlatform()` 가드 — 브라우저(Vercel 배포)에서는 안내 문구만.
 - **팀 모드 제외**: `dev/active/reels-stop-team-mode/`는 reels-stop 자체의 별도 기능, 이번 포팅 대상 아님.
+- **차단 조건(2026-08-27)**: reels-stop에서 이식한 "쉬는 시간 종료 후 lockout 창" 조건을 버리고 `sessionActive`(학습 타이머) 기반으로 전환. lockout 개념과 설정 UI 삭제. 쉬는 시간 시작 = 학습 일시정지. 앱 강제 종료 대비 3시간 자동 만료 + 알림 `공부 끝내기` 버튼. 스펙: `docs/superpowers/specs/2026-08-27-distraction-stop-session-gated-blocking-design.md`
 
 ## 알려진 제약
-- 이 개발 환경에는 Android SDK/Kotlin 컴파일러가 없어 `./gradlew` 빌드/테스트를 직접 실행할 수 없음. Kotlin 코드는 패턴을 최대한 안전하게 작성하되, 실제 컴파일/온디바이스 검증은 사용자가 Android Studio에서 수행해야 함 (reels-stop-team-mode와 동일한 제약).
+- 이 환경에 Android SDK가 있고 `./gradlew`로 빌드·단위 테스트가 실제로 가능하다. 기본 `JAVA_HOME`은 JDK 17이라 `invalid source release: 21`로 실패한다. Android Studio 내장 JBR도 대안이 아니다 — 지금은 JDK 25라서 Gradle 8.14.3이 settings 스크립트를 컴파일하는 순간 `Unsupported class file major version 69`로 죽는다. 컴파일된 스크립트가 캐시돼 있을 때만 잠시 성공하는 것처럼 보이니 속지 말 것. 실제로 써야 하는 JDK는 `C:/Users/DELL/.jdks/jbr-21.0.11`(JDK 21)이고, 단위 테스트와 APK 빌드 양쪽에 같은 값을 쓴다: `JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDebugUnitTest`, `JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:assembleDebug`. 실기기 차단 동작 검증은 여전히 사용자가 수행해야 한다.
 - 웹(TS/React) 쪽은 기존처럼 `npx tsc -b` / `npx vitest run` / 브라우저로 직접 검증 가능.
 
 ## 의존 관계
