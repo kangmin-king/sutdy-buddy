@@ -6,10 +6,11 @@ export interface DistractionState {
   exitMode: ExitModeId;
   gracePeriodSeconds: number;
   enabledApps: BlockedAppId[];
-  lockoutDurationMillis: number;
   featureEnabled: boolean;
   allowedApps: string[];
-  // 학습 타이머가 도는 중인지 여부. 네이티브가 허용앱 밖으로 이탈을 감지하면 스스로 false로
-  // 내리고 stateChanged로 알려준다 — 웹 타이머는 이 전환을 보고 세션을 '이탈'로 종료한다.
+  // 학습 타이머가 도는 중인지 여부. 차단은 이 값으로만 무장한다 — 공부 중이 아니면 차단하지
+  // 않는다. 네이티브가 허용앱 밖 이탈을 감지하면 스스로 false로 내리고 stateChanged로 알린다.
   sessionActive: boolean;
+  // sessionActive를 켠 시각. 앱이 강제 종료돼 이 값이 남으면 3시간 뒤 만료로 취급한다.
+  sessionStartedAtMillis: number | null;
 }
