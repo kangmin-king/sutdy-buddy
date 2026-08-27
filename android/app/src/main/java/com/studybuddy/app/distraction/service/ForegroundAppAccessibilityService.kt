@@ -35,26 +35,16 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             val state = store.observeState().first()
             val now = System.currentTimeMillis()
 
-            // Existing break-timer blocking logic takes priority: it must not be skipped
-            // just because a study session also happens to be active. We first determine
-            // whether THIS event qualifies for a break-timer block; only if it does not do
-            // we fall through to the (independent) session-deviation check below.
+            // 차단은 학습 세션으로만 무장한다 — 공부 중에 차단 대상 앱을 열었을 때만 막는다.
+            // 예전에는 "쉬는 시간이 끝난 직후 lockout 창" 안에서만 막아서, 기능을 켜고 앱을
+            // 골라도 쉬는 시간을 한 번 돌리지 않으면 아무 일도 일어나지 않았다.
             val blockedApp = BlockedApp.fromPackageName(packageName)
             val inCooldown = blockedApp != null &&
                 blockedApp.packageName == lastBlockedPackage &&
                 now - lastBlockedAtMillis < BLOCK_COOLDOWN_MILLIS
-            // Outside the lockout window (break ended a while ago and nobody re-armed
-            // it), stop auto-blocking — the lockout is meant to prevent immediately
-            // re-opening a just-blocked app, not to block forever.
-            val shouldBreakBlock = blockedApp != null &&
-                state.featureEnabled &&
-                blockedApp in state.enabledApps &&
-                !state.isBreakActive(now) &&
-                state.isWithinLockout(now) &&
-                !inCooldown
 
-            if (shouldBreakBlock) {
-                lastBlockedPackage = blockedApp!!.packageName
+            if (blockedApp != null && state.shouldBlock(blockedApp, now) && !inCooldown) {
+                lastBlockedPackage = blockedApp.packageName
                 lastBlockedAtMillis = now
 
                 val action = exitHandler.decide(state.exitMode, state.gracePeriodSeconds)
@@ -62,11 +52,14 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 return@launch
             }
 
-            // Study-session allow-list deviation detection: independent of the break-timer
-            // blocking logic above. Only flips a flag — no forced navigation — so the web
-            // layer notices via the state Flow and stops the timer on its own. Only reached
-            // when this event did NOT qualify for a break-timer block above.
-            if (state.sessionActive && packageName != applicationContext.packageName && packageName !in state.allowedApps) {
+            // Study-session allow-list deviation detection: independent of the blocking logic
+            // above. Only flips a flag — no forced navigation — so the web layer notices via
+            // the state Flow and stops the timer on its own. Only reached when this event did
+            // NOT qualify for a block above.
+            if (state.isSessionActive(now) &&
+                packageName != applicationContext.packageName &&
+                packageName !in state.allowedApps
+            ) {
                 store.setSessionActive(false)
             }
         }

@@ -20,18 +20,16 @@ class TimerStateStore(context: Context) {
     fun observeState(): StateFlow<TimerState> = stateFlow
 
     suspend fun startTimer(durationMillis: Long, nowMillis: Long) {
-        val current = currentState()
-        save(current.copy(endTimeMillis = nowMillis + durationMillis))
+        save(currentState().withBreakUntil(nowMillis + durationMillis))
     }
 
     suspend fun startTimerUntil(endTimeMillis: Long) {
-        save(currentState().copy(endTimeMillis = endTimeMillis))
+        save(currentState().withBreakUntil(endTimeMillis))
     }
 
     suspend fun extendTimer(extraMillis: Long, nowMillis: Long = System.currentTimeMillis()) {
         val current = currentState()
-        val base = current.endTimeMillis ?: nowMillis
-        save(current.copy(endTimeMillis = base + extraMillis))
+        save(current.withBreakUntil(current.extendedEndTime(extraMillis, nowMillis)))
     }
 
     suspend fun stopTimer() {
@@ -44,10 +42,6 @@ class TimerStateStore(context: Context) {
 
     suspend fun setGracePeriodSeconds(seconds: Int) {
         save(currentState().copy(gracePeriodSeconds = seconds))
-    }
-
-    suspend fun setLockoutDurationMillis(durationMillis: Long) {
-        save(currentState().copy(lockoutDurationMillis = durationMillis))
     }
 
     suspend fun setAppEnabled(app: BlockedApp, enabled: Boolean) {
@@ -64,8 +58,9 @@ class TimerStateStore(context: Context) {
         save(currentState().copy(allowedApps = apps))
     }
 
-    suspend fun setSessionActive(active: Boolean) {
-        save(currentState().copy(sessionActive = active))
+    suspend fun setSessionActive(active: Boolean, nowMillis: Long = System.currentTimeMillis()) {
+        val current = currentState()
+        save(if (active) current.withSessionStarted(nowMillis) else current.withSessionStopped())
     }
 
     private suspend fun currentState(): TimerState = observeState().first()
@@ -86,10 +81,10 @@ class TimerStateStore(context: Context) {
         json.put("exitMode", state.exitMode.name)
         json.put("gracePeriodSeconds", state.gracePeriodSeconds)
         json.put("enabledApps", JSONArray(state.enabledApps.map { it.name }))
-        json.put("lockoutDurationMillis", state.lockoutDurationMillis)
         json.put("featureEnabled", state.featureEnabled)
         json.put("allowedApps", JSONArray(state.allowedApps.toList()))
         json.put("sessionActive", state.sessionActive)
+        json.put("sessionStartedAtMillis", state.sessionStartedAtMillis ?: JSONObject.NULL)
         return json.toString()
     }
 
@@ -112,10 +107,12 @@ class TimerStateStore(context: Context) {
             exitMode = runCatching { ExitMode.valueOf(json.getString("exitMode")) }.getOrDefault(ExitMode.GRACE_PERIOD),
             gracePeriodSeconds = json.getInt("gracePeriodSeconds"),
             enabledApps = apps,
-            lockoutDurationMillis = json.getLong("lockoutDurationMillis"),
             featureEnabled = json.getBoolean("featureEnabled"),
             allowedApps = allowedApps,
-            sessionActive = json.optBoolean("sessionActive", false)
+            sessionActive = json.optBoolean("sessionActive", false),
+            sessionStartedAtMillis =
+                if (!json.has("sessionStartedAtMillis") || json.isNull("sessionStartedAtMillis")) null
+                else json.getLong("sessionStartedAtMillis")
         )
     }
 

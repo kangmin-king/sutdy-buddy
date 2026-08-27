@@ -98,18 +98,6 @@ class DistractionStopPlugin : Plugin() {
     }
 
     @PluginMethod
-    fun setLockoutDurationMillis(call: PluginCall) {
-        val durationMillis = call.getLong("durationMillis") ?: run {
-            call.reject("durationMillis is required")
-            return
-        }
-        scope.launch {
-            store.setLockoutDurationMillis(durationMillis)
-            call.resolve(store.observeState().value.toJSObject())
-        }
-    }
-
-    @PluginMethod
     fun setAppEnabled(call: PluginCall) {
         val appName = call.getString("app") ?: run {
             call.reject("app is required")
@@ -217,10 +205,10 @@ class DistractionStopPlugin : Plugin() {
         obj.put("exitMode", exitMode.name)
         obj.put("gracePeriodSeconds", gracePeriodSeconds)
         obj.put("enabledApps", com.getcapacitor.JSArray(enabledApps.map { it.name }))
-        obj.put("lockoutDurationMillis", lockoutDurationMillis)
         obj.put("featureEnabled", featureEnabled)
         obj.put("allowedApps", com.getcapacitor.JSArray(allowedApps.toList()))
         obj.put("sessionActive", sessionActive)
+        obj.put("sessionStartedAtMillis", sessionStartedAtMillis ?: JSObject.NULL)
         return obj
     }
 
