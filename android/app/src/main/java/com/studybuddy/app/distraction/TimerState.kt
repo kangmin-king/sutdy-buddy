@@ -4,21 +4,25 @@ data class TimerState(
     val endTimeMillis: Long?,
     val exitMode: ExitMode,
     val gracePeriodSeconds: Int,
-    val enabledApps: Set<BlockedApp>,
     val featureEnabled: Boolean,
+    // 학생이 직접 고른, 공부 중에도 열 수 있는 앱들.
     val allowedApps: Set<String> = emptySet(),
-    // 학습 타이머가 도는 중인지. 차단은 이 값으로만 무장한다 — 공부 중이 아니면 차단하지 않는다.
+    // 공부 모드. 차단을 무장시키는 유일한 신호이며, 웹(학생의 시작/정지/완료)과 알림·화면의
+    // '공부 끝내기'만 바꾼다 — 네이티브가 스스로 내리는 경로는 없다.
     val sessionActive: Boolean = false,
     // sessionActive를 켠 시각. 앱이 강제 종료되면 네이티브는 세션이 죽은 걸 알 수 없어
     // sessionActive가 영구히 참으로 남는데, 이 값이 있으면 자동 만료로 빠져나올 수 있다.
-    val sessionStartedAtMillis: Long? = null
+    val sessionStartedAtMillis: Long? = null,
+    // "이 시각 기준으로 학습 시간 집계를 멈춰야 한다"는 표식. 쉬는 시간 시작이 세우고, 웹이
+    // 처리한 뒤 지운다. 이벤트가 아니라 상태인 이유: 딴짓멈춰 화면을 열면 학생 홈이
+    // 언마운트되어 그 순간의 이벤트를 받을 컴포넌트가 없지만, 표식은 남아 다음에 처리된다.
+    val pendingPauseAtMillis: Long? = null
 ) {
     fun isBreakActive(nowMillis: Long): Boolean =
         endTimeMillis != null && nowMillis < endTimeMillis
 
     // 연장의 기준점은 "쉬는 시간이 아직 남아 있으면 그 끝, 이미 지났으면 지금"이다. 과거
-    // endTime을 기준으로 더하면 결과가 여전히 과거로 남아 화면이 '종료됨'에서 벗어나지
-    // 못하고, +5분을 눌러도 아무 반응이 없는 것처럼 보인다.
+    // endTime을 기준으로 더하면 결과가 여전히 과거로 남아 화면이 '종료됨'에서 벗어나지 못한다.
     fun extendedEndTime(extraMillis: Long, nowMillis: Long): Long =
         maxOf(endTimeMillis ?: nowMillis, nowMillis) + extraMillis
 
@@ -27,19 +31,38 @@ data class TimerState(
         return sessionActive && nowMillis - startedAt < SESSION_MAX_MILLIS
     }
 
-    fun shouldBlock(app: BlockedApp, nowMillis: Long): Boolean =
-        featureEnabled && app in enabledApps && isSessionActive(nowMillis)
+    // 공부 중에는 허용앱이 아닌 앱에 들어갈 수 없다. passThrough는 시스템에서 조회한 통과
+    // 대상(런처·시스템UI·키보드·전화·시계·설정·우리 앱)이며 PassThroughPackages가 넘긴다.
+    // !isBreakActive가 쉬는 시간 중 차단을 푸는 유일한 경로다 — 쉬는 시간이 공부 모드를 끄지
+    // 않으므로, 쉬는 시간이 끝나면 학생이 아무것도 누르지 않아도 차단이 복귀한다.
+    fun shouldBlock(packageName: String, passThrough: Set<String>, nowMillis: Long): Boolean =
+        featureEnabled &&
+            isSessionActive(nowMillis) &&
+            !isBreakActive(nowMillis) &&
+            packageName !in passThrough &&
+            packageName !in allowedApps
+
+    fun hasPendingPause(): Boolean = pendingPauseAtMillis != null
 
     fun withSessionStarted(nowMillis: Long): TimerState =
-        copy(sessionActive = true, sessionStartedAtMillis = nowMillis)
+        copy(sessionActive = true, sessionStartedAtMillis = nowMillis, endTimeMillis = null)
 
     fun withSessionStopped(): TimerState =
         copy(sessionActive = false, sessionStartedAtMillis = null)
 
-    // 쉬는 시간을 시작/연장하면 공부는 멈춘 것으로 본다 — 차단이 풀리는 것과 학습 시간이
-    // 쌓이지 않는 것이 같은 전이여야 둘이 어긋나지 않는다.
-    fun withBreakUntil(endTimeMillis: Long): TimerState =
-        copy(endTimeMillis = endTimeMillis).withSessionStopped()
+    // 쉬는 시간은 endTimeMillis만 세우고 공부 모드는 그대로 둔다. 공부 중이었다면 집계를
+    // 멈추라는 표식을 남기되, 이미 처리 안 된 표식이 있으면 덮어쓰지 않는다 — 첫 표식 시각이
+    // 실제로 공부를 멈춘 순간이고, 덮어쓰면 그만큼 쉬는 시간이 학습 시간으로 들어간다.
+    fun withBreakUntil(endTimeMillis: Long, nowMillis: Long): TimerState {
+        val next = copy(endTimeMillis = endTimeMillis)
+        return if (sessionActive && pendingPauseAtMillis == null) {
+            next.copy(pendingPauseAtMillis = nowMillis)
+        } else {
+            next
+        }
+    }
+
+    fun withPendingPauseCleared(): TimerState = copy(pendingPauseAtMillis = null)
 
     companion object {
         // 한 항목을 3시간 연속 공부하는 경우는 사실상 없다. 넘으면 방치된 세션으로 보고 차단을
@@ -50,11 +73,11 @@ data class TimerState(
             endTimeMillis = null,
             exitMode = ExitMode.GRACE_PERIOD,
             gracePeriodSeconds = 10,
-            enabledApps = setOf(BlockedApp.INSTAGRAM, BlockedApp.YOUTUBE, BlockedApp.TIKTOK),
             featureEnabled = true,
             allowedApps = emptySet(),
             sessionActive = false,
-            sessionStartedAtMillis = null
+            sessionStartedAtMillis = null,
+            pendingPauseAtMillis = null
         )
     }
 }

@@ -98,26 +98,6 @@ class DistractionStopPlugin : Plugin() {
     }
 
     @PluginMethod
-    fun setAppEnabled(call: PluginCall) {
-        val appName = call.getString("app") ?: run {
-            call.reject("app is required")
-            return
-        }
-        val app = runCatching { BlockedApp.valueOf(appName) }.getOrNull() ?: run {
-            call.reject("invalid app: $appName")
-            return
-        }
-        val enabled = call.getBoolean("enabled") ?: run {
-            call.reject("enabled is required")
-            return
-        }
-        scope.launch {
-            store.setAppEnabled(app, enabled)
-            call.resolve(store.observeState().value.toJSObject())
-        }
-    }
-
-    @PluginMethod
     fun setFeatureEnabled(call: PluginCall) {
         val enabled = call.getBoolean("enabled") ?: run {
             call.reject("enabled is required")
@@ -199,16 +179,24 @@ class DistractionStopPlugin : Plugin() {
         call.resolve(result)
     }
 
+    @PluginMethod
+    fun clearPendingPause(call: PluginCall) {
+        scope.launch {
+            store.clearPendingPause()
+            call.resolve(store.observeState().value.toJSObject())
+        }
+    }
+
     private fun TimerState.toJSObject(): JSObject {
         val obj = JSObject()
         obj.put("endTimeMillis", endTimeMillis ?: JSObject.NULL)
         obj.put("exitMode", exitMode.name)
         obj.put("gracePeriodSeconds", gracePeriodSeconds)
-        obj.put("enabledApps", com.getcapacitor.JSArray(enabledApps.map { it.name }))
         obj.put("featureEnabled", featureEnabled)
         obj.put("allowedApps", com.getcapacitor.JSArray(allowedApps.toList()))
         obj.put("sessionActive", sessionActive)
         obj.put("sessionStartedAtMillis", sessionStartedAtMillis ?: JSObject.NULL)
+        obj.put("pendingPauseAtMillis", pendingPauseAtMillis ?: JSObject.NULL)
         return obj
     }
 

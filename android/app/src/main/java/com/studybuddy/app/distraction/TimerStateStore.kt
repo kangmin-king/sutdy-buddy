@@ -20,16 +20,12 @@ class TimerStateStore(context: Context) {
     fun observeState(): StateFlow<TimerState> = stateFlow
 
     suspend fun startTimer(durationMillis: Long, nowMillis: Long) {
-        save(currentState().withBreakUntil(nowMillis + durationMillis))
-    }
-
-    suspend fun startTimerUntil(endTimeMillis: Long) {
-        save(currentState().withBreakUntil(endTimeMillis))
+        save(currentState().withBreakUntil(nowMillis + durationMillis, nowMillis))
     }
 
     suspend fun extendTimer(extraMillis: Long, nowMillis: Long = System.currentTimeMillis()) {
         val current = currentState()
-        save(current.withBreakUntil(current.extendedEndTime(extraMillis, nowMillis)))
+        save(current.withBreakUntil(current.extendedEndTime(extraMillis, nowMillis), nowMillis))
     }
 
     suspend fun stopTimer() {
@@ -44,12 +40,6 @@ class TimerStateStore(context: Context) {
         save(currentState().copy(gracePeriodSeconds = seconds))
     }
 
-    suspend fun setAppEnabled(app: BlockedApp, enabled: Boolean) {
-        val current = currentState()
-        val updated = if (enabled) current.enabledApps + app else current.enabledApps - app
-        save(current.copy(enabledApps = updated))
-    }
-
     suspend fun setFeatureEnabled(enabled: Boolean) {
         save(currentState().copy(featureEnabled = enabled))
     }
@@ -61,6 +51,10 @@ class TimerStateStore(context: Context) {
     suspend fun setSessionActive(active: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         val current = currentState()
         save(if (active) current.withSessionStarted(nowMillis) else current.withSessionStopped())
+    }
+
+    suspend fun clearPendingPause() {
+        save(currentState().withPendingPauseCleared())
     }
 
     private suspend fun currentState(): TimerState = observeState().first()
@@ -80,21 +74,16 @@ class TimerStateStore(context: Context) {
         json.put("endTimeMillis", state.endTimeMillis ?: JSONObject.NULL)
         json.put("exitMode", state.exitMode.name)
         json.put("gracePeriodSeconds", state.gracePeriodSeconds)
-        json.put("enabledApps", JSONArray(state.enabledApps.map { it.name }))
         json.put("featureEnabled", state.featureEnabled)
         json.put("allowedApps", JSONArray(state.allowedApps.toList()))
         json.put("sessionActive", state.sessionActive)
         json.put("sessionStartedAtMillis", state.sessionStartedAtMillis ?: JSONObject.NULL)
+        json.put("pendingPauseAtMillis", state.pendingPauseAtMillis ?: JSONObject.NULL)
         return json.toString()
     }
 
     private fun fromJson(raw: String): TimerState {
         val json = JSONObject(raw)
-        val appsArray = json.getJSONArray("enabledApps")
-        val apps = mutableSetOf<BlockedApp>()
-        for (i in 0 until appsArray.length()) {
-            runCatching { BlockedApp.valueOf(appsArray.getString(i)) }.getOrNull()?.let { apps.add(it) }
-        }
         val allowedApps = mutableSetOf<String>()
         if (json.has("allowedApps")) {
             val allowedArray = json.getJSONArray("allowedApps")
@@ -106,15 +95,16 @@ class TimerStateStore(context: Context) {
             endTimeMillis = if (json.isNull("endTimeMillis")) null else json.getLong("endTimeMillis"),
             exitMode = runCatching { ExitMode.valueOf(json.getString("exitMode")) }.getOrDefault(ExitMode.GRACE_PERIOD),
             gracePeriodSeconds = json.getInt("gracePeriodSeconds"),
-            enabledApps = apps,
             featureEnabled = json.getBoolean("featureEnabled"),
             allowedApps = allowedApps,
             sessionActive = json.optBoolean("sessionActive", false),
-            sessionStartedAtMillis =
-                if (!json.has("sessionStartedAtMillis") || json.isNull("sessionStartedAtMillis")) null
-                else json.getLong("sessionStartedAtMillis")
+            sessionStartedAtMillis = optLongOrNull(json, "sessionStartedAtMillis"),
+            pendingPauseAtMillis = optLongOrNull(json, "pendingPauseAtMillis")
         )
     }
+
+    private fun optLongOrNull(json: JSONObject, key: String): Long? =
+        if (!json.has(key) || json.isNull(key)) null else json.getLong(key)
 
     companion object {
         private const val KEY_STATE = "timer_state_json"

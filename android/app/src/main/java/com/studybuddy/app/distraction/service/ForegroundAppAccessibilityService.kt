@@ -3,9 +3,9 @@ package com.studybuddy.app.distraction.service
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
-import com.studybuddy.app.distraction.BlockedApp
 import com.studybuddy.app.distraction.ExitAction
 import com.studybuddy.app.distraction.ExitHandler
+import com.studybuddy.app.distraction.PassThroughPackages
 import com.studybuddy.app.distraction.TimerStateStore
 import com.studybuddy.app.distraction.notification.WarningNotificationManager
 import com.studybuddy.app.distraction.ui.BlockScreenActivity
@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 class ForegroundAppAccessibilityService : AccessibilityService() {
 
     private val store by lazy { TimerStateStore.getInstance(applicationContext) }
+    private val passThrough by lazy { PassThroughPackages(applicationContext) }
     private val exitHandler = ExitHandler()
     private val warningManager = WarningNotificationManager()
     private val scope = kotlinx.coroutines.MainScope()
@@ -35,33 +36,20 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             val state = store.observeState().first()
             val now = System.currentTimeMillis()
 
-            // 차단은 학습 세션으로만 무장한다 — 공부 중에 차단 대상 앱을 열었을 때만 막는다.
-            // 예전에는 "쉬는 시간이 끝난 직후 lockout 창" 안에서만 막아서, 기능을 켜고 앱을
-            // 골라도 쉬는 시간을 한 번 돌리지 않으면 아무 일도 일어나지 않았다.
-            val blockedApp = BlockedApp.fromPackageName(packageName)
-            val inCooldown = blockedApp != null &&
-                blockedApp.packageName == lastBlockedPackage &&
-                now - lastBlockedAtMillis < BLOCK_COOLDOWN_MILLIS
+            // 공부 중에는 허용앱과 통과 대상 외에는 열 수 없다. 통과 대상이면 여기서 끝이다 —
+            // 예전에는 이 아래에 이탈 감지 분기가 있어서, 홈 버튼을 누르면 런처가 이탈로
+            // 잡혀 차단이 스스로 꺼졌다.
+            if (!state.shouldBlock(packageName, passThrough.packages(now), now)) return@launch
 
-            if (blockedApp != null && state.shouldBlock(blockedApp, now) && !inCooldown) {
-                lastBlockedPackage = blockedApp.packageName
-                lastBlockedAtMillis = now
-
-                val action = exitHandler.decide(state.exitMode, state.gracePeriodSeconds)
-                handleExitAction(action)
+            // 쿨다운은 "이번 이벤트를 넘긴다"로 끝난다. 예전에는 여기서 이탈 분기로 흘러내려,
+            // 3초 안에 다시 열면 차단이 세션 내내 풀리는 우회 경로가 됐다.
+            if (packageName == lastBlockedPackage && now - lastBlockedAtMillis < BLOCK_COOLDOWN_MILLIS) {
                 return@launch
             }
+            lastBlockedPackage = packageName
+            lastBlockedAtMillis = now
 
-            // Study-session allow-list deviation detection: independent of the blocking logic
-            // above. Only flips a flag — no forced navigation — so the web layer notices via
-            // the state Flow and stops the timer on its own. Only reached when this event did
-            // NOT qualify for a block above.
-            if (state.isSessionActive(now) &&
-                packageName != applicationContext.packageName &&
-                packageName !in state.allowedApps
-            ) {
-                store.setSessionActive(false)
-            }
+            handleExitAction(exitHandler.decide(state.exitMode, state.gracePeriodSeconds))
         }
     }
 
