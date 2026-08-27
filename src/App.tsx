@@ -114,7 +114,7 @@ function StudentAppShell() {
       )}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
-      <DistractionFab onOpen={() => setShowDistractionStop(true)} />
+      {isNativePlatform() && <DistractionFab onOpen={() => setShowDistractionStop(true)} />}
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
   );

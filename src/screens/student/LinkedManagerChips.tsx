@@ -36,21 +36,21 @@ export default function LinkedManagerChips() {
               onChange={(e) => setDraft(e.target.value)}
               onBlur={commitEdit}
               onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-              className="rounded-full bg-surface-container px-3 py-1.5 text-xs font-semibold outline-none ring-2 ring-primary"
+              className="min-h-11 rounded-full bg-surface-container px-3 py-2 text-xs font-semibold outline-none ring-2 ring-primary"
             />
           );
         }
         return (
           <div
             key={manager.id}
-            className="flex items-center gap-1 rounded-full bg-surface-container px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-on-surface-variant"
+            className="flex min-h-11 items-center gap-1 rounded-full bg-surface-container pl-3 pr-0.5 text-xs font-semibold whitespace-nowrap text-on-surface-variant"
           >
             <span>{managerDisplayLabel(manager.id, state.managerLabels, index)}</span>
             <button
               type="button"
               aria-label={`${managerDisplayLabel(manager.id, state.managerLabels, index)} 이름 수정`}
               onClick={() => startEdit(manager.id, index)}
-              className="ml-0.5 flex items-center opacity-70"
+              className="ml-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full opacity-70 transition hover:bg-surface-container-high active:scale-[0.96]"
             >
               <Icon name="edit" className="!text-[14px]" />
             </button>

@@ -7,11 +7,11 @@ export function Icon({ name, className = '', filled = false }: { name: string; c
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
 }
 
-export function TopAppBar({ title = '스터디 벅스', onBell }: { title?: string; onBell?: () => void }) {
+export function TopAppBar({ title = '스터디 벅스', onBell, className = '' }: { title?: string; onBell?: () => void; className?: string }) {
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between bg-surface/90 backdrop-blur px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
+    <header className={`sticky top-0 z-20 flex items-center justify-between bg-surface/90 px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur ${className}`.trim()}>
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
           <img src={mascotFaceUrl} alt="" className="w-full h-full object-cover" />
@@ -19,10 +19,10 @@ export function TopAppBar({ title = '스터디 벅스', onBell }: { title?: stri
         <span className="text-lg font-bold text-primary">{title}</span>
       </div>
       <div className="relative flex items-center gap-1">
-        <button onClick={onBell} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
+        <button onClick={onBell} className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
           <Icon name="notifications" />
         </button>
-        <button onClick={() => setConfirmOpen(true)} className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
+        <button onClick={() => setConfirmOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
           <Icon name="logout" />
         </button>
         {confirmOpen && (

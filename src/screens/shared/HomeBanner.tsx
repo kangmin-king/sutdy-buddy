@@ -36,7 +36,7 @@ export default function HomeBanner() {
           e.stopPropagation();
           setDismissed(true);
         }}
-        className="shrink-0 text-on-surface-variant"
+        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container"
         aria-label="배너 닫기"
       >
         <Icon name="close" className="!text-[18px]" />
