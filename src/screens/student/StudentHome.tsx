@@ -160,10 +160,16 @@ export default function StudentHomeScreen({
     if (!sessionId) return;
     const sessions = state.studySessions[itemId] ?? [];
     const running = sessions.find((s) => s.id === sessionId);
-    // 화면에 이미 보이고 있던 값을 그대로 저장한다. 정지 시각 기준으로 다시 정밀 계산하면
-    // 1초 주기로만 갱신되는 화면 표시값과 어긋나, 정지하는 순간 숫자가 위아래로 튀어 보인다.
-    const displayedSeconds = running ? Math.floor((now - Date.parse(running.startedAt)) / 1000) : undefined;
-    actions.endStudySession(itemId, sessionId, false, displayedSeconds);
+    // 쉬는 시간 표식 처리(usePendingStudyPause)가 이 세션을 이미 쉬는 시간 시작 시각까지로
+    // 닫아둔 경우가 있다 — 알림의 +5분/+30분이나 경고의 '5분 쉬기'는 학생 홈을 언마운트하지
+    // 않아서 화면의 runningSessionId가 그대로 남는다. 그때 다시 쓰면 쉬는 시간이 포함된 전체
+    // 벽시계 값이 올바른 값을 덮어쓴다 — 이 변경이 애초에 없애려던 그 시간이다.
+    if (running == null || running.endedAt == null) {
+      // 화면에 이미 보이고 있던 값을 그대로 저장한다. 정지 시각 기준으로 다시 정밀 계산하면
+      // 1초 주기로만 갱신되는 화면 표시값과 어긋나, 정지하는 순간 숫자가 위아래로 튀어 보인다.
+      const displayedSeconds = running ? Math.floor((now - Date.parse(running.startedAt)) / 1000) : undefined;
+      actions.endStudySession(itemId, sessionId, false, displayedSeconds);
+    }
     if (isNativePlatform()) {
       // 네이티브 호출은 다음 틱으로 미뤄 화면 갱신을 막지 않게 한다.
       setTimeout(() => DistractionStop.setSessionActive({ active: false }), 0);

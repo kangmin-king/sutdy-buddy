@@ -14,6 +14,9 @@ export function usePendingStudyPause(): void {
   const { state: distraction } = useDistractionState();
   const { state, actions } = useAppState();
   const pendingAt = distraction?.pendingPauseAtMillis ?? null;
+  // 이번 공부 세션이 시작된 시각. 지난 날짜에 열린 채 남은 고아 세션까지 닫지 않도록
+  // findOpenStudySessionsBefore의 아래 경계로 쓴다.
+  const sessionStartedAt = distraction?.sessionStartedAtMillis ?? null;
   const handling = React.useRef(false);
 
   React.useEffect(() => {
@@ -21,7 +24,7 @@ export function usePendingStudyPause(): void {
     if (handling.current) return;
     handling.current = true;
 
-    const open = findOpenStudySessionsBefore(state.studySessions, pendingAt);
+    const open = findOpenStudySessionsBefore(state.studySessions, pendingAt, sessionStartedAt);
 
     void (async () => {
       try {
@@ -33,5 +36,5 @@ export function usePendingStudyPause(): void {
         handling.current = false;
       }
     })();
-  }, [pendingAt, state.studySessions, actions]);
+  }, [pendingAt, sessionStartedAt, state.studySessions, actions]);
 }

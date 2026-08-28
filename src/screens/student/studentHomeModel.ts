@@ -27,7 +27,10 @@ export function buildStudentHomeModel(
       let elapsedSeconds = sessions.reduce((total, session) => total + (session.durationSeconds ?? 0), 0);
       const runningSessionId = runningSessionIds[item.id];
       const runningSession = runningSessionId ? sessions.find((session) => session.id === runningSessionId) : undefined;
-      if (runningSession) {
+      // 아직 열려 있는 세션만 지금까지의 시간을 더한다. 쉬는 시간 표식 처리(usePendingStudyPause)가
+      // 세션을 닫아도 화면의 runningSessionId는 그대로 남을 수 있는데, endedAt을 보지 않으면
+      // durationSeconds와 실시간 경과가 둘 다 더해져 표시 시간이 두 배로 뛰고 쉬는 동안 계속 올라간다.
+      if (runningSession && runningSession.endedAt == null) {
         elapsedSeconds += Math.max(0, Math.floor((nowMs - Date.parse(runningSession.startedAt)) / 1000));
       }
       return [item.id, elapsedSeconds];

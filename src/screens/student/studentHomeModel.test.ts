@@ -117,6 +117,29 @@ describe('buildStudentHomeModel', () => {
     expect(model.currentElapsedSeconds).toBe(275);
   });
 
+  // 회귀: 쉬는 시간 표식 처리(usePendingStudyPause)가 세션을 닫아도, 화면이 마운트된 채라면
+  // runningSessionId는 닫힌 세션을 계속 가리킨다. endedAt을 보지 않으면 저장된 durationSeconds에
+  // 실시간 경과까지 더해져 표시 시간이 두 배가 되고 쉬는 동안 계속 올라갔다.
+  it('does not add live elapsed time for a running id that points at a closed session', () => {
+    const current = item('current', 1);
+    const model = buildStudentHomeModel(
+      [current],
+      {
+        current: [
+          session('paused', 'current', {
+            startedAt: '2026-08-21T09:00:00.000Z',
+            endedAt: '2026-08-21T09:03:00.000Z',
+            durationSeconds: 180,
+          }),
+        ],
+      },
+      { current: 'paused' },
+      Date.parse('2026-08-21T09:20:00.000Z'),
+    );
+
+    expect(model.currentElapsedSeconds).toBe(180);
+  });
+
   it('returns accumulated study time for every visible item', () => {
     const current = item('current', 1);
     const next = item('next', 2);

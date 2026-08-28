@@ -16,33 +16,43 @@ export default function AllowedAppsScreen({
 }) {
   const [apps, setApps] = React.useState<InstalledAppInfo[] | null>(null);
   const [query, setQuery] = React.useState('');
+  // 정렬 기준이 되는 허용 목록은 화면을 열 때의 값으로 고정한다. 지금 상태를 그대로 쓰면
+  // 40번째 앱을 켠 순간 그 줄이 맨 위로 올라가고 아래 줄이 전부 밀려, 연달아 고르는 학생이
+  // 엉뚱한 앱을 누르게 된다. 스위치만 바뀌고 줄은 제자리에 있어야 한다.
+  const orderingAllowed = React.useRef<Set<string>>(new Set());
 
   React.useEffect(() => {
     let cancelled = false;
     DistractionStop.listInstalledApps()
-      .then((r) => !cancelled && setApps(r.apps))
+      .then((r) => {
+        if (cancelled) return;
+        orderingAllowed.current = new Set(allowedApps);
+        setApps(r.apps);
+      })
       .catch(() => !cancelled && setApps([]));
     return () => {
       cancelled = true;
     };
+    // 목록을 부르는 것도, 정렬 기준을 고정하는 것도 화면을 열 때 한 번뿐이므로 의존성은 비운다.
   }, []);
 
   const toggle = (packageName: string, enabled: boolean) => {
     onChange(enabled ? [...allowedApps, packageName] : allowedApps.filter((p) => p !== packageName));
   };
 
-  // 이미 허용된 앱을 위로 모아 지금 상태가 바로 보이게 한다. 그 안에서는 이름 순서를 유지한다.
+  // 화면을 열 때 이미 허용돼 있던 앱을 위로 모아 지금 상태가 바로 보이게 한다. 그 안에서는
+  // 이름 순서를 유지한다. 켜고 끄는 동안 순서는 바뀌지 않는다(orderingAllowed 참고).
   const visible = React.useMemo(() => {
     if (!apps) return [];
     const trimmed = query.trim().toLowerCase();
     const matched = trimmed ? apps.filter((a) => a.label.toLowerCase().includes(trimmed)) : apps;
-    const allowed = new Set(allowedApps);
+    const allowed = orderingAllowed.current;
     return [...matched].sort((a, b) => {
       const aAllowed = allowed.has(a.packageName) ? 0 : 1;
       const bAllowed = allowed.has(b.packageName) ? 0 : 1;
       return aAllowed - bAllowed;
     });
-  }, [apps, query, allowedApps]);
+  }, [apps, query]);
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
