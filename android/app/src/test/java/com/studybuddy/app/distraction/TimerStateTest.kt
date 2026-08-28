@@ -19,6 +19,8 @@ class TimerStateTest {
 
     private val passThrough = setOf("com.android.launcher", "com.studybuddy.app")
 
+    private val MUSIC = "com.spotify.music"
+
     // --- 쉬는 시간 ---
 
     @Test
@@ -65,7 +67,7 @@ class TimerStateTest {
 
     @Test
     fun `withSessionStopped clears both the flag and the start time`() {
-        val stopped = studying(1_000L).withSessionStopped()
+        val stopped = studying(1_000L).withSessionStopped(nowMillis = 2_000L)
         assertFalse(stopped.sessionActive)
         assertNull(stopped.sessionStartedAtMillis)
     }
@@ -88,7 +90,7 @@ class TimerStateTest {
     @Test
     fun `withSessionStopped drops a stale pending pause`() {
         val stale = studying(1_000L).withBreakUntil(endTimeMillis = 60_000L, nowMillis = 2_000L)
-        assertNull(stale.withSessionStopped().pendingPauseAtMillis)
+        assertNull(stale.withSessionStopped(nowMillis = 3_000L).pendingPauseAtMillis)
     }
 
     @Test
@@ -195,6 +197,82 @@ class TimerStateTest {
         assertNull(cleared.pendingPauseAtMillis)
         assertTrue(cleared.sessionActive)
         assertEquals(60_000L, cleared.endTimeMillis)
+    }
+
+    // --- 허용앱 사용 구간 ---
+
+    private fun studyingWithMusic(startedAt: Long = 0L) =
+        base.copy(allowedApps = setOf(MUSIC)).withSessionStarted(nowMillis = startedAt)
+
+    @Test
+    fun `withForegroundPackage opens an interval when the student enters an allowed app`() {
+        val state = studyingWithMusic().withForegroundPackage(MUSIC, nowMillis = 1_000L)
+        assertEquals(1_000L, state.allowedAppEnteredAtMillis)
+        assertTrue(state.allowedAppIntervals.isEmpty())
+    }
+
+    // 같은 앱 안에서도 화면 전환 이벤트는 여러 번 온다. 매번 시작 시각을 덮으면 구간이
+    // 계속 짧아져 사용 시간이 실제보다 적게 기록된다.
+    @Test
+    fun `withForegroundPackage does not restart an interval that is already open`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 1_000L)
+            .withForegroundPackage(MUSIC, nowMillis = 5_000L)
+        assertEquals(1_000L, state.allowedAppEnteredAtMillis)
+    }
+
+    @Test
+    fun `withForegroundPackage closes the interval when the student leaves for another app`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 1_000L)
+            .withForegroundPackage("com.studybuddy.app", nowMillis = 61_000L)
+        assertNull(state.allowedAppEnteredAtMillis)
+        assertEquals(listOf(AllowedAppInterval(1_000L, 61_000L)), state.allowedAppIntervals)
+    }
+
+    @Test
+    fun `withForegroundPackage does nothing when no interval is open`() {
+        val state = studyingWithMusic().withForegroundPackage("com.kakao.talk", nowMillis = 1_000L)
+        assertNull(state.allowedAppEnteredAtMillis)
+        assertTrue(state.allowedAppIntervals.isEmpty())
+    }
+
+    // 학습 세션이 3시간에 만료되므로 정직한 구간이 그보다 길 수 없다. 기기 시각이 앞으로
+    // 당겨진 경우도 이 상한이 함께 막는다.
+    @Test
+    fun `a closed interval is capped at the session maximum`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 0L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = TimerState.SESSION_MAX_MILLIS * 2)
+        assertEquals(listOf(AllowedAppInterval(0L, TimerState.SESSION_MAX_MILLIS)), state.allowedAppIntervals)
+    }
+
+    @Test
+    fun `withSessionStopped closes an open interval`() {
+        val state = studyingWithMusic().withForegroundPackage(MUSIC, nowMillis = 1_000L).withSessionStopped(nowMillis = 61_000L)
+        assertNull(state.allowedAppEnteredAtMillis)
+        assertEquals(listOf(AllowedAppInterval(1_000L, 61_000L)), state.allowedAppIntervals)
+    }
+
+    // 쉬는 동안은 차단 자체가 없으므로 "허용앱을 썼다"는 개념이 성립하지 않는다.
+    @Test
+    fun `withBreakUntil closes an open interval`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 1_000L)
+            .withBreakUntil(endTimeMillis = 300_000L, nowMillis = 61_000L)
+        assertNull(state.allowedAppEnteredAtMillis)
+        assertEquals(listOf(AllowedAppInterval(1_000L, 61_000L)), state.allowedAppIntervals)
+    }
+
+    @Test
+    fun `withAllowedAppIntervalsCleared empties the list but keeps an open interval`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 1_000L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = 61_000L)
+            .withForegroundPackage(MUSIC, nowMillis = 120_000L)
+            .withAllowedAppIntervalsCleared()
+        assertTrue(state.allowedAppIntervals.isEmpty())
+        assertEquals(120_000L, state.allowedAppEnteredAtMillis)
     }
 
     // --- 기본값 ---

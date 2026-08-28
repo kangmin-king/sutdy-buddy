@@ -16,7 +16,12 @@ data class TimerState(
     // "이 시각 기준으로 학습 시간 집계를 멈춰야 한다"는 표식. 쉬는 시간 시작이 세우고, 웹이
     // 처리한 뒤 지운다. 이벤트가 아니라 상태인 이유: 딴짓멈춰 화면을 열면 학생 홈이
     // 언마운트되어 그 순간의 이벤트를 받을 컴포넌트가 없지만, 표식은 남아 다음에 처리된다.
-    val pendingPauseAtMillis: Long? = null
+    val pendingPauseAtMillis: Long? = null,
+    // 아직 진행 중인 허용앱 구간의 시작 시각. 허용앱에 들어간 순간 세우고 나오는 순간 지운다.
+    val allowedAppEnteredAtMillis: Long? = null,
+    // 닫힌 구간들. 웹이 서버로 보낸 뒤 비운다. 이벤트가 아니라 상태인 이유는
+    // pendingPauseAtMillis와 같다 — 학생이 허용앱을 쓰는 동안 우리 앱은 백그라운드다.
+    val allowedAppIntervals: List<AllowedAppInterval> = emptyList()
 ) {
     fun isBreakActive(nowMillis: Long): Boolean =
         endTimeMillis != null && nowMillis < endTimeMillis
@@ -53,17 +58,19 @@ data class TimerState(
             sessionActive = true,
             sessionStartedAtMillis = nowMillis,
             endTimeMillis = null,
-            pendingPauseAtMillis = null
+            pendingPauseAtMillis = null,
+            allowedAppEnteredAtMillis = null
         )
 
-    fun withSessionStopped(): TimerState =
-        copy(sessionActive = false, sessionStartedAtMillis = null, pendingPauseAtMillis = null)
+    fun withSessionStopped(nowMillis: Long): TimerState =
+        closeOpenAllowedAppInterval(nowMillis)
+            .copy(sessionActive = false, sessionStartedAtMillis = null, pendingPauseAtMillis = null)
 
     // 쉬는 시간은 endTimeMillis만 세우고 공부 모드는 그대로 둔다. 공부 중이었다면 집계를
     // 멈추라는 표식을 남기되, 이미 처리 안 된 표식이 있으면 덮어쓰지 않는다 — 첫 표식 시각이
     // 실제로 공부를 멈춘 순간이고, 덮어쓰면 그만큼 쉬는 시간이 학습 시간으로 들어간다.
     fun withBreakUntil(endTimeMillis: Long, nowMillis: Long): TimerState {
-        val next = copy(endTimeMillis = endTimeMillis)
+        val next = closeOpenAllowedAppInterval(nowMillis).copy(endTimeMillis = endTimeMillis)
         return if (sessionActive && pendingPauseAtMillis == null) {
             next.copy(pendingPauseAtMillis = nowMillis)
         } else {
@@ -72,6 +79,29 @@ data class TimerState(
     }
 
     fun withPendingPauseCleared(): TimerState = copy(pendingPauseAtMillis = null)
+
+    // 화면 전환마다 불린다. 허용앱이면 구간을 열고(이미 열려 있으면 그대로), 아니면 열린
+    // 구간을 닫는다. 자동 통과 앱(전화·시계·설정 등)은 allowedApps에 없으므로 여기서
+    // 구간을 닫는 쪽으로 처리된다 — 전화를 받은 것을 딴짓으로 세면 안 된다.
+    fun withForegroundPackage(packageName: String, nowMillis: Long): TimerState =
+        if (packageName in allowedApps) {
+            if (allowedAppEnteredAtMillis != null) this else copy(allowedAppEnteredAtMillis = nowMillis)
+        } else {
+            closeOpenAllowedAppInterval(nowMillis)
+        }
+
+    fun withAllowedAppIntervalsCleared(): TimerState = copy(allowedAppIntervals = emptyList())
+
+    // 학습 세션이 3시간에 만료되므로 정직한 구간이 그보다 길 수 없다. 상한을 두면 기기
+    // 시각이 앞으로 당겨진 경우도 함께 막힌다.
+    private fun closeOpenAllowedAppInterval(nowMillis: Long): TimerState {
+        val startedAt = allowedAppEnteredAtMillis ?: return this
+        val endedAt = minOf(nowMillis, startedAt + SESSION_MAX_MILLIS)
+        return copy(
+            allowedAppEnteredAtMillis = null,
+            allowedAppIntervals = allowedAppIntervals + AllowedAppInterval(startedAt, endedAt)
+        )
+    }
 
     companion object {
         // 한 항목을 3시간 연속 공부하는 경우는 사실상 없다. 넘으면 방치된 세션으로 보고 차단을
@@ -91,7 +121,9 @@ data class TimerState(
             allowedApps = emptySet(),
             sessionActive = false,
             sessionStartedAtMillis = null,
-            pendingPauseAtMillis = null
+            pendingPauseAtMillis = null,
+            allowedAppEnteredAtMillis = null,
+            allowedAppIntervals = emptyList()
         )
     }
 }

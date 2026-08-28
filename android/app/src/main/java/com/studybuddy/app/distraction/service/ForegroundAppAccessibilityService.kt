@@ -45,6 +45,13 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             val state = store.observeState().first()
             val now = System.currentTimeMillis()
 
+            // 허용앱 사용 구간 기록. 공부 중이고 쉬는 시간이 아닐 때만 의미가 있다.
+            // 차단 판정보다 앞에 있어야 하는 이유: 허용앱은 차단되지 않으므로 차단 경로
+            // 뒤에 두면 기록될 기회가 없다.
+            if (state.isSessionActive(now) && !state.isBreakActive(now)) {
+                store.updateForegroundPackage(packageName, now)
+            }
+
             // 공부 중에는 허용앱과 통과 대상 외에는 열 수 없다. 통과 대상이면 여기서 끝이다 —
             // 예전에는 이 아래에 이탈 감지 분기가 있어서, 홈 버튼을 누르면 런처가 이탈로
             // 잡혀 차단이 스스로 꺼졌다.

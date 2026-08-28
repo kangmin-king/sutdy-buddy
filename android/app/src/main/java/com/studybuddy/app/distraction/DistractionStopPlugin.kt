@@ -191,6 +191,14 @@ class DistractionStopPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun clearAllowedAppIntervals(call: PluginCall) {
+        scope.launch {
+            store.clearAllowedAppIntervals()
+            call.resolve(store.observeState().value.toJSObject())
+        }
+    }
+
     // 다른 @PluginMethod와 달리 이 메서드는 scope(Main)에서 바로 launch하지 않는다.
     // installedApps.list()는 앱 100~200개 기준으로 PackageManager 조회 + 앱마다 아이콘
     // 비트맵 생성/캔버스 그리기/PNG 압축/base64 인코딩을 한다 — 메인 스레드에서 돌리면
@@ -227,6 +235,15 @@ class DistractionStopPlugin : Plugin() {
         obj.put("sessionActive", sessionActive)
         obj.put("sessionStartedAtMillis", sessionStartedAtMillis ?: JSObject.NULL)
         obj.put("pendingPauseAtMillis", pendingPauseAtMillis ?: JSObject.NULL)
+        obj.put("allowedAppEnteredAtMillis", allowedAppEnteredAtMillis ?: JSObject.NULL)
+        obj.put(
+            "allowedAppIntervals",
+            com.getcapacitor.JSArray(
+                allowedAppIntervals.map { interval ->
+                    JSObject().put("startedAtMillis", interval.startedAtMillis).put("endedAtMillis", interval.endedAtMillis)
+                }
+            )
+        )
         return obj
     }
 

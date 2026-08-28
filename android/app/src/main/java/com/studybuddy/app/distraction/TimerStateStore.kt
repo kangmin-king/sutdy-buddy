@@ -50,16 +50,27 @@ class TimerStateStore(context: Context) {
 
     suspend fun setSessionActive(active: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         val current = currentState()
-        save(if (active) current.withSessionStarted(nowMillis) else current.withSessionStopped())
+        save(if (active) current.withSessionStarted(nowMillis) else current.withSessionStopped(nowMillis))
     }
 
     suspend fun clearPendingPause() {
         save(currentState().withPendingPauseCleared())
     }
 
+    suspend fun updateForegroundPackage(packageName: String, nowMillis: Long = System.currentTimeMillis()) {
+        save(currentState().withForegroundPackage(packageName, nowMillis))
+    }
+
+    suspend fun clearAllowedAppIntervals() {
+        save(currentState().withAllowedAppIntervalsCleared())
+    }
+
     private suspend fun currentState(): TimerState = observeState().first()
 
     private fun save(state: TimerState) {
+        // 화면 전환마다 updateForegroundPackage가 불리지만 대부분은 상태를 바꾸지 않는다.
+        // 같은 값이면 디스크 쓰기도 Flow 방출도 하지 않는다.
+        if (state == stateFlow.value) return
         prefs.edit().putString(KEY_STATE, toJson(state)).apply()
         stateFlow.value = state
     }
@@ -79,6 +90,15 @@ class TimerStateStore(context: Context) {
         json.put("sessionActive", state.sessionActive)
         json.put("sessionStartedAtMillis", state.sessionStartedAtMillis ?: JSONObject.NULL)
         json.put("pendingPauseAtMillis", state.pendingPauseAtMillis ?: JSONObject.NULL)
+        json.put("allowedAppEnteredAtMillis", state.allowedAppEnteredAtMillis ?: JSONObject.NULL)
+        json.put(
+            "allowedAppIntervals",
+            JSONArray(
+                state.allowedAppIntervals.map { interval ->
+                    JSONObject().put("startedAtMillis", interval.startedAtMillis).put("endedAtMillis", interval.endedAtMillis)
+                }
+            )
+        )
         return json.toString()
     }
 
@@ -97,6 +117,17 @@ class TimerStateStore(context: Context) {
         // 학생이 앱을 열지도, 공부를 시작하지도 않았는데. 업그레이드 시 한 번만 공부 모드를 끈다.
         val isPreAllowListFormat = json.has("enabledApps")
 
+        val intervals = mutableListOf<AllowedAppInterval>()
+        if (json.has("allowedAppIntervals") && !json.isNull("allowedAppIntervals")) {
+            val array = json.getJSONArray("allowedAppIntervals")
+            for (i in 0 until array.length()) {
+                runCatching {
+                    val item = array.getJSONObject(i)
+                    AllowedAppInterval(item.getLong("startedAtMillis"), item.getLong("endedAtMillis"))
+                }.getOrNull()?.let { intervals.add(it) }
+            }
+        }
+
         // 아래 두 값은 getInt/getBoolean으로 읽으면 키가 없거나 타입이 다를 때 예외를 던진다.
         // 이 함수 전체가 runCatching + DEFAULT 폴백이라, 그러면 학생이 맞춰둔 설정과 허용앱이
         // 통째로 날아간다. 해당 필드만 기본값으로 떨어지게 한다.
@@ -109,7 +140,9 @@ class TimerStateStore(context: Context) {
             allowedApps = allowedApps,
             sessionActive = !isPreAllowListFormat && json.optBoolean("sessionActive", false),
             sessionStartedAtMillis = if (isPreAllowListFormat) null else optLongOrNull(json, "sessionStartedAtMillis"),
-            pendingPauseAtMillis = optLongOrNull(json, "pendingPauseAtMillis")
+            pendingPauseAtMillis = optLongOrNull(json, "pendingPauseAtMillis"),
+            allowedAppEnteredAtMillis = optLongOrNull(json, "allowedAppEnteredAtMillis"),
+            allowedAppIntervals = intervals
         )
     }
 
