@@ -178,7 +178,6 @@ export interface StudySession {
   startedAt: string;
   endedAt: string | null;
   durationSeconds: number | null;
-  deviated: boolean;
 }
 
 export interface TomorrowRecommendationItem {

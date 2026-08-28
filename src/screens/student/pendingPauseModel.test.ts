@@ -7,7 +7,6 @@ const session = (over: Partial<StudySession> & { id: string; startedAt: string }
   plannerItemId: 'item-1',
   endedAt: null,
   durationSeconds: null,
-  deviated: false,
   ...over,
 });
 

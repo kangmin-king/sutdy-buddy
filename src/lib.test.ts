@@ -328,14 +328,13 @@ describe('sessionsToTimelineBlocks', () => {
       startedAt: '2026-08-04T14:00:00+09:00',
       endedAt: '2026-08-04T14:30:00+09:00',
       durationSeconds: 1800,
-      deviated: false,
       ...overrides,
     };
   }
 
   it('converts a completed session into a block with local HH:MM start/end', () => {
     const blocks = sessionsToTimelineBlocks([{ session: session({}), subjectLabel: '수학' }]);
-    expect(blocks).toEqual([{ startTime: '14:00', endTime: '14:30', subjectLabel: '수학', deviated: false }]);
+    expect(blocks).toEqual([{ startTime: '14:00', endTime: '14:30', subjectLabel: '수학' }]);
   });
 
   it('renders UTC-stored timestamps in local time rather than slicing the ISO string', () => {
@@ -343,7 +342,7 @@ describe('sessionsToTimelineBlocks', () => {
     const blocks = sessionsToTimelineBlocks([
       { session: session({ startedAt: '2026-08-04T05:00:00Z', endedAt: '2026-08-04T05:30:00Z' }), subjectLabel: '수학' },
     ]);
-    expect(blocks[0]).toEqual({ startTime: '14:00', endTime: '14:30', subjectLabel: '수학', deviated: false });
+    expect(blocks[0]).toEqual({ startTime: '14:00', endTime: '14:30', subjectLabel: '수학' });
   });
 
   it('uses "now" as the end when a session has not ended yet', () => {
@@ -352,13 +351,6 @@ describe('sessionsToTimelineBlocks', () => {
       '2026-08-04T14:10:00+09:00'
     );
     expect(blocks[0].endTime).toBe('14:10');
-  });
-
-  it('marks deviated sessions', () => {
-    const blocks = sessionsToTimelineBlocks([
-      { session: session({ endedAt: '2026-08-04T14:05:00+09:00', durationSeconds: 300, deviated: true }), subjectLabel: '영어' },
-    ]);
-    expect(blocks[0].deviated).toBe(true);
   });
 
   it('sorts blocks by start time', () => {

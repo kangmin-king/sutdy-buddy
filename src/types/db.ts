@@ -107,7 +107,6 @@ export type SbStudySessionRow = {
   started_at: string;
   ended_at: string | null;
   duration_seconds: number | null;
-  deviated: boolean;
 };
 
 export type SbStudentManagerLinkRow = {

@@ -3,7 +3,6 @@ export interface TimelineSegment {
   color: string;
   startMinutes: number;
   endMinutes: number;
-  deviated: boolean;
 }
 
 const ROW_HEIGHT = 18;
@@ -41,7 +40,7 @@ export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
                   key={c}
                   title={seg?.subjectLabel}
                   className={seg ? undefined : 'bg-surface-container'}
-                  style={seg ? { backgroundColor: seg.deviated ? '#ba1a1a' : seg.color, opacity: 0.8 } : undefined}
+                  style={seg ? { backgroundColor: seg.color, opacity: 0.8 } : undefined}
                 />
               );
             })}

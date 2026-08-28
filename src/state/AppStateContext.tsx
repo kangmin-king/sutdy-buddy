@@ -144,7 +144,7 @@ interface AppStateActions {
   ) => Promise<void>;
   updateHomeworkAssignment: (id: string, patch: Partial<HomeworkAssignment>) => Promise<void>;
   startStudySession: (plannerItemId: string) => Promise<string>;
-  endStudySession: (plannerItemId: string, sessionId: string, deviated: boolean, displayedSeconds?: number) => Promise<void>;
+  endStudySession: (plannerItemId: string, sessionId: string, displayedSeconds?: number) => Promise<void>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   registerDeviceToken: (token: string) => Promise<void>;
@@ -883,7 +883,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             ...s.studySessions,
             [plannerItemId]: [
               ...(s.studySessions[plannerItemId] ?? []),
-              { id, plannerItemId, startedAt, endedAt: null, durationSeconds: null, deviated: false },
+              { id, plannerItemId, startedAt, endedAt: null, durationSeconds: null },
             ],
           },
         }));
@@ -900,7 +900,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             started_at: startedAt,
             ended_at: null,
             duration_seconds: null,
-            deviated: false,
           })
           .then(({ error }) => {
             if (error) {
@@ -911,7 +910,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return id;
       },
 
-      async endStudySession(plannerItemId, sessionId, deviated, displayedSeconds) {
+      async endStudySession(plannerItemId, sessionId, displayedSeconds) {
         const endedAt = new Date().toISOString();
         // startedAt is immutable once a session is created, so reading it from the outer `state`
         // closure (rather than deriving inside the setState updater) is safe here — unlike
@@ -928,13 +927,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         setState((s) => {
           const list = s.studySessions[plannerItemId] ?? [];
-          const updated = list.map((sess) => (sess.id === sessionId ? { ...sess, endedAt, deviated, durationSeconds } : sess));
+          const updated = list.map((sess) => (sess.id === sessionId ? { ...sess, endedAt, durationSeconds } : sess));
           return { ...s, studySessions: { ...s.studySessions, [plannerItemId]: updated } };
         });
 
         const { error } = await supabase
           .from('sb_study_sessions')
-          .update({ ended_at: endedAt, deviated, duration_seconds: durationSeconds })
+          .update({ ended_at: endedAt, duration_seconds: durationSeconds })
           .eq('id', sessionId);
         if (error) {
           console.error('endStudySession failed:', error.message);

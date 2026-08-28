@@ -29,7 +29,7 @@ export function usePendingStudyPause(): void {
     void (async () => {
       try {
         for (const { itemId, sessionId, startedAt } of open) {
-          await actions.endStudySession(itemId, sessionId, false, secondsUntil(startedAt, pendingAt));
+          await actions.endStudySession(itemId, sessionId, secondsUntil(startedAt, pendingAt));
         }
         await DistractionStop.clearPendingPause();
       } finally {

@@ -104,7 +104,7 @@ export default function StudentHomeScreen({
     );
     const recovered = deriveRunningSessionIds(state.studySessions, visibleItemIds);
     for (const stale of findStaleRunningSessions(state.studySessions, visibleItemIds)) {
-      void actions.endStudySession(stale.itemId, stale.sessionId, false, stale.durationSeconds);
+      void actions.endStudySession(stale.itemId, stale.sessionId, stale.durationSeconds);
     }
     setRunningSessionId(recovered);
   }, [actions, allTodayItems, state.loading, state.studySessions]);
@@ -168,7 +168,7 @@ export default function StudentHomeScreen({
       // 화면에 이미 보이고 있던 값을 그대로 저장한다. 정지 시각 기준으로 다시 정밀 계산하면
       // 1초 주기로만 갱신되는 화면 표시값과 어긋나, 정지하는 순간 숫자가 위아래로 튀어 보인다.
       const displayedSeconds = running ? Math.floor((now - Date.parse(running.startedAt)) / 1000) : undefined;
-      actions.endStudySession(itemId, sessionId, false, displayedSeconds);
+      actions.endStudySession(itemId, sessionId, displayedSeconds);
     }
     if (isNativePlatform()) {
       // 네이티브 호출은 다음 틱으로 미뤄 화면 갱신을 막지 않게 한다.

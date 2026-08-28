@@ -46,7 +46,7 @@ export default function ChecklistTimeline({
       // 시작~종료가 1분 안에 끝나면 분 단위로 내림했을 때 startMinutes와 같아진다. 실제로는
       // 유효한 기록이므로 통째로 버리지 않고 최소 한 칸(1분)은 보이게 한다.
       const endMinutes = Math.max(startMinutes + 1, toMinutesOfDay(session.endedAt));
-      segments.push({ subjectLabel: subject.label, color, startMinutes, endMinutes, deviated: session.deviated });
+      segments.push({ subjectLabel: subject.label, color, startMinutes, endMinutes });
     }
     elapsedSecondsByItem[item.id] = elapsedSeconds;
   }

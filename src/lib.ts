@@ -272,7 +272,6 @@ export interface TimelineBlock {
   startTime: string;
   endTime: string;
   subjectLabel: string;
-  deviated: boolean;
 }
 
 // 세션 시각은 timestamptz(ISO/UTC)로 저장되지만, 타임라인은 사용자가 실제로 겪은 시각을
@@ -299,7 +298,6 @@ export function sessionsToTimelineBlocks(
       startTime: toHHMM(session.startedAt),
       endTime: toHHMM(session.endedAt ?? nowIso),
       subjectLabel,
-      deviated: session.deviated,
     }))
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }

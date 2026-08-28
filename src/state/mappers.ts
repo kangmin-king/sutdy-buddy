@@ -130,7 +130,6 @@ export function studySessionFromRow(row: SbStudySessionRow): StudySession {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
-    deviated: row.deviated,
   };
 }
 
