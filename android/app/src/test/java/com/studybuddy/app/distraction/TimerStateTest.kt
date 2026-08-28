@@ -70,6 +70,27 @@ class TimerStateTest {
         assertNull(stopped.sessionStartedAtMillis)
     }
 
+    // 회귀: 어떤 이유로든 처리되지 않고 남은 표식은 withBreakUntil의 "덮어쓰지 않는다" 규칙
+    // 때문에 다음 쉬는 시간의 표식을 통째로 막아, 그 쉬는 시간이 학습 시간으로 들어간다.
+    @Test
+    fun `withSessionStarted drops a stale pending pause from the previous session`() {
+        val stale = studying(1_000L).withBreakUntil(endTimeMillis = 60_000L, nowMillis = 2_000L)
+        assertEquals(2_000L, stale.pendingPauseAtMillis)
+
+        val restarted = stale.withSessionStarted(nowMillis = 500_000L)
+        assertNull(restarted.pendingPauseAtMillis)
+
+        // 그래서 새 세션의 첫 쉬는 시간이 다시 표식을 세울 수 있다.
+        val nextBreak = restarted.withBreakUntil(endTimeMillis = 600_000L, nowMillis = 560_000L)
+        assertEquals(560_000L, nextBreak.pendingPauseAtMillis)
+    }
+
+    @Test
+    fun `withSessionStopped drops a stale pending pause`() {
+        val stale = studying(1_000L).withBreakUntil(endTimeMillis = 60_000L, nowMillis = 2_000L)
+        assertNull(stale.withSessionStopped().pendingPauseAtMillis)
+    }
+
     @Test
     fun `isSessionActive is true within the three hour window`() {
         assertTrue(studying().isSessionActive(nowMillis = TimerState.SESSION_MAX_MILLIS - 1))
@@ -185,5 +206,13 @@ class TimerStateTest {
         assertNull(TimerState.DEFAULT.sessionStartedAtMillis)
         assertNull(TimerState.DEFAULT.pendingPauseAtMillis)
         assertEquals(emptySet<String>(), TimerState.DEFAULT.allowedApps)
+    }
+
+    // PRD가 약속하는 "공부 중에는 허용앱이 아닌 앱에 들어갈 수 없다"를 실제로 지키는 것은
+    // IMMEDIATE뿐이다. GRACE_PERIOD는 10초 뒤 홈으로 보내는데 그때는 3초 쿨다운이 끝나 바로
+    // 다시 들어갈 수 있고, CONFIRM은 알림만 띄운다.
+    @Test
+    fun `DEFAULT blocks immediately`() {
+        assertEquals(ExitMode.IMMEDIATE, TimerState.DEFAULT.exitMode)
     }
 }

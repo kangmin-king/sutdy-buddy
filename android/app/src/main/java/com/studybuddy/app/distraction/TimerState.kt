@@ -44,11 +44,20 @@ data class TimerState(
 
     fun hasPendingPause(): Boolean = pendingPauseAtMillis != null
 
+    // 세션 경계에서는 표식도 함께 지운다. 어떤 이유로든 처리되지 않고 남은 표식은 withBreakUntil의
+    // "덮어쓰지 않는다" 규칙 때문에 다음 쉬는 시간의 표식을 통째로 막아버려, 그 쉬는 시간이
+    // 고스란히 학습 시간으로 들어간다. 세션이 새로 시작하거나 끝나면 이전 표식은 더 이상
+    // 처리할 대상이 없으므로 버리는 것이 맞다.
     fun withSessionStarted(nowMillis: Long): TimerState =
-        copy(sessionActive = true, sessionStartedAtMillis = nowMillis, endTimeMillis = null)
+        copy(
+            sessionActive = true,
+            sessionStartedAtMillis = nowMillis,
+            endTimeMillis = null,
+            pendingPauseAtMillis = null
+        )
 
     fun withSessionStopped(): TimerState =
-        copy(sessionActive = false, sessionStartedAtMillis = null)
+        copy(sessionActive = false, sessionStartedAtMillis = null, pendingPauseAtMillis = null)
 
     // 쉬는 시간은 endTimeMillis만 세우고 공부 모드는 그대로 둔다. 공부 중이었다면 집계를
     // 멈추라는 표식을 남기되, 이미 처리 안 된 표식이 있으면 덮어쓰지 않는다 — 첫 표식 시각이
@@ -69,9 +78,14 @@ data class TimerState(
         // 푼다 — 학생이 화면에서 다시 시작을 누르면 시작 시각이 갱신된다.
         const val SESSION_MAX_MILLIS = 3 * 60 * 60 * 1000L
 
+        // 기본값이 IMMEDIATE인 이유: PRD가 약속하는 "공부 중에는 허용앱이 아닌 앱에 들어갈 수
+        // 없다"를 실제로 지키는 것은 IMMEDIATE뿐이다. GRACE_PERIOD는 10초를 준 뒤 홈으로
+        // 보내는데 그때는 3초 쿨다운이 이미 끝나 바로 다시 들어갈 수 있고, CONFIRM은 알림만
+        // 띄운다. 둘 다 학생이 고를 수 있는 선택지로 그대로 남는다.
+        // 이 값은 새로 설치한 기기에만 적용된다 — 이미 쓰던 학생의 exitMode는 JSON에서 읽는다.
         val DEFAULT = TimerState(
             endTimeMillis = null,
-            exitMode = ExitMode.GRACE_PERIOD,
+            exitMode = ExitMode.IMMEDIATE,
             gracePeriodSeconds = 10,
             featureEnabled = true,
             allowedApps = emptySet(),

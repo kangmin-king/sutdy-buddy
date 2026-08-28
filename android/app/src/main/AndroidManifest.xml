@@ -37,7 +37,7 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- 딴짓 멈춰: 인스타/유튜브/틱톡 감지 -->
+        <!-- 딴짓 멈춰: 공부 중 화면에 올라온 앱이 허용앱·통과 대상이 아니면 막는다 -->
         <service
             android:name=".distraction.service.ForegroundAppAccessibilityService"
             android:exported="true"
