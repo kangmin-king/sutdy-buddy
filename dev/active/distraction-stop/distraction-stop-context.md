@@ -1,6 +1,6 @@
 # Context — 딴짓 멈춰
 
-**Last Updated**: 2026-08-04
+**Last Updated**: 2026-08-27
 
 ## 핵심 파일 위치
 - 포팅 원본 (읽기 전용 참고): `C:\Users\DELL\Desktop\reels-stop\app\src\main\java\com\reelsstop\app\{data,exit,notification,service,ui}`
@@ -17,6 +17,7 @@
 - **웹 배포 호환**: 모든 진입점 `Capacitor.isNativePlatform()` 가드 — 브라우저(Vercel 배포)에서는 안내 문구만.
 - **팀 모드 제외**: `dev/active/reels-stop-team-mode/`는 reels-stop 자체의 별도 기능, 이번 포팅 대상 아님.
 - **차단 조건(2026-08-27)**: reels-stop에서 이식한 "쉬는 시간 종료 후 lockout 창" 조건을 버리고 `sessionActive`(학습 타이머) 기반으로 전환. lockout 개념과 설정 UI 삭제. 쉬는 시간 시작 = 학습 일시정지. 앱 강제 종료 대비 3시간 자동 만료 + 알림 `공부 끝내기` 버튼. 스펙: `docs/superpowers/specs/2026-08-27-distraction-stop-session-gated-blocking-design.md`
+- **허용 목록 전환(2026-08-27)**: 차단할 앱 목록(인스타/유튜브/틱톡)을 버리고 허용 목록으로 뒤집었다 — 공부 중에는 학생이 고른 허용앱과 생활 필수 앱(전화·시계·설정·런처·시스템UI·키보드, 시스템 조회) 외에 열리지 않는다. 그 결과 이탈 감지 기능이 필요 없어져 삭제했고, `sessionActive`를 차단과 이탈 감지가 다투던 구조(홈 버튼만 눌러도 차단이 스스로 꺼지던 버그)가 근본에서 사라졌다. `BlockedApp` enum, `setAppEnabled`, `classifySessionStop`, `selfInitiatedStop` ref도 함께 삭제. 쉬는 시간은 공부 모드를 끄지 않아 끝나면 차단이 자동 복귀한다. 허용앱 선택 UI는 `<queries>` + `queryIntentActivities`로 런처 앱만 조회하므로 `QUERY_ALL_PACKAGES`가 필요 없다. 스펙: `docs/superpowers/specs/2026-08-27-distraction-stop-allowlist-design.md`
 
 ## 알려진 제약
 - 이 환경에 Android SDK가 있고 `./gradlew`로 빌드·단위 테스트가 실제로 가능하다. 기본 `JAVA_HOME`은 JDK 17이라 `invalid source release: 21`로 실패한다. Android Studio 내장 JBR도 대안이 아니다 — 지금은 JDK 25라서 Gradle 8.14.3이 settings 스크립트를 컴파일하는 순간 `Unsupported class file major version 69`로 죽는다. 컴파일된 스크립트가 캐시돼 있을 때만 잠시 성공하는 것처럼 보이니 속지 말 것. 실제로 써야 하는 JDK는 `C:/Users/DELL/.jdks/jbr-21.0.11`(JDK 21)이고, 단위 테스트와 APK 빌드 양쪽에 같은 값을 쓴다: `JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDebugUnitTest`, `JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:assembleDebug`. 실기기 차단 동작 검증은 여전히 사용자가 수행해야 한다.
