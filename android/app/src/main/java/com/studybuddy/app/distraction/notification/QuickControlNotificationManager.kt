@@ -35,7 +35,7 @@ class QuickControlNotificationManager {
                 val state = store.observeState().first()
                 // 남은 시간 표시와 세션 만료는 둘 다 시간이 지나면서 저절로 바뀌는 값이라,
                 // 상태 변경 이벤트만으로는 알림이 굳는다.
-                if (state.endTimeMillis != null || state.sessionActive) {
+                if (state.endTimeMillis != null || state.isSessionActive(System.currentTimeMillis())) {
                     show(context, state)
                 }
             }
@@ -54,8 +54,8 @@ class QuickControlNotificationManager {
         val content = when {
             state.isBreakActive(now) && remainingMinutes != null ->
                 "쉬는 시간 ${remainingMinutes}분 남음 — 이 동안은 공부 시간이 쌓이지 않아요"
-            studying -> "공부 중 — 지금 인스타·유튜브·틱톡을 열면 막혀요"
-            else -> "공부를 시작하면 인스타·유튜브·틱톡이 막혀요"
+            studying -> "공부 중 — 허용앱 외에는 열리지 않아요"
+            else -> "공부를 시작하면 허용앱 외에는 열리지 않아요"
         }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)

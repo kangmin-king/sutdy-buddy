@@ -20,13 +20,13 @@ class WarningNotificationManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("쉬는 시간이 끝났어요")
-            .setContentText("계속 쉴까요?")
+            .setContentTitle("공부 중이에요")
+            .setContentText("5분 쉬고 올까요?")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
-            .addAction(0, "5분 더 쉬기", continueIntent)
-            .addAction(0, "그만 쉬기", endIntent)
+            .addAction(0, "5분 쉬기", continueIntent)
+            .addAction(0, "공부 계속하기", endIntent)
             .build()
 
         notify(context, notification)
@@ -38,8 +38,8 @@ class WarningNotificationManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("쉬는 시간이 곧 끝나요")
-            .setContentText("${delaySeconds}초 후 자동으로 종료됩니다")
+            .setContentTitle("공부 중이에요")
+            .setContentText("${delaySeconds}초 후 자동으로 닫혀요")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)

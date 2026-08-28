@@ -10,7 +10,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="쉬는 시간이 끝났어요"
+        android:text="공부 중에는 열 수 없어요"
         android:textColor="#FFFFFF"
         android:textSize="24sp"
         android:textStyle="bold"
