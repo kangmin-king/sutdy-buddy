@@ -1,42 +1,15 @@
 import React from 'react';
-import { TopAppBar, BackBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon, TextField } from '../primitives';
+import { TopAppBar, BackBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon } from '../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../native/distractionStop';
-import type { BlockedAppId, DistractionState, ExitModeId } from '../types/distraction';
-import { extendedEndTime, formatRemaining, isBreakActive, statusMessage } from './distractionStopModel';
-
-const BLOCKED_APP_OPTIONS: { id: BlockedAppId; label: string }[] = [
-  { id: 'INSTAGRAM', label: '인스타그램' },
-  { id: 'YOUTUBE', label: '유튜브' },
-  { id: 'TIKTOK', label: '틱톡' },
-];
+import type { DistractionState, ExitModeId } from '../types/distraction';
+import { distractionStatus, extendedEndTime, formatRemaining, isBreakActive, statusMessage } from './distractionStopModel';
+import AllowedAppsScreen from './AllowedAppsScreen';
 
 const EXIT_MODE_OPTIONS: { id: ExitModeId; label: string }[] = [
   { id: 'IMMEDIATE', label: '즉시 차단' },
   { id: 'CONFIRM', label: '확인 후 종료' },
   { id: 'GRACE_PERIOD', label: '유예시간 후 종료' },
 ];
-
-function AllowedAppAdder({ onAdd }: { onAdd: (pkg: string) => void }) {
-  const [pkg, setPkg] = React.useState('');
-
-  const handleAdd = () => {
-    const trimmed = pkg.trim();
-    if (!trimmed) return;
-    onAdd(trimmed);
-    setPkg('');
-  };
-
-  return (
-    <div className="flex items-end gap-2">
-      <div className="flex-1">
-        <TextField value={pkg} onChange={setPkg} placeholder="com.android.calculator2" />
-      </div>
-      <Button variant="secondary" className="!px-4" onClick={handleAdd}>
-        추가
-      </Button>
-    </div>
-  );
-}
 
 // onClose가 있으면(오른쪽 아래 떠 있는 버튼으로 연 오버레이) 뒤로가기 헤더를 쓰고, 없으면
 // (레거시 하단 탭 등 기존 자리) 기존 TopAppBar를 그대로 쓴다.
@@ -53,6 +26,8 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
     if (remoteState) setLocal(remoteState);
   }, [remoteState]);
   const state = local;
+
+  const [showAllowedApps, setShowAllowedApps] = React.useState(false);
 
   React.useEffect(() => {
     setNow(Date.now());
@@ -83,6 +58,19 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
     );
   }
 
+  if (showAllowedApps) {
+    return (
+      <AllowedAppsScreen
+        allowedApps={state.allowedApps}
+        onChange={(apps) => {
+          setLocal((s) => s && { ...s, allowedApps: apps });
+          DistractionStop.setAllowedApps({ apps });
+        }}
+        onClose={() => setShowAllowedApps(false)}
+      />
+    );
+  }
+
   const remaining = formatRemaining(state.endTimeMillis, now);
 
   return (
@@ -92,7 +80,7 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
         <Card className="flex items-center justify-between">
           <div>
             <p className="text-sm font-bold">딴짓 멈춰 켜기</p>
-            <p className="text-xs text-on-surface-variant mt-0.5">공부하는 동안 선택한 앱을 차단해요</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">공부하는 동안 허용앱 외에는 열리지 않아요</p>
           </div>
           <ToggleSwitch
             checked={state.featureEnabled}
@@ -103,8 +91,20 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
           />
         </Card>
 
-        <Card className="text-center">
+        <Card className="text-center space-y-3">
           <p className="text-sm text-on-surface-variant">{statusMessage(state, now)}</p>
+          {distractionStatus(state, now) === 'blocking' && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setLocal((s) => s && { ...s, sessionActive: false, sessionStartedAtMillis: null });
+                DistractionStop.setSessionActive({ active: false });
+              }}
+            >
+              공부 끝내기
+            </Button>
+          )}
         </Card>
 
         {(!permissions.accessibilityEnabled || !permissions.overlayGranted) && (
@@ -168,26 +168,7 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
         </div>
 
         <div>
-          <SectionTitle>차단할 앱</SectionTitle>
-          <Card className="space-y-3">
-            {BLOCKED_APP_OPTIONS.map((app) => (
-              <ToggleSwitch
-                key={app.id}
-                label={app.label}
-                checked={state.enabledApps.includes(app.id)}
-                onChange={(enabled) => {
-                  setLocal((s) =>
-                    s && { ...s, enabledApps: enabled ? [...s.enabledApps, app.id] : s.enabledApps.filter((a) => a !== app.id) }
-                  );
-                  DistractionStop.setAppEnabled({ app: app.id, enabled });
-                }}
-              />
-            ))}
-          </Card>
-        </div>
-
-        <div>
-          <SectionTitle>공부 중 차단 앱을 열면</SectionTitle>
+          <SectionTitle>공부 중 다른 앱을 열면</SectionTitle>
           <ChipGroup
             options={EXIT_MODE_OPTIONS}
             value={state.exitMode}
@@ -199,30 +180,17 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
         </div>
 
         <div>
-          <SectionTitle>허용앱 (학습 실행 중 이탈 감지 예외)</SectionTitle>
-          <Card className="space-y-2">
-            {state.allowedApps.map((pkg) => (
-              <div key={pkg} className="flex items-center justify-between">
-                <span className="text-sm">{pkg}</span>
-                <button
-                  onClick={() => {
-                    const next = state.allowedApps.filter((p) => p !== pkg);
-                    setLocal((s) => s && { ...s, allowedApps: next });
-                    DistractionStop.setAllowedApps({ apps: next });
-                  }}
-                >
-                  <Icon name="close" className="!text-[16px]" />
-                </button>
-              </div>
-            ))}
-            <AllowedAppAdder
-              onAdd={(pkg) => {
-                if (state.allowedApps.includes(pkg)) return;
-                const next = [...state.allowedApps, pkg];
-                setLocal((s) => s && { ...s, allowedApps: next });
-                DistractionStop.setAllowedApps({ apps: next });
-              }}
-            />
+          <SectionTitle>허용앱</SectionTitle>
+          <Card>
+            <button className="w-full flex items-center justify-between" onClick={() => setShowAllowedApps(true)}>
+              <span className="text-sm">
+                {state.allowedApps.length === 0 ? '아직 고른 앱이 없어요' : `${state.allowedApps.length}개 허용 중`}
+              </span>
+              <span className="flex items-center gap-1 text-sm text-primary">
+                고르기
+                <Icon name="chevron_right" className="!text-[18px]" />
+              </span>
+            </button>
           </Card>
         </div>
       </div>
