@@ -78,6 +78,27 @@
         </receiver>
     </application>
 
+    <!-- 허용앱 선택 화면에 보여줄 "런처에 아이콘이 있는 앱" 목록과, PassThroughPackages가
+         resolveActivity로 찾는 런처·시계·설정을 조회하기 위한 선언. targetSdk 36에서는 이
+         선언이 없으면 조회 결과가 null이 되어 홈 화면조차 차단 대상이 된다.
+         QUERY_ALL_PACKAGES(플레이스토어 심사 대상 민감 권한)는 쓰지 않는다. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SHOW_ALARMS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

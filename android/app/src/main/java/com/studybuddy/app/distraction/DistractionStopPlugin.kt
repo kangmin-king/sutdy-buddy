@@ -21,6 +21,8 @@ import kotlinx.coroutines.launch
 class DistractionStopPlugin : Plugin() {
 
     private val store by lazy { TimerStateStore.getInstance(context) }
+    private val installedApps by lazy { InstalledApps(context) }
+    private val passThrough by lazy { PassThroughPackages(context) }
     private val scope = MainScope()
 
     override fun load() {
@@ -184,6 +186,24 @@ class DistractionStopPlugin : Plugin() {
         scope.launch {
             store.clearPendingPause()
             call.resolve(store.observeState().value.toJSObject())
+        }
+    }
+
+    @PluginMethod
+    fun listInstalledApps(call: PluginCall) {
+        scope.launch {
+            val apps = installedApps.list(excluded = passThrough.packages())
+            val array = com.getcapacitor.JSArray()
+            apps.forEach { app ->
+                array.put(
+                    JSObject().apply {
+                        put("packageName", app.packageName)
+                        put("label", app.label)
+                        put("iconPng", app.iconPng)
+                    }
+                )
+            }
+            call.resolve(JSObject().apply { put("apps", array) })
         }
     }
 

@@ -14,3 +14,10 @@ export interface DistractionState {
   // sessionActive를 켠 시각. 앱이 강제 종료돼 이 값이 남으면 3시간 뒤 만료로 취급한다.
   sessionStartedAtMillis: number | null;
 }
+
+export interface InstalledAppInfo {
+  packageName: string;
+  label: string;
+  // base64로 인코딩된 64x64 PNG. data URI 접두사는 붙어 있지 않다.
+  iconPng: string;
+}

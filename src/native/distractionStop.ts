@@ -1,6 +1,6 @@
 import { registerPlugin, Capacitor } from '@capacitor/core';
 import React from 'react';
-import type { BlockedAppId, DistractionState, ExitModeId } from '../types/distraction';
+import type { DistractionState, ExitModeId, InstalledAppInfo } from '../types/distraction';
 
 interface DistractionStopPlugin {
   getState(): Promise<DistractionState>;
@@ -9,7 +9,6 @@ interface DistractionStopPlugin {
   stopTimer(): Promise<DistractionState>;
   setExitMode(opts: { mode: ExitModeId }): Promise<DistractionState>;
   setGracePeriodSeconds(opts: { seconds: number }): Promise<DistractionState>;
-  setAppEnabled(opts: { app: BlockedAppId; enabled: boolean }): Promise<DistractionState>;
   setFeatureEnabled(opts: { enabled: boolean }): Promise<DistractionState>;
   setAllowedApps(opts: { apps: string[] }): Promise<DistractionState>;
   setSessionActive(opts: { active: boolean }): Promise<DistractionState>;
@@ -18,6 +17,8 @@ interface DistractionStopPlugin {
   openAccessibilitySettings(): Promise<void>;
   openOverlaySettings(): Promise<void>;
   consumeOpenRequest(): Promise<{ requested: boolean }>;
+  clearPendingPause(): Promise<DistractionState>;
+  listInstalledApps(): Promise<{ apps: InstalledAppInfo[] }>;
   addListener(
     eventName: 'stateChanged',
     listenerFunc: (state: DistractionState) => void
