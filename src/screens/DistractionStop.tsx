@@ -98,8 +98,18 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
               variant="outline"
               className="w-full"
               onClick={() => {
+                // 이 파일의 다른 네이티브 호출은 낙관적 업데이트 후 실패를 무시한다 —
+                // 실패해도 설정 하나가 어긋나는 정도라 다음 stateChanged로 자연히
+                // 맞춰진다. 이 버튼은 다르다: 대부분의 화면이 막힌 상태를 벗어나는
+                // 유일한 탈출구라, 실패했는데도 성공한 것처럼 보이면 학생은 폰이
+                // 계속 잠겨 있는데 화면은 "차단 아님"이라 말하고 그 사실을 되돌릴
+                // 버튼마저 사라진다. 그래서 실패 시 되돌린다.
+                const prevSessionActive = state.sessionActive;
+                const prevSessionStartedAtMillis = state.sessionStartedAtMillis;
                 setLocal((s) => s && { ...s, sessionActive: false, sessionStartedAtMillis: null });
-                DistractionStop.setSessionActive({ active: false });
+                DistractionStop.setSessionActive({ active: false }).catch(() => {
+                  setLocal((s) => s && { ...s, sessionActive: prevSessionActive, sessionStartedAtMillis: prevSessionStartedAtMillis });
+                });
               }}
             >
               공부 끝내기
