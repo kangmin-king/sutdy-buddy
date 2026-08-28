@@ -28,6 +28,7 @@ import ManagerCalendarScreen from './screens/manager/ManagerCalendar';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useOpenDistractionStopRequest, isNativePlatform } from './native/distractionStop';
 import { usePushRegistration } from './native/push';
+import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
@@ -77,6 +78,10 @@ function StudentAppShell() {
   // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
   // 탭 전환 대신 이 오버레이를 띄운다.
   useOpenDistractionStopRequest(React.useCallback(() => setShowDistractionStop(true), []));
+
+  // 쉬는 시간이 시작되면 네이티브가 표식을 남긴다. 오버레이가 떠서 학생 홈이 언마운트돼도
+  // 처리되어야 하므로 셸에서 부른다.
+  usePendingStudyPause();
 
   // 이 오버레이가 떠 있는 동안은 휴대폰 뒤로 가기 버튼도 왼쪽 위 화살표랑 똑같이 오버레이만
   // 닫아야 한다 — 기본 동작대로 두면 뒤로 가기가 앱을 통째로 나가버린다.

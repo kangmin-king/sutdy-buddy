@@ -4,12 +4,11 @@ import { useAppState } from '../../state/AppStateContext';
 import { todayKey, addDaysToKey, resolvePlannerItemManagerId, managerDisplayLabel } from '../../lib';
 import { getSubject } from '../../constants';
 import { TopAppBar, Icon } from '../../primitives';
-import { DistractionStop, isNativePlatform, useDistractionState } from '../../native/distractionStop';
+import { DistractionStop, isNativePlatform } from '../../native/distractionStop';
 import LinkedManagerChips from './LinkedManagerChips';
 import HomeBanner from '../shared/HomeBanner';
 import type { PlannerItem } from '../../types';
 import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions } from './studentHomeModel';
-import { classifySessionStop } from '../distractionStopModel';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -127,47 +126,10 @@ export default function StudentHomeScreen({
     return index >= 0 ? managerDisplayLabel(managerId, state.managerLabels, index) : (state.managerLabels[managerId] || '선생님');
   };
 
-  // 네이티브가 허용앱 밖 이탈을 감지하면 스스로 sessionActive를 false로 내리고 stateChanged로
-  // 알려준다(DistractionStop 화면과 같은 구독 훅). 웹은 그 전환을 보고 타이머를 이탈로 끝낸다.
-  const { state: distraction } = useDistractionState();
-  const nativeSessionActive = distraction?.sessionActive ?? false;
-  const prevNativeSessionActive = React.useRef(false);
-  // 사용자가 직접 정지/완료를 눌러 setSessionActive(false)를 보낸 경우에도 같은 전환이 오기
-  // 때문에, "우리가 멈춘 것"인지 구분할 플래그가 필요하다. 정지 핸들러에서 동기적으로 세워두고
-  // 전환을 관측할 때 소비한다.
-  const selfInitiatedStop = React.useRef(false);
-
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-
-  React.useEffect(() => {
-    const wasActive = prevNativeSessionActive.current;
-    prevNativeSessionActive.current = nativeSessionActive;
-    if (nativeSessionActive) {
-      // false -> true(새 세션 시작) 전환에서만 소비되지 않고 남은 플래그를 버린다. 매번 지우면
-      // 정지 버튼이 세운 플래그가 네이티브 응답 전에(runningSessionId 변경으로 이 이펙트가
-      // 다시 돌면서) 날아가 자기 정지를 이탈로 오인하게 된다.
-      if (!wasActive) selfInitiatedStop.current = false;
-      return;
-    }
-    if (!wasActive) return; // true -> false 전환만 처리
-    const cause = distraction
-      ? classifySessionStop(distraction, Date.now(), selfInitiatedStop.current)
-      : 'deviation';
-    if (cause === 'self') {
-      selfInitiatedStop.current = false;
-      return;
-    }
-    const running = Object.entries(runningSessionId);
-    if (running.length === 0) return;
-    for (const [itemId, sessionId] of running) {
-      // 쉬는 시간으로 멈춘 것은 이탈이 아니다 — 학생이 하지 않은 이탈을 기록에 남기면 안 된다.
-      actions.endStudySession(itemId, sessionId, cause === 'deviation');
-    }
-    setRunningSessionId({});
-  }, [nativeSessionActive, runningSessionId, actions, distraction]);
 
   const handleStart = async (itemId: string) => {
     if (startPending[itemId] || !canStartStudyItem(runningSessionId, itemId)) return;
@@ -179,7 +141,6 @@ export default function StudentHomeScreen({
       // 바로 맞춰준다.
       setNow(Date.now());
       setRunningSessionId((m) => ({ ...m, [itemId]: sessionId }));
-      selfInitiatedStop.current = false;
       // 네이티브 브릿지 호출(DistractionStop 접근성 서비스 쪽 처리)이 실기기에서 동기적으로
       // 오래 걸릴 수 있는데, 같은 실행 흐름 안에 있으면 위 setState들이 화면에 그려지는 게
       // 그만큼 늦어져 "재시작해도 잠깐 멈춰있다가 시간이 간다"로 보인다. 화면이 먼저 그려지도록
@@ -203,10 +164,7 @@ export default function StudentHomeScreen({
     const displayedSeconds = running ? Math.floor((now - Date.parse(running.startedAt)) / 1000) : undefined;
     actions.endStudySession(itemId, sessionId, false, displayedSeconds);
     if (isNativePlatform()) {
-      // 아래 setSessionActive(false)가 돌려보낼 true -> false 전환을 이탈로 오인하지 않도록
-      // 네이티브에 알리기 전에 동기적으로 표시해둔다(이 ref 대입 자체는 즉시 실행되어야 한다).
-      selfInitiatedStop.current = true;
-      // 네이티브 호출 자체는 다음 틱으로 미뤄 화면 갱신을 막지 않게 한다 (handleStart와 동일한 이유).
+      // 네이티브 호출은 다음 틱으로 미뤄 화면 갱신을 막지 않게 한다.
       setTimeout(() => DistractionStop.setSessionActive({ active: false }), 0);
     }
     setRunningSessionId((m) => {
