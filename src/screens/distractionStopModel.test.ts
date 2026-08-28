@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  classifySessionStop,
   distractionStatus,
   extendedEndTime,
   formatRemaining,
@@ -15,11 +14,11 @@ const BASE: DistractionState = {
   endTimeMillis: null,
   exitMode: 'IMMEDIATE',
   gracePeriodSeconds: 0,
-  enabledApps: ['INSTAGRAM'],
   featureEnabled: true,
-  allowedApps: [],
+  allowedApps: ['com.spotify.music'],
   sessionActive: false,
   sessionStartedAtMillis: null,
+  pendingPauseAtMillis: null,
 };
 
 const studying = (startedAt = 0): DistractionState => ({
@@ -96,15 +95,25 @@ describe('distractionStatus', () => {
     expect(distractionStatus({ ...studying(0), featureEnabled: false }, 1_000)).toBe('off');
   });
 
-  it('is break while a break is running', () => {
-    expect(distractionStatus({ ...BASE, endTimeMillis: 60_000 }, 1_000)).toBe('break');
+  // 쉬는 시간이 공부 중보다 먼저다 — 지금 차단이 풀려 있다는 사실이 더 급하다.
+  it('is break while a break is running, even during study mode', () => {
+    expect(distractionStatus({ ...studying(0), endTimeMillis: 60_000 }, 1_000)).toBe('break');
   });
 
   it('is blocking while studying', () => {
     expect(distractionStatus(studying(0), 1_000)).toBe('blocking');
   });
 
-  it('is idle when not studying', () => {
+  // 이미 차단이 걸린 상태에서는 준비 안내보다 지금 벌어지는 일이 급하다.
+  it('prefers blocking over the no-allowed-apps hint while studying', () => {
+    expect(distractionStatus({ ...studying(0), allowedApps: [] }, 1_000)).toBe('blocking');
+  });
+
+  it('is noAllowedApps when not studying and nothing is allowed yet', () => {
+    expect(distractionStatus({ ...BASE, allowedApps: [] }, 1_000)).toBe('noAllowedApps');
+  });
+
+  it('is idle when not studying but apps are already allowed', () => {
     expect(distractionStatus(BASE, 1_000)).toBe('idle');
   });
 
@@ -114,12 +123,8 @@ describe('distractionStatus', () => {
 });
 
 describe('statusMessage', () => {
-  it('explains that studying turns blocking on', () => {
-    expect(statusMessage(BASE, 1_000)).toBe('차단 대기 중 — 공부를 시작하면 인스타·유튜브·틱톡이 막혀요');
-  });
-
-  it('says blocking is on while studying', () => {
-    expect(statusMessage(studying(0), 1_000)).toBe('차단 중 — 지금 인스타·유튜브·틱톡을 열면 막혀요');
+  it('says the feature is off', () => {
+    expect(statusMessage({ ...BASE, featureEnabled: false }, 1_000)).toBe('딴짓 멈춰가 꺼져 있어요');
   });
 
   it('shows the remaining break time and that study time is not counting', () => {
@@ -128,26 +133,17 @@ describe('statusMessage', () => {
     );
   });
 
-  it('says the feature is off', () => {
-    expect(statusMessage({ ...BASE, featureEnabled: false }, 1_000)).toBe('딴짓 멈춰가 꺼져 있어요');
-  });
-});
-
-describe('classifySessionStop', () => {
-  it('is self when the student pressed stop or complete', () => {
-    expect(classifySessionStop(BASE, 1_000, true)).toBe('self');
+  it('says only allowed apps open while studying', () => {
+    expect(statusMessage(studying(0), 1_000)).toBe('차단 중 — 허용앱 외에는 열리지 않아요');
   });
 
-  // 쉬는 시간을 시작하면 네이티브가 세션을 내린다. 그건 이탈이 아니라 정상 일시정지다.
-  it('is break when a break became active at the same time', () => {
-    expect(classifySessionStop({ ...BASE, endTimeMillis: 60_000 }, 1_000, false)).toBe('break');
+  it('nudges the student to pick apps before studying', () => {
+    expect(statusMessage({ ...BASE, allowedApps: [] }, 1_000)).toBe(
+      '공부 중에 쓸 앱을 미리 골라두세요 — 지금은 전화·시계·설정만 열려요'
+    );
   });
 
-  it('is deviation when the session dropped with no break running', () => {
-    expect(classifySessionStop(BASE, 1_000, false)).toBe('deviation');
-  });
-
-  it('prefers self over break when the student stopped during a break', () => {
-    expect(classifySessionStop({ ...BASE, endTimeMillis: 60_000 }, 1_000, true)).toBe('self');
+  it('explains that studying turns blocking on', () => {
+    expect(statusMessage(BASE, 1_000)).toBe('차단 대기 중 — 공부를 시작하면 허용앱 외에는 열리지 않아요');
   });
 });

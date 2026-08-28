@@ -34,12 +34,16 @@ export function isSessionActive(state: DistractionState, nowMillis: number): boo
   return nowMillis - state.sessionStartedAtMillis < SESSION_MAX_MILLIS;
 }
 
-export type DistractionStatus = 'off' | 'idle' | 'blocking' | 'break';
+export type DistractionStatus = 'off' | 'break' | 'blocking' | 'noAllowedApps' | 'idle';
 
+// 위에서 아래로 먼저 맞는 것을 쓴다. 순서가 곧 우선순위다 — 공부 중이면 준비 안내보다
+// 지금 벌어지는 일이 급하고, 쉬는 시간이면 차단이 풀렸다는 사실이 그보다 급하다.
 export function distractionStatus(state: DistractionState, nowMillis: number): DistractionStatus {
   if (!state.featureEnabled) return 'off';
   if (isBreakActive(state.endTimeMillis, nowMillis)) return 'break';
-  return isSessionActive(state, nowMillis) ? 'blocking' : 'idle';
+  if (isSessionActive(state, nowMillis)) return 'blocking';
+  if (state.allowedApps.length === 0) return 'noAllowedApps';
+  return 'idle';
 }
 
 // 화면이 왜 차단이 걸리지 않는지 알려주지 않아서 학생이 "실행이 안 된다"고 느꼈다.
@@ -48,23 +52,12 @@ export function statusMessage(state: DistractionState, nowMillis: number): strin
     case 'off':
       return '딴짓 멈춰가 꺼져 있어요';
     case 'break':
-      return `쉬는 시간 ${formatRemaining(state.endTimeMillis, nowMillis)} — 이 동안은 공부 시간이 쌓이지 않아요`;
+      return `쉬는 시간 ${formatRemaining(state.endTimeMillis, nowMillis) ?? ''} — 이 동안은 공부 시간이 쌓이지 않아요`;
     case 'blocking':
-      return '차단 중 — 지금 인스타·유튜브·틱톡을 열면 막혀요';
+      return '차단 중 — 허용앱 외에는 열리지 않아요';
+    case 'noAllowedApps':
+      return '공부 중에 쓸 앱을 미리 골라두세요 — 지금은 전화·시계·설정만 열려요';
     case 'idle':
-      return '차단 대기 중 — 공부를 시작하면 인스타·유튜브·틱톡이 막혀요';
+      return '차단 대기 중 — 공부를 시작하면 허용앱 외에는 열리지 않아요';
   }
-}
-
-export type SessionStopCause = 'self' | 'break' | 'deviation';
-
-// sessionActive가 true -> false로 떨어졌을 때 그 이유. 쉬는 시간으로 인한 정지를 이탈로
-// 기록하면 학생이 하지 않은 이탈이 기록에 남는다.
-export function classifySessionStop(
-  state: DistractionState,
-  nowMillis: number,
-  selfInitiated: boolean
-): SessionStopCause {
-  if (selfInitiated) return 'self';
-  return isBreakActive(state.endTimeMillis, nowMillis) ? 'break' : 'deviation';
 }
