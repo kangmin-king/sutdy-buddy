@@ -10,10 +10,12 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.studybuddy.app.distraction.notification.QuickControlNotificationManager
 import com.studybuddy.app.distraction.service.ForegroundAppAccessibilityService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // React 쪽(src/native/distractionStop.ts)의 유일한 진입점. TimerStateStore를 읽고 쓰며,
 // 상태가 바뀔 때마다 notifyListeners로 JS에 실시간 반영한다.
@@ -189,21 +191,29 @@ class DistractionStopPlugin : Plugin() {
         }
     }
 
+    // 다른 @PluginMethod와 달리 이 메서드는 scope(Main)에서 바로 launch하지 않는다.
+    // installedApps.list()는 앱 100~200개 기준으로 PackageManager 조회 + 앱마다 아이콘
+    // 비트맵 생성/캔버스 그리기/PNG 압축/base64 인코딩을 한다 — 메인 스레드에서 돌리면
+    // 버벅임은 물론 저사양 기기에서는 ANR까지 날 수 있다. Dispatchers.Default로 옮겨서
+    // 계산/IO를 백그라운드 스레드 풀에서 처리한다. call.resolve는 어느 스레드에서 불러도
+    // 안전하므로 결과를 만든 뒤 그대로 반환한다.
     @PluginMethod
     fun listInstalledApps(call: PluginCall) {
         scope.launch {
-            val apps = installedApps.list(excluded = passThrough.packages())
-            val array = com.getcapacitor.JSArray()
-            apps.forEach { app ->
-                array.put(
-                    JSObject().apply {
-                        put("packageName", app.packageName)
-                        put("label", app.label)
-                        put("iconPng", app.iconPng)
-                    }
-                )
+            withContext(Dispatchers.Default) {
+                val apps = installedApps.list(excluded = passThrough.packages())
+                val array = com.getcapacitor.JSArray()
+                apps.forEach { app ->
+                    array.put(
+                        JSObject().apply {
+                            put("packageName", app.packageName)
+                            put("label", app.label)
+                            put("iconPng", app.iconPng)
+                        }
+                    )
+                }
+                call.resolve(JSObject().apply { put("apps", array) })
             }
-            call.resolve(JSObject().apply { put("apps", array) })
         }
     }
 
