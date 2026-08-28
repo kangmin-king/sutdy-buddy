@@ -107,3 +107,41 @@ export function canStartStudyItem(
   const runningItemIds = Object.keys(runningSessionIds);
   return runningItemIds.length === 0 || (runningItemIds.length === 1 && runningItemIds[0] === itemId);
 }
+export interface NextItemGroup {
+  header: string | null;
+  items: PlannerItem[];
+}
+
+// 연결이 끊긴 선생님이 낸 숙제도 managerId는 그대로 남는다. 연결된 선생님 목록만으로 그룹을
+// 만들면 그런 항목이 어느 그룹에도 속하지 못해 목록에서 조용히 사라진다 — 실제로 존재하는
+// managerId를 기준으로 그룹을 만들어 항목이 누락될 수 없게 한다.
+export function groupNextItemsByManager(
+  items: readonly PlannerItem[],
+  managerIdOf: (item: PlannerItem) => string | null,
+  linkedManagerIds: readonly string[],
+  labelFor: (managerId: string) => string,
+): NextItemGroup[] {
+  const itemsByManagerId = new Map<string, PlannerItem[]>();
+  const selfAdded: PlannerItem[] = [];
+  for (const item of items) {
+    const managerId = managerIdOf(item);
+    if (managerId == null) {
+      selfAdded.push(item);
+      continue;
+    }
+    const grouped = itemsByManagerId.get(managerId);
+    if (grouped) grouped.push(item);
+    else itemsByManagerId.set(managerId, [item]);
+  }
+
+  // 연결된 선생님을 화면에 보이는 순서대로 먼저 두고, 연결이 끊긴 선생님은 항목 등장 순서대로 뒤에 붙인다.
+  const orderedManagerIds = [
+    ...linkedManagerIds.filter((managerId) => itemsByManagerId.has(managerId)),
+    ...[...itemsByManagerId.keys()].filter((managerId) => !linkedManagerIds.includes(managerId)),
+  ];
+  const groups = orderedManagerIds.map((managerId) => ({
+    header: labelFor(managerId),
+    items: itemsByManagerId.get(managerId) ?? [],
+  }));
+  return selfAdded.length > 0 ? [...groups, { header: '직접 추가', items: selfAdded }] : groups;
+}

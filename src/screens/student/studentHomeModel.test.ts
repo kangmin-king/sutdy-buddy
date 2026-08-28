@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlannerItem, StudySession } from '../../types';
-import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions } from './studentHomeModel';
+import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
 
 function item(id: string, order: number, status: PlannerItem['status'] = 'planned'): PlannerItem {
   return {
@@ -201,5 +201,41 @@ describe('buildStudentHomeModel', () => {
     expect(items[1]).toBe(first);
     expect(sessions).toEqual(sessionsBefore);
     expect(runningSessionIds).toEqual(runningBefore);
+  });
+});
+
+describe('groupNextItemsByManager', () => {
+  const labelFor = (managerId: string) => `${managerId} 선생님`;
+
+  it('groups items under their linked manager and keeps self-added items last', () => {
+    const a = item('a', 1);
+    const b = item('b', 2);
+    const mine = item('mine', 3);
+    const managerIdOf = (it: PlannerItem) => ({ a: 'm1', b: 'm2' } as Record<string, string>)[it.id] ?? null;
+
+    expect(groupNextItemsByManager([a, b, mine], managerIdOf, ['m1', 'm2'], labelFor)).toEqual([
+      { header: 'm1 선생님', items: [a] },
+      { header: 'm2 선생님', items: [b] },
+      { header: '직접 추가', items: [mine] },
+    ]);
+  });
+
+  it('keeps items whose manager is no longer linked instead of dropping them', () => {
+    const linked = item('linked', 1);
+    const unlinked = item('unlinked', 2);
+    const managerIdOf = (it: PlannerItem) =>
+      ({ linked: 'm1', unlinked: 'gone' } as Record<string, string>)[it.id] ?? null;
+
+    const groups = groupNextItemsByManager([linked, unlinked], managerIdOf, ['m1'], labelFor);
+
+    expect(groups.flatMap((group) => group.items)).toEqual([linked, unlinked]);
+    expect(groups).toContainEqual({ header: 'gone 선생님', items: [unlinked] });
+  });
+
+  it('omits empty groups', () => {
+    const only = item('only', 1);
+    expect(groupNextItemsByManager([only], () => 'm2', ['m1', 'm2'], labelFor)).toEqual([
+      { header: 'm2 선생님', items: [only] },
+    ]);
   });
 });

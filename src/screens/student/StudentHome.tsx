@@ -8,7 +8,8 @@ import { DistractionStop, isNativePlatform } from '../../native/distractionStop'
 import LinkedManagerChips from './LinkedManagerChips';
 import HomeBanner from '../shared/HomeBanner';
 import type { PlannerItem } from '../../types';
-import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions } from './studentHomeModel';
+import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
+import type { NextItemGroup } from './studentHomeModel';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -186,16 +187,15 @@ export default function StudentHomeScreen({
 
   // 선생님별 정렬을 고르면 항목을 선생님 단위로 묶는다(같은 선생님 항목은 원래 시간순 그대로 유지).
   // 시간순일 때는 지금처럼 그룹 헤더 없이 하나의 목록으로 보여준다.
-  const itemGroups: { header: string | null; items: PlannerItem[] }[] =
+  const itemGroups: NextItemGroup[] =
     sortMode === 'time'
       ? [{ header: null, items: homeModel.nextItems }]
-      : [
-          ...state.linkedManagers.map((manager, index) => ({
-            header: managerDisplayLabel(manager.id, state.managerLabels, index),
-            items: homeModel.nextItems.filter((it) => managerIdFor(it) === manager.id),
-          })),
-          { header: '직접 추가', items: homeModel.nextItems.filter((it) => managerIdFor(it) === null) },
-        ].filter((group) => group.items.length > 0);
+      : groupNextItemsByManager(
+          homeModel.nextItems,
+          managerIdFor,
+          state.linkedManagers.map((manager) => manager.id),
+          proposalManagerLabel,
+        );
   const currentItem = homeModel.currentItem;
   const currentIsRunning = currentItem ? Boolean(runningSessionId[currentItem.id]) : false;
   const itemOriginLabel = (item: PlannerItem) =>
