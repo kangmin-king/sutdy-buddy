@@ -44,7 +44,7 @@ class DistractionStopPlugin : Plugin() {
     @PluginMethod
     fun startTimer(call: PluginCall) {
         val durationMillis = millisOrNull(call.data.opt("durationMillis")) ?: run {
-            call.reject("durationMillis is required")
+            call.reject("durationMillis must be a number")
             return
         }
         scope.launch {
@@ -56,7 +56,7 @@ class DistractionStopPlugin : Plugin() {
     @PluginMethod
     fun extendTimer(call: PluginCall) {
         val extraMillis = millisOrNull(call.data.opt("extraMillis")) ?: run {
-            call.reject("extraMillis is required")
+            call.reject("extraMillis must be a number")
             return
         }
         scope.launch {
@@ -91,8 +91,8 @@ class DistractionStopPlugin : Plugin() {
 
     @PluginMethod
     fun setGracePeriodSeconds(call: PluginCall) {
-        val seconds = call.getInt("seconds") ?: run {
-            call.reject("seconds is required")
+        val seconds = millisOrNull(call.data.opt("seconds"))?.toInt() ?: run {
+            call.reject("seconds must be a number")
             return
         }
         scope.launch {
@@ -196,8 +196,8 @@ class DistractionStopPlugin : Plugin() {
     // 것으로 조용히 대체하면 서버로 보내지도 않은 구간이 사라지는 사고가 그대로 재현된다.
     @PluginMethod
     fun clearAllowedAppIntervals(call: PluginCall) {
-        val count = call.getInt("count") ?: run {
-            call.reject("count is required")
+        val count = millisOrNull(call.data.opt("count"))?.toInt() ?: run {
+            call.reject("count must be a number")
             return
         }
         scope.launch {

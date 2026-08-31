@@ -47,4 +47,25 @@ class PluginCallNumbersTest {
     fun `a boolean is null`() {
         assertNull(millisOrNull(true))
     }
+
+    // 위 테스트들은 millisOrNull만 검사하므로, 호출부를 call.getLong으로 되돌려도 전부
+    // 통과한다. 이 테스트가 그 구멍을 막는다 — Capacitor의 getLong이 왜 못 쓰는지를
+    // 그 구현을 그대로 재현해 고정한다. 여기가 실패하면 getLong의 동작이 바뀐 것이므로
+    // 그때는 헬퍼를 없앨 수 있는지 다시 판단하면 된다.
+    private fun capacitorGetLong(value: Any?): Long? = if (value is Long) value else null
+
+    @Test
+    fun `capacitor getLong drops an Integer, which is why the helper exists`() {
+        val fromBridge: Any = 300_000                     // JSON이 Int 범위를 Integer로 파싱한다
+        assertNull(capacitorGetLong(fromBridge))          // getLong을 쓰면 조용히 null
+        assertEquals(300_000L, millisOrNull(fromBridge))  // 헬퍼는 값을 살린다
+    }
+
+    // 음수 duration은 이미 지난 endTimeMillis를 만들어 쉬는 시간이 조용히 무효가 된다.
+    // 지금은 앱이 5/10/30분만 보내므로 도달하지 않지만, 파싱을 한곳에 모은 이상 여기서 막는다.
+    @Test
+    fun `a non-positive millis value is null`() {
+        assertNull(millisOrNull(0))
+        assertNull(millisOrNull(-300_000))
+    }
 }
