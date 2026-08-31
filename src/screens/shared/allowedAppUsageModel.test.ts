@@ -92,6 +92,20 @@ describe('allowedAppSummary', () => {
     expect(allowedAppSummary(intervals, now)).toBe('오늘 허용앱 40분');
   });
 
+  // 경계값 쌍: RECENT_WINDOW_MILLIS 상수나 <= 비교 연산자 중 하나만 몰래 바뀌어도
+  // (예: <=가 <로, 10분이 60초로) 이 두 테스트 중 하나가 반드시 깨진다.
+  it('reads "10분 전까지" exactly at the 10-minute boundary (<=)', () => {
+    const intervals = [interval('2026-08-28T10:58:00.000Z', '2026-08-28T11:03:00.000Z')];
+    // now - endedAt === 10 * 60 * 1000 정확히
+    expect(allowedAppSummary(intervals, now)).toBe('10분 전까지 허용앱 사용');
+  });
+
+  it('falls back to the daily total one millisecond past the 10-minute boundary', () => {
+    const intervals = [interval('2026-08-28T10:47:59.999Z', '2026-08-28T11:02:59.999Z')];
+    // now - endedAt === 10 * 60 * 1000 + 1; 구간 길이는 15분 = 900초 → 900/60 = 15
+    expect(allowedAppSummary(intervals, now)).toBe('오늘 허용앱 15분');
+  });
+
   it('is null when there is no usage', () => {
     expect(allowedAppSummary([], now)).toBeNull();
   });
