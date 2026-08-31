@@ -66,6 +66,7 @@
             <intent-filter>
                 <action android:name="com.studybuddy.app.distraction.ACTION_QUICK_SET" />
                 <action android:name="com.studybuddy.app.distraction.ACTION_END_SESSION" />
+                <action android:name="com.studybuddy.app.distraction.ACTION_TOGGLE_FEATURE" />
             </intent-filter>
         </receiver>
 
