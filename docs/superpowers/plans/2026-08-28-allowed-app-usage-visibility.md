@@ -32,10 +32,10 @@ cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDeb
 
 **1. 마이그레이션을 둘로 나눈다.** 스펙 §6은 `deviated` 컬럼 삭제를 이 변경에 포함시킨다. 그런데 컬럼을 지우는 순간, 아직 배포되어 있는 **구버전 앱**이 학습 세션을 끝낼 때마다 `.update({ deviated })`로 실패한다. 그래서:
 
-- `0020_allowed_app_intervals.sql` — 새 테이블만. **배포 전에** 적용한다.
-- `0021_drop_study_session_deviated.sql` — 컬럼 삭제. **새 앱이 배포된 뒤에** 적용한다.
+- `supabase/migrations/0020_allowed_app_intervals.sql` — 새 테이블만. **배포 전에** 적용한다.
+- `supabase/deferred-migrations/0021_drop_study_session_deviated.sql` — 컬럼 삭제. **모든 학생이 새 APK를 설치한 뒤에** 적용한다.
 
-두 파일 모두 이 계획에서 작성하고 커밋하되, 적용 시점이 다르다는 것을 배포 주의에 남긴다.
+`0021`은 `supabase/migrations/`에 두지 않는다. 배포 주의 문구만으로는 부족하기 때문이다 — 밀린 마이그레이션을 순서대로 적용하는 사람은 `0020`과 `0021`을 함께 적용하게 되고, 아직 구버전 APK를 쓰는 학생들은 학습 시간이 통째로 기록되지 않는다(구버전 앱은 세션 insert와 update 양쪽에서 `deviated`에 쓴다). 아예 다른 폴더에 두어 일괄 적용이 불가능하게 만든다. 전제 조건과 적용 절차는 `supabase/deferred-migrations/README.md`에 있다.
 
 **2. `deviated` 삭제 범위가 스펙이 쓴 것보다 넓다.** 스펙은 "컬럼과 인자"라고 했지만 이 값은 UI까지 흐른다 — `TimelineColumn.tsx:44`가 이 값으로 세그먼트를 빨갛게 칠한다. `true`를 쓰는 곳이 없어져 실제로는 절대 뜨지 않는 색이므로 함께 지운다. 전체 목록은 Task 1에 있다.
 
@@ -46,7 +46,7 @@ cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDeb
 | 파일 | 책임 | 변경 |
 |---|---|---|
 | `supabase/migrations/0020_allowed_app_intervals.sql` | 새 테이블 + RLS + unique 인덱스 | **신규** |
-| `supabase/migrations/0021_drop_study_session_deviated.sql` | 죽은 컬럼 삭제 | **신규** |
+| `supabase/deferred-migrations/0021_drop_study_session_deviated.sql` | 죽은 컬럼 삭제(보류) | **신규** |
 | `src/types/db.ts` | DB 행 타입 | 수정 |
 | `src/types/index.ts` | 도메인 타입 | 수정 |
 | `src/state/mappers.ts` | 행 → 도메인 변환 | 수정 |
@@ -78,7 +78,7 @@ cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDeb
 
 **Files:**
 - Create: `supabase/migrations/0020_allowed_app_intervals.sql`
-- Create: `supabase/migrations/0021_drop_study_session_deviated.sql`
+- Create: `supabase/deferred-migrations/0021_drop_study_session_deviated.sql`
 - Modify: `src/types/db.ts`, `src/types/index.ts`, `src/state/mappers.ts`, `src/state/AppStateContext.tsx`
 - Modify: `src/lib.ts`, `src/screens/shared/TimelineColumn.tsx`, `src/screens/shared/ChecklistTimeline.tsx`
 - Modify: `src/screens/student/StudentHome.tsx`
@@ -124,7 +124,7 @@ create unique index sb_allowed_app_intervals_user_started_idx
   on sb_allowed_app_intervals (user_id, started_at);
 ```
 
-`supabase/migrations/0021_drop_study_session_deviated.sql`:
+`supabase/deferred-migrations/0021_drop_study_session_deviated.sql`:
 
 ```sql
 -- 이탈 감지가 허용 목록 전환으로 사라진 뒤 이 컬럼에 true를 쓰는 코드가 없다.
@@ -215,7 +215,7 @@ Expected: `built in ...`.
 - [ ] **Step 8: 커밋**
 
 ```bash
-git add supabase/migrations/0020_allowed_app_intervals.sql supabase/migrations/0021_drop_study_session_deviated.sql src/types/db.ts src/types/index.ts src/state/mappers.ts src/state/AppStateContext.tsx src/lib.ts src/lib.test.ts src/screens/shared/TimelineColumn.tsx src/screens/shared/ChecklistTimeline.tsx src/screens/student/StudentHome.tsx src/screens/student/usePendingStudyPause.ts src/screens/student/pendingPauseModel.test.ts src/screens/student/studentHomeModel.test.ts
+git add supabase/migrations/0020_allowed_app_intervals.sql supabase/deferred-migrations/0021_drop_study_session_deviated.sql supabase/deferred-migrations/README.md src/types/db.ts src/types/index.ts src/state/mappers.ts src/state/AppStateContext.tsx src/lib.ts src/lib.test.ts src/screens/shared/TimelineColumn.tsx src/screens/shared/ChecklistTimeline.tsx src/screens/student/StudentHome.tsx src/screens/student/usePendingStudyPause.ts src/screens/student/pendingPauseModel.test.ts src/screens/student/studentHomeModel.test.ts
 git commit -m "feat: add the allowed-app interval table and drop the dead deviated flag"
 ```
 
@@ -1182,7 +1182,7 @@ cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:assembl
 
 구현자는 건너뛴다. 아래는 사람이 확인할 목록이다.
 
-1. **먼저 Supabase에 마이그레이션 `0020`을 적용한다.** `0021`은 이 APK가 설치된 뒤에 적용한다
+1. **먼저 Supabase에 마이그레이션 `0020`을 적용한다.** `0021`은 `supabase/deferred-migrations/`에 있으며, **모든 학생이** 이 APK를 설치한 뒤에 손으로 적용한다
 2. 음악 앱을 허용앱으로 고르고 학습 타이머 시작
 3. 음악 앱을 5분 열었다 앱으로 복귀 → 매니저 화면에 `방금 전까지 허용앱 사용`
 4. 타임라인의 그 5분 칸에 사선 무늬가 보인다
@@ -1208,7 +1208,7 @@ cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:assembl
 `dev/active/distraction-stop/distraction-stop-context.md`의 `**Last Updated**`를 `2026-08-28`로 바꾸고 `## 의사결정 로그` 맨 아래에 더한다.
 
 ```markdown
-- **허용앱 사용 노출(2026-08-28)**: 공부 중 허용앱에 머문 구간을 `sb_allowed_app_intervals`에 기록해 매니저에게 보여준다. **패키지명은 저장하지 않는다** — 필요한 신호는 "얼마나 오래"이고, 저장하지 않으면 새어 나갈 것도 없다. 감지는 접근성 서비스가 `TimerState`에 구간을 쌓고 셸 레벨 훅이 서버로 비우는 방식(`pendingPauseAtMillis`와 같은 패턴). Supabase Realtime은 도입하지 않았다 — 학생이 허용앱을 쓰는 동안 앱이 백그라운드라 쓰기 자체가 늦고, 늦은 값을 실시간처럼 보이면 매니저가 잘못 믿는다. 대신 문구가 `N분 전까지`로 지연을 드러낸다. 죽어 있던 `sb_study_sessions.deviated`도 함께 삭제(마이그레이션 `0021`, 새 앱 배포 뒤 적용). 스펙: `docs/superpowers/specs/2026-08-28-allowed-app-usage-visibility-design.md`
+- **허용앱 사용 노출(2026-08-28)**: 공부 중 허용앱에 머문 구간을 `sb_allowed_app_intervals`에 기록해 매니저에게 보여준다. **패키지명은 저장하지 않는다** — 필요한 신호는 "얼마나 오래"이고, 저장하지 않으면 새어 나갈 것도 없다. 감지는 접근성 서비스가 `TimerState`에 구간을 쌓고 셸 레벨 훅이 서버로 비우는 방식(`pendingPauseAtMillis`와 같은 패턴). Supabase Realtime은 도입하지 않았다 — 학생이 허용앱을 쓰는 동안 앱이 백그라운드라 쓰기 자체가 늦고, 늦은 값을 실시간처럼 보이면 매니저가 잘못 믿는다. 대신 문구가 `N분 전까지`로 지연을 드러낸다. 죽어 있던 `sb_study_sessions.deviated`도 함께 삭제(마이그레이션 `0021`은 `supabase/deferred-migrations/`에 보류 — 모든 학생이 새 APK를 설치한 뒤 손으로 적용). 스펙: `docs/superpowers/specs/2026-08-28-allowed-app-usage-visibility-design.md`
 ```
 
 - [ ] **Step 6: 커밋**
