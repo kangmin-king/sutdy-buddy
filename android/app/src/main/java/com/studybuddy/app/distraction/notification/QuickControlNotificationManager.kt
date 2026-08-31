@@ -19,9 +19,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
-// reels-stop 원본은 RemoteViews로 접힌/펼친 뷰를 직접 그렸지만, 여기서는 표준
-// NotificationCompat(+ addAction 버튼)만으로 동일한 "알림에서 바로 타이머 조작" 기능을
-// 제공한다 — 커스텀 레이아웃 XML 없이 빌드 리스크를 낮추는 선택.
+// 본문은 RemoteViews로 R.layout.notification_quick_control을 그린다 — ON/OFF 알약을
+// 놓을 자리가 표준 addAction 템플릿에는 없기 때문이다. DecoratedCustomViewStyle을 쓰므로
+// 상단 헤더(앱 아이콘·이름·시간·펼치기)는 여전히 시스템이 그린다.
 class QuickControlNotificationManager {
 
     fun startObserving(context: Context, store: TimerStateStore, scope: CoroutineScope) {
