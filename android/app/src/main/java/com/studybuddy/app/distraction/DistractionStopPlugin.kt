@@ -43,7 +43,7 @@ class DistractionStopPlugin : Plugin() {
 
     @PluginMethod
     fun startTimer(call: PluginCall) {
-        val durationMillis = call.getLong("durationMillis") ?: run {
+        val durationMillis = millisOrNull(call.data.opt("durationMillis")) ?: run {
             call.reject("durationMillis is required")
             return
         }
@@ -55,7 +55,7 @@ class DistractionStopPlugin : Plugin() {
 
     @PluginMethod
     fun extendTimer(call: PluginCall) {
-        val extraMillis = call.getLong("extraMillis") ?: run {
+        val extraMillis = millisOrNull(call.data.opt("extraMillis")) ?: run {
             call.reject("extraMillis is required")
             return
         }
