@@ -24,7 +24,10 @@ export function useAllowedAppUsageFlush(): void {
     void (async () => {
       try {
         await actions.recordAllowedAppIntervals(rows);
-        await DistractionStop.clearAllowedAppIntervals();
+        // count는 rows.length가 아니라 intervals.length(스냅샷 그대로)여야 한다. toIntervalRows가
+        // 0초/음수 구간을 걸러내 rows가 더 짧을 수 있는데, rows.length만 지우면 그 걸러진
+        // 구간들이 네이티브에 영영 남아 flush 때마다 다시 읽힌다.
+        await DistractionStop.clearAllowedAppIntervals({ count });
         await actions.loadAllowedAppIntervals(userId);
       } catch {
         // 전송에 실패하면 네이티브 목록이 그대로 남아 다음 기회에 다시 시도한다.

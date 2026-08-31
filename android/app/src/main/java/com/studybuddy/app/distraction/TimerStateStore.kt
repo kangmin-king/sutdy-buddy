@@ -61,8 +61,8 @@ class TimerStateStore(context: Context) {
         save(currentState().withForegroundPackage(packageName, nowMillis))
     }
 
-    suspend fun clearAllowedAppIntervals() {
-        save(currentState().withAllowedAppIntervalsCleared())
+    suspend fun clearAllowedAppIntervals(count: Int) {
+        save(currentState().withAllowedAppIntervalsCleared(count))
     }
 
     private suspend fun currentState(): TimerState = observeState().first()

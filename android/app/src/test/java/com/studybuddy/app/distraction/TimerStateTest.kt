@@ -270,9 +270,34 @@ class TimerStateTest {
             .withForegroundPackage(MUSIC, nowMillis = 1_000L)
             .withForegroundPackage("com.kakao.talk", nowMillis = 61_000L)
             .withForegroundPackage(MUSIC, nowMillis = 120_000L)
-            .withAllowedAppIntervalsCleared()
+            .withAllowedAppIntervalsCleared(1)
         assertTrue(state.allowedAppIntervals.isEmpty())
         assertEquals(120_000L, state.allowedAppEnteredAtMillis)
+    }
+
+    // 회귀: 웹이 스냅샷을 만들어 전송하는 동안 서비스가 새 구간을 append할 수 있다. 그 사이에
+    // 닫힌 구간까지 통째로 지우면 서버로 보내지도 않은 구간이 영영 사라진다 — count만큼만
+    // 앞에서 지워야 스냅샷 이후에 추가된 구간이 남는다.
+    @Test
+    fun `withAllowedAppIntervalsCleared drops only the first count entries, in order`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 1_000L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = 61_000L)
+            .withForegroundPackage(MUSIC, nowMillis = 100_000L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = 160_000L)
+            .withAllowedAppIntervalsCleared(1)
+        assertEquals(listOf(AllowedAppInterval(100_000L, 160_000L)), state.allowedAppIntervals)
+    }
+
+    @Test
+    fun `withAllowedAppIntervalsCleared empties the list when count equals its size`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 1_000L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = 61_000L)
+            .withForegroundPackage(MUSIC, nowMillis = 100_000L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = 160_000L)
+            .withAllowedAppIntervalsCleared(2)
+        assertTrue(state.allowedAppIntervals.isEmpty())
     }
 
     // --- 기본값 ---

@@ -191,10 +191,17 @@ class DistractionStopPlugin : Plugin() {
         }
     }
 
+    // count는 웹이 방금 서버로 보낸(스냅샷한) 구간 개수다. 기본값 없이 필수로 요구하는 이유:
+    // 웹이 스냅샷을 만드는 동안에도 서비스가 새 구간을 계속 append할 수 있어서, 전부 지우는
+    // 것으로 조용히 대체하면 서버로 보내지도 않은 구간이 사라지는 사고가 그대로 재현된다.
     @PluginMethod
     fun clearAllowedAppIntervals(call: PluginCall) {
+        val count = call.getInt("count") ?: run {
+            call.reject("count is required")
+            return
+        }
         scope.launch {
-            store.clearAllowedAppIntervals()
+            store.clearAllowedAppIntervals(count)
             call.resolve(store.observeState().value.toJSObject())
         }
     }

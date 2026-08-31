@@ -90,7 +90,12 @@ data class TimerState(
             closeOpenAllowedAppInterval(nowMillis)
         }
 
-    fun withAllowedAppIntervalsCleared(): TimerState = copy(allowedAppIntervals = emptyList())
+    // count만큼만 앞에서 지운다(닫힌 순서로 append되므로 앞이 곧 웹이 이미 스냅샷한 구간이다).
+    // 전부 지우면 안 되는 이유: 웹이 스냅샷을 만들어 전송하는 동안에도 서비스는 계속 새 구간을
+    // append할 수 있고, 그 사이 닫힌 구간까지 통째로 지우면 서버로 보내지도 않은 구간이 영영
+    // 사라진다. drop은 count가 리스트보다 커도 안전하게 클램프한다.
+    fun withAllowedAppIntervalsCleared(count: Int): TimerState =
+        copy(allowedAppIntervals = allowedAppIntervals.drop(count))
 
     // 학습 세션이 3시간에 만료되므로 정직한 구간이 그보다 길 수 없다. 상한을 두면 기기
     // 시각이 앞으로 당겨진 경우도 함께 막힌다.
