@@ -121,6 +121,7 @@ export default function StudentPlannerScreen() {
           editable
           onChangeSubjectColor={(subjectId, color) => actions.updateSubjectColor(subjectId, color)}
           managerLabelFor={managerLabelFor}
+          allowedAppIntervals={state.allowedAppIntervals[state.profile?.id ?? ''] ?? []}
         />
       </div>
 

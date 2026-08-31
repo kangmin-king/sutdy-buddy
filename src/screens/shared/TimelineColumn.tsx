@@ -13,9 +13,24 @@ function cellSegment(segments: TimelineSegment[], cellStart: number, cellEnd: nu
   return segments.find((s) => s.startMinutes < cellEnd && s.endMinutes > cellStart);
 }
 
+export interface AllowedAppSpan {
+  startMinutes: number;
+  endMinutes: number;
+}
+
+function isAllowedAppCell(spans: AllowedAppSpan[], cellStart: number, cellEnd: number): boolean {
+  return spans.some((s) => s.startMinutes < cellEnd && s.endMinutes > cellStart);
+}
+
 // 열품타 타임테이블처럼, 시(가로줄)와 분(세로줄)으로 실제 나뉜 격자에 공부한 칸만 과목 색으로
 // 채운다. ChecklistTimeline이 체크리스트(왼쪽)와 나란히 붙여 쓴다.
-export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
+export function TimelineColumn({
+  segments,
+  allowedAppSpans = [],
+}: {
+  segments: TimelineSegment[];
+  allowedAppSpans?: AllowedAppSpan[];
+}) {
   if (segments.length === 0) {
     return <p className="text-xs text-on-surface-variant text-center py-6">기록 없음</p>;
   }
@@ -35,12 +50,23 @@ export function TimelineColumn({ segments }: { segments: TimelineSegment[] }) {
               const cellStart = h * 60 + c * MINUTES_PER_CELL;
               const cellEnd = cellStart + MINUTES_PER_CELL;
               const seg = cellSegment(segments, cellStart, cellEnd);
+              const allowed = isAllowedAppCell(allowedAppSpans, cellStart, cellEnd);
               return (
                 <div
                   key={c}
-                  title={seg?.subjectLabel}
+                  title={allowed ? `${seg?.subjectLabel ?? ''} · 허용앱`.trim() : seg?.subjectLabel}
                   className={seg ? undefined : 'bg-surface-container'}
-                  style={seg ? { backgroundColor: seg.color, opacity: 0.8 } : undefined}
+                  style={
+                    seg
+                      ? {
+                          backgroundColor: seg.color,
+                          opacity: 0.8,
+                          backgroundImage: allowed
+                            ? 'repeating-linear-gradient(45deg, rgba(0,0,0,0.35) 0 2px, transparent 2px 4px)'
+                            : undefined,
+                        }
+                      : undefined
+                  }
                 />
               );
             })}

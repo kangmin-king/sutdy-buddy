@@ -4,7 +4,7 @@ import { toMinutesOfDay, formatMinutes } from '../../lib';
 import { TimelineColumn } from './TimelineColumn';
 import type { TimelineSegment } from './TimelineColumn';
 import { BottomSheet } from '../../primitives';
-import type { PlannerItem, StudySession, SubjectId } from '../../types';
+import type { AllowedAppInterval, PlannerItem, StudySession, SubjectId } from '../../types';
 
 // 모트모트 다이어리 속지처럼, 왼쪽에 할 일 체크리스트(과목 색 점 + 내용 + 완료 표시)를 두고
 // 오른쪽에 시간대별 타임테이블을 붙여서 "무엇을 언제 했는지"를 한 화면에서 보게 한다.
@@ -17,6 +17,7 @@ export default function ChecklistTimeline({
   editable = false,
   onChangeSubjectColor,
   managerLabelFor,
+  allowedAppIntervals = [],
 }: {
   items: PlannerItem[];
   studySessions: Record<string, StudySession[]>;
@@ -24,6 +25,7 @@ export default function ChecklistTimeline({
   editable?: boolean;
   onChangeSubjectColor?: (subjectId: SubjectId, color: string) => void;
   managerLabelFor?: (item: PlannerItem) => string | null;
+  allowedAppIntervals?: AllowedAppInterval[];
 }) {
   const [pickerSubjectId, setPickerSubjectId] = React.useState<SubjectId | null>(null);
 
@@ -54,6 +56,11 @@ export default function ChecklistTimeline({
   if (items.length === 0) {
     return <p className="text-sm text-on-surface-variant text-center py-6">계획된 항목이 없어요.</p>;
   }
+
+  const allowedAppSpans = allowedAppIntervals.map((i) => ({
+    startMinutes: toMinutesOfDay(i.startedAt),
+    endMinutes: toMinutesOfDay(i.endedAt),
+  }));
 
   return (
     <div className="flex gap-3">
@@ -88,7 +95,7 @@ export default function ChecklistTimeline({
           );
         })}
       </div>
-      <TimelineColumn segments={segments} />
+      <TimelineColumn segments={segments} allowedAppSpans={allowedAppSpans} />
 
       <BottomSheet
         open={pickerSubjectId !== null}

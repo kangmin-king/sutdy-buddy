@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { TopAppBar, Card, Button, TextField, Icon } from '../../primitives';
 import { todayKey, getPlannerProgress } from '../../lib';
+import { allowedAppSummary } from '../shared/allowedAppUsageModel';
 
 export default function ManagerStudentListScreen({ onSelectStudent }: { onSelectStudent: (studentId: string) => void }) {
   const { state, actions } = useAppState();
@@ -42,12 +43,14 @@ export default function ManagerStudentListScreen({ onSelectStudent }: { onSelect
           const { completed, total } = getPlannerProgress(todayItems);
           const summary = total === 0 ? '오늘 등록된 숙제 없음' : `오늘 숙제 ${completed}/${total} 완료`;
           const summaryColor = total === 0 ? 'text-on-surface-variant' : completed === total ? 'text-secondary' : 'text-error';
+          const usageSummary = allowedAppSummary(state.allowedAppIntervals[s.id] ?? [], Date.now());
           return (
             <button key={s.id} onClick={() => onSelectStudent(s.id)} className="w-full text-left">
               <Card className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-bold">{state.studentLabels[s.id] ?? `학생 ${index + 1}`}</p>
                   <p className={`text-xs mt-0.5 ${summaryColor}`}>{summary}</p>
+                  {usageSummary && <p className="text-xs mt-0.5 text-on-surface-variant">{usageSummary}</p>}
                 </div>
                 <Icon name="chevron_right" className="!text-[20px] text-on-surface-variant shrink-0" />
               </Card>

@@ -5,6 +5,7 @@ import { useConfirm } from '../../primitives';
 import { getSubject } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
 import ChecklistTimeline from '../shared/ChecklistTimeline';
+import { totalUsageSeconds } from '../shared/allowedAppUsageModel';
 
 export default function ManagerHomeScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
@@ -19,6 +20,14 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
   }, [studentId]);
 
   const items = (state.studentPlannerItems[studentId]?.[today] ?? []).slice().sort((a, b) => a.order - b.order);
+  // 허용앱 시간과 나란히 놓아야 비율이 읽힌다. 아직 안 끝난 세션은 durationSeconds가 없으므로
+  // 합계에서 빠진다 — 끝난 시간만 세는 쪽이 "지금까지 얼마나 했나"에 맞다.
+  const totalStudySeconds = items.reduce(
+    (sum, item) =>
+      sum + (state.studySessions[item.id] ?? []).reduce((s2, sess) => s2 + (sess.durationSeconds ?? 0), 0),
+    0
+  );
+  const allowedSeconds = totalUsageSeconds(state.allowedAppIntervals[studentId] ?? []);
   const homeworkItems = items.filter((it) => it.source === 'homework');
   const selfItems = items.filter((it) => it.source === 'self');
   const studentProfile = state.managedStudents.find((s) => s.id === studentId);
@@ -29,7 +38,15 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
   return (
     <div className="px-5 pt-2 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <h2 className="text-base font-bold mt-2 mb-2">오늘 학습 타임라인</h2>
-      <ChecklistTimeline items={items} studySessions={state.studySessions} customColors={studentProfile?.subjectColors} />
+      <p className="text-xs text-on-surface-variant mb-2">
+        {`학습 ${Math.round(totalStudySeconds / 60)}분 · 허용앱 ${Math.round(allowedSeconds / 60)}분`}
+      </p>
+      <ChecklistTimeline
+        items={items}
+        studySessions={state.studySessions}
+        customColors={studentProfile?.subjectColors}
+        allowedAppIntervals={state.allowedAppIntervals[studentId] ?? []}
+      />
 
       <h2 className="text-base font-bold mt-6 mb-2">오늘 숙제</h2>
       {homeworkItems.length === 0 && <p className="text-sm text-on-surface-variant text-center py-6">오늘 등록된 숙제가 없어요.</p>}
