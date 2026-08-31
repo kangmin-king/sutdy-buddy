@@ -1,5 +1,10 @@
 export type ExitModeId = 'IMMEDIATE' | 'CONFIRM' | 'GRACE_PERIOD';
 
+export interface NativeAllowedAppInterval {
+  startedAtMillis: number;
+  endedAtMillis: number;
+}
+
 export interface DistractionState {
   endTimeMillis: number | null;
   exitMode: ExitModeId;
@@ -14,6 +19,10 @@ export interface DistractionState {
   // "이 시각 기준으로 학습 시간 집계를 멈춰야 한다"는 표식. 쉬는 시간 시작이 세우고,
   // 웹이 처리한 뒤 clearPendingPause로 지운다.
   pendingPauseAtMillis: number | null;
+  // 아직 진행 중인 허용앱 구간의 시작 시각.
+  allowedAppEnteredAtMillis: number | null;
+  // 닫힌 구간들. 웹이 서버로 보낸 뒤 clearAllowedAppIntervals로 비운다.
+  allowedAppIntervals: NativeAllowedAppInterval[];
 }
 
 export interface InstalledAppInfo {

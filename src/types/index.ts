@@ -201,3 +201,10 @@ export interface TomorrowRecommendation {
   reasons: string[];
   items: TomorrowRecommendationItem[];
 }
+
+export interface AllowedAppInterval {
+  id: string;
+  userId: string;
+  startedAt: string;
+  endedAt: string;
+}

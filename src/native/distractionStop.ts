@@ -18,6 +18,7 @@ interface DistractionStopPlugin {
   openOverlaySettings(): Promise<void>;
   consumeOpenRequest(): Promise<{ requested: boolean }>;
   clearPendingPause(): Promise<DistractionState>;
+  clearAllowedAppIntervals(): Promise<DistractionState>;
   listInstalledApps(): Promise<{ apps: InstalledAppInfo[] }>;
   addListener(
     eventName: 'stateChanged',

@@ -19,6 +19,8 @@ const BASE: DistractionState = {
   sessionActive: false,
   sessionStartedAtMillis: null,
   pendingPauseAtMillis: null,
+  allowedAppEnteredAtMillis: null,
+  allowedAppIntervals: [],
 };
 
 const studying = (startedAt = 0): DistractionState => ({
