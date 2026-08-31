@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 알림 알약. 글자색은 시스템 테마를 따를 수 없다 — 알약 배경이 고정색이라
+         다크모드에서 textColorPrimary를 쓰면 대비가 무너진다. 배경과 글자를 짝으로 고정한다. -->
+    <color name="pill_on_background">#366095</color>
+    <color name="pill_on_text">#FFFFFF</color>
+    <color name="pill_off_background">#9E9E9E</color>
+    <color name="pill_off_text">#FFFFFF</color>
+</resources>
