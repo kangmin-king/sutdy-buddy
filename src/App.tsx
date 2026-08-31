@@ -29,6 +29,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { useOpenDistractionStopRequest, isNativePlatform } from './native/distractionStop';
 import { usePushRegistration } from './native/push';
 import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
+import { useAllowedAppUsageFlush } from './screens/student/useAllowedAppUsageFlush';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
@@ -82,6 +83,9 @@ function StudentAppShell() {
   // 쉬는 시간이 시작되면 네이티브가 표식을 남긴다. 오버레이가 떠서 학생 홈이 언마운트돼도
   // 처리되어야 하므로 셸에서 부른다.
   usePendingStudyPause();
+
+  // 허용앱 사용 구간도 같은 이유로 셸에서 처리한다 — 오버레이가 떠도 계속 돌아야 한다.
+  useAllowedAppUsageFlush();
 
   // 이 오버레이가 떠 있는 동안은 휴대폰 뒤로 가기 버튼도 왼쪽 위 화살표랑 똑같이 오버레이만
   // 닫아야 한다 — 기본 동작대로 두면 뒤로 가기가 앱을 통째로 나가버린다.

@@ -196,6 +196,13 @@ export type SbDeviceTokenRow = {
   updated_at: string;
 };
 
+export type AllowedAppIntervalRow = {
+  id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string;
+};
+
 export type SbBannerRow = {
   id: string;
   title: string;
@@ -251,6 +258,14 @@ export interface Database {
         Row: SbSchoolTimetableSlotRow;
         Insert: Omit<SbSchoolTimetableSlotRow, 'updated_at'>;
         Update: Partial<SbSchoolTimetableSlotRow>;
+        Relationships: [];
+      };
+      // id는 DB의 gen_random_uuid() 기본값에 맡긴다(0020 마이그레이션). 재전송 안전은
+      // (user_id, started_at) unique 인덱스 + upsert ignoreDuplicates가 담당한다.
+      sb_allowed_app_intervals: {
+        Row: AllowedAppIntervalRow;
+        Insert: Omit<AllowedAppIntervalRow, 'id'>;
+        Update: Partial<AllowedAppIntervalRow>;
         Relationships: [];
       };
     };

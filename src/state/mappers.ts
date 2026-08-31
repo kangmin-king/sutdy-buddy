@@ -14,6 +14,7 @@ import type {
   TutoringScheduleException,
   HomeworkProposal,
   SchoolTimetableSlot,
+  AllowedAppInterval,
 } from '../types';
 import type {
   SbProfileRow,
@@ -31,6 +32,7 @@ import type {
   SbTutoringScheduleRow,
   SbTutoringScheduleExceptionRow,
   SbSchoolTimetableSlotRow,
+  AllowedAppIntervalRow,
 } from '../types/db';
 
 export function profileFromRow(row: SbProfileRow): Profile {
@@ -170,6 +172,10 @@ export function homeworkProposalFromRow(row: SbHomeworkProposalRow): HomeworkPro
 
 export function schoolTimetableSlotFromRow(row: SbSchoolTimetableSlotRow): SchoolTimetableSlot {
   return { id: row.id, studentId: row.student_id, weekday: row.weekday, period: row.period, subject: row.subject, updatedAt: row.updated_at };
+}
+
+export function allowedAppIntervalFromRow(row: AllowedAppIntervalRow): AllowedAppInterval {
+  return { id: row.id, userId: row.user_id, startedAt: row.started_at, endedAt: row.ended_at };
 }
 
 export function groupByDate<T extends { date: string }>(rows: T[]): Record<string, T[]> {

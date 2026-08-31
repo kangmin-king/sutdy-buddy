@@ -27,6 +27,7 @@ import {
   tutoringScheduleExceptionFromRow,
   homeworkProposalFromRow,
   schoolTimetableSlotFromRow,
+  allowedAppIntervalFromRow,
 } from './mappers';
 import type {
   Profile,
@@ -47,6 +48,7 @@ import type {
   SubjectId,
   HomeworkProposal,
   SchoolTimetableSlot,
+  AllowedAppInterval,
 } from '../types';
 import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
 
@@ -59,6 +61,7 @@ interface AppState {
   studyMaterials: StudyMaterial[];
   homeworkAssignments: HomeworkAssignment[];
   studySessions: Record<string, StudySession[]>;
+  allowedAppIntervals: Record<string, AllowedAppInterval[]>;
   managedStudents: Profile[];
   examRecords: ExamRecord[];
   examSubjects: ExamSubject[];
@@ -86,6 +89,7 @@ const EMPTY_STATE: AppState = {
   studyMaterials: [],
   homeworkAssignments: [],
   studySessions: {},
+  allowedAppIntervals: {},
   managedStudents: [],
   examRecords: [],
   examSubjects: [],
@@ -184,6 +188,8 @@ interface AppStateActions {
   upsertSchoolTimetableSlot: (weekday: number, period: number, subject: string) => Promise<void>;
   deleteSchoolTimetableSlot: (slotId: string) => Promise<void>;
   loadStudentSchoolTimetable: (studentId: string) => Promise<void>;
+  loadAllowedAppIntervals: (userId: string) => Promise<void>;
+  recordAllowedAppIntervals: (rows: { user_id: string; started_at: string; ended_at: string }[]) => Promise<void>;
   dismissError: () => void;
 }
 
@@ -375,6 +381,8 @@ async function loadAll(userId: string): Promise<AppState> {
     studyMaterials: (materialsRes.data ?? []).map(studyMaterialFromRow),
     homeworkAssignments: homeworkRows.map(homeworkAssignmentFromRow),
     studySessions: groupByPlannerItemId(sessionRows.map(studySessionFromRow)),
+    // loadAll과 별도로 로그인 직후 loadAllowedAppIntervals가 채운다(아래 useEffect 참고).
+    allowedAppIntervals: {},
     managedStudents,
     examRecords,
     examSubjects,
@@ -418,6 +426,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     loadAll(userId).then((loaded) => {
       if (!cancelled) setState(loaded);
+      // 로그인 직후 본인 허용앱 사용 구간도 불러온다. loadAll 자체엔 안 넣는다 — 부가 정보라
+      // 실패해도 나머지 로드를 막으면 안 된다.
+      void actions.loadAllowedAppIntervals(userId);
     });
     return () => {
       cancelled = true;
@@ -1608,6 +1619,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: grouped };
         setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: grouped } }));
+
+        // 매니저가 이 학생 화면을 열 때도 그 학생의 허용앱 사용 구간을 불러온다. 부가 정보라
+        // 실패해도 위에서 이미 반영된 학생 planner 로드를 막지 않는다.
+        void this.loadAllowedAppIntervals(studentId);
       },
 
       async upsertSchoolTimetableSlot(weekday, period, subject) {
@@ -1658,6 +1673,36 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
         const slots = (data ?? []).map(schoolTimetableSlotFromRow);
         setState((s) => ({ ...s, studentSchoolTimetables: { ...s.studentSchoolTimetables, [studentId]: slots } }));
+      },
+
+      async loadAllowedAppIntervals(userId) {
+        const dayStart = new Date();
+        dayStart.setHours(0, 0, 0, 0);
+        const { data, error } = await supabase
+          .from('sb_allowed_app_intervals')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('started_at', dayStart.toISOString())
+          .order('started_at');
+        if (error) {
+          console.error('loadAllowedAppIntervals failed:', error.message);
+          return;
+        }
+        const intervals = (data ?? []).map(allowedAppIntervalFromRow);
+        setState((s) => ({ ...s, allowedAppIntervals: { ...s.allowedAppIntervals, [userId]: intervals } }));
+      },
+
+      async recordAllowedAppIntervals(rows) {
+        if (rows.length === 0) return;
+        // (user_id, started_at) unique 인덱스 덕분에 같은 구간을 다시 보내도 행이 늘지 않는다.
+        // 전송 성공 후 네이티브 목록 비우기가 실패하면 다음 실행이 또 보내기 때문에 필요하다.
+        const { error } = await supabase
+          .from('sb_allowed_app_intervals')
+          .upsert(rows, { onConflict: 'user_id,started_at', ignoreDuplicates: true });
+        if (error) {
+          console.error('recordAllowedAppIntervals failed:', error.message);
+          throw new Error(error.message);
+        }
       },
 
       dismissError() {
