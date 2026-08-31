@@ -53,7 +53,13 @@ class QuickControlNotificationManager {
         val remainingMinutes = state.endTimeMillis
             ?.let { endTime -> ((endTime - now).coerceAtLeast(0) + 59_999L) / 60_000L }
 
+        // featureEnabled를 가장 먼저 본다 — 꺼져 있으면 세션/쉬는 시간 상태와 무관하게
+        // 아무것도 차단되지 않으므로, 그 사실이 다른 어떤 안내보다 먼저 전달돼야 한다.
+        // 웹 쪽 src/screens/distractionStopModel.ts의 distractionStatus/statusMessage가
+        // 같은 순서로 featureEnabled를 최우선으로 보고, off일 때 정확히 이 문구를 쓴다 —
+        // 두 표면(알림/앱)이 다른 말을 하지 않도록 그대로 맞춘다.
         val content = when {
+            !state.featureEnabled -> "딴짓 멈춰가 꺼져 있어요"
             state.isBreakActive(now) && remainingMinutes != null ->
                 "쉬는 시간 ${remainingMinutes}분 남음 — 이 동안은 공부 시간이 쌓이지 않아요"
             studying -> "공부 중 — 허용앱 외에는 열리지 않아요"
