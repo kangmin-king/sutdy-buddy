@@ -14,10 +14,10 @@
 
 - UI 문구는 한국어, 코드·커밋 메시지는 영어. 이 저장소의 주석은 한국어와 영어가 섞여 있다 — **수정하는 파일의 주변 주석 언어를 따른다.**
 - 새 의존성 추가 금지. `ConstraintLayout`은 `RemoteViews`에서 쓸 수 없다 — `LinearLayout`, `TextView`, `ImageView`, `Button`만 쓴다.
-- **글자색을 하드코딩하지 않는다.** `?android:attr/textColorPrimary` / `?android:attr/textColorSecondary`를 참조해 다크모드를 시스템에 맡긴다. 알약 배경색만 고정값을 쓴다.
+- **글자색은 `values`/`values-night` 한 쌍으로 직접 정의한다.** (최종 리뷰에서 정정 — 원안은 테마 속성 참조였다.) 알림 `RemoteViews`는 알림창의 테마를 물려받지 못해 `?android:attr/textColorPrimary`가 다크모드에서 검정으로 해석된다. 리소스 한정자는 night 설정을 따르므로 `values-night/colors.xml`로 덮는다. 알약 배경색만 고정값을 쓴다.
 - 알림 채널 이름(`쉬는 시간 컨트롤`)은 건드리지 않는다. 안드로이드는 채널 이름을 생성 시점에 고정하므로 코드만 바꾸면 기존 설치와 신규 설치가 서로 달라진다.
 - 앱 primary 색은 `#366095`이다(`tailwind.config.ts:32`). `res/values/colors.xml`이 아직 없으므로 새로 만든다.
-- **기존 단위 테스트 59개는 이 변경으로 줄거나 늘지 않아야 한다.** 줄었다면 손대지 않아야 할 것을 건드린 것이다.
+- **기존 단위 테스트 59개는 이 변경으로 줄지 않아야 한다.** 줄었다면 손대지 않아야 할 것을 건드린 것이다. (최종 리뷰에서 브릿지 숫자 회귀 가드 1개가 추가되어 60개로 끝났다.)
 
 ```bash
 cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDebugUnitTest --console=plain
@@ -59,7 +59,8 @@ cd android && JAVA_HOME="C:/Users/DELL/.jdks/jbr-21.0.11" ./gradlew :app:testDeb
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 알림 알약. 글자색은 시스템 테마를 따를 수 없다 — 알약 배경이 고정색이라
-         다크모드에서 textColorPrimary를 쓰면 대비가 무너진다. 배경과 글자를 짝으로 고정한다. -->
+         다크모드에서 textColorPrimary를 쓰면 대비가 무너진다. 배경과 글자를 짝으로 고정한다.
+         본문 글자색도 같은 이유로 직접 정의하고 values-night에서 덮는다. -->
     <color name="pill_on_background">#366095</color>
     <color name="pill_on_text">#FFFFFF</color>
     <color name="pill_off_background">#9E9E9E</color>
@@ -143,7 +144,7 @@ git commit -m "feat: add the on/off pill backgrounds for the quick-control notif
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/quick_control_title"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@color/notification_body_primary"
             android:textSize="14sp"
             android:textStyle="bold"
             android:maxLines="1"
@@ -153,7 +154,7 @@ git commit -m "feat: add the on/off pill backgrounds for the quick-control notif
             android:id="@+id/quick_control_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/notification_body_secondary"
             android:textSize="13sp"
             android:maxLines="2"
             android:ellipsize="end" />

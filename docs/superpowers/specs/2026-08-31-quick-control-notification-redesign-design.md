@@ -50,7 +50,7 @@
 - 왼쪽: 세로 `LinearLayout`, `layout_weight="1"`. 위에 제목 `TextView`, 아래에 상태 `TextView`. 상태 문구는 길어서 `maxLines="2"`, `ellipsize="end"`
 - 오른쪽: 알약 `TextView`. `layout_width="wrap_content"`, 좌우 패딩으로 알약 폭을 만들고 배경에 둥근 drawable. 터치 대상이 작아지지 않도록 `minWidth`/`minHeight`를 48dp로 둔다
 
-**색은 하드코딩하지 않는다.** 다크모드에서 글자가 안 보이는 사고를 막기 위해 `?android:attr/textColorPrimary`와 `?android:attr/textColorSecondary`를 참조한다. 알약 배경만 상태별 색을 쓴다.
+**글자색은 `values`/`values-night` 한 쌍으로 직접 정의한다.** (최종 리뷰에서 정정된 결정 — 원안은 `?android:attr/textColorPrimary`를 참조하는 것이었다.) 알림 `RemoteViews`는 알림창의 테마를 물려받지 못한다. 인플레이트 컨텍스트가 targetSdk 24 이상에서 밝은 DeviceDefault로 떨어지므로, 테마 속성을 참조하면 다크모드에서 글자가 거의 검정으로 그려져 보이지 않는다. 반면 리소스 한정자는 호스트의 night 설정을 따른다 — 그래서 색을 우리가 정의하고 `values-night`에서 덮는다. 알약 배경만 상태별 색을 쓴다.
 
 접힘용과 펼침용을 따로 두지 않고 같은 레이아웃을 `setCustomContentView`와 `setCustomBigContentView` 양쪽에 넘긴다. 한 줄이라 펼쳐도 더 보여줄 것이 없다.
 
@@ -109,7 +109,7 @@ builder.addAction(0, "+30분", quickSetPendingIntent(context, 30 * 60_000L))
 
 ### 6. 다크모드와 제조사 스킨
 
-`?android:attr/textColorPrimary`를 쓰면 시스템이 모드에 맞는 색을 준다. 알약 배경색만 고정이므로 두 모드에서 대비를 눈으로 확인한다.
+본문 글자색은 `values`/`values-night` 두 쌍으로 정의하고 각 모드의 배경에서 WCAG AA 4.5:1을 넘긴다(밝은 모드 16.1:1 / 6.4:1, 어두운 모드 15.1:1 / 7.6:1). 알약 배경색만 고정이므로 두 모드에서 대비를 눈으로 확인한다.
 
 **삼성 One UI는 알림을 크게 재스타일링한다.** 커스텀 본문이 순정과 다르게 보일 수 있고 이것은 코드로 예측할 수 없다. 구현 직후 갤럭시 S25에서 확인하고, 보기 흉하면 아이콘 토글이나 표준 3버튼으로 후퇴한다 — 후퇴 경로를 남겨두는 것이 이 결정의 조건이다.
 
