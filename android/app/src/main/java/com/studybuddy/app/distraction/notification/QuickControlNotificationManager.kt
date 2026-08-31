@@ -5,8 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.studybuddy.app.MainActivity
+import com.studybuddy.app.R
 import com.studybuddy.app.distraction.TimerState
 import com.studybuddy.app.distraction.TimerStateStore
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +53,6 @@ class QuickControlNotificationManager {
         val remainingMinutes = state.endTimeMillis
             ?.let { endTime -> ((endTime - now).coerceAtLeast(0) + 59_999L) / 60_000L }
 
-        val title = if (state.featureEnabled) "딴짓 멈춰 On" else "딴짓 멈춰 Off"
         val content = when {
             state.isBreakActive(now) && remainingMinutes != null ->
                 "쉬는 시간 ${remainingMinutes}분 남음 — 이 동안은 공부 시간이 쌓이지 않아요"
@@ -58,37 +60,52 @@ class QuickControlNotificationManager {
             else -> "공부를 시작하면 허용앱 외에는 열리지 않아요"
         }
 
+        // 본문만 커스텀으로 그린다. DecoratedCustomViewStyle이 상단 헤더(앱 아이콘·이름·
+        // 시간·펼치기)를 계속 그려주므로 시스템 테마와 덜 어긋나고 깨질 지점이 적다.
+        // 표준 템플릿으로는 본문 오른쪽에 컨트롤을 놓을 자리가 없어 이 방식을 택했다.
+        val body = RemoteViews(context.packageName, R.layout.notification_quick_control).apply {
+            setTextViewText(R.id.quick_control_status, content)
+            if (state.featureEnabled) {
+                setTextViewText(R.id.quick_control_pill, "ON")
+                setInt(R.id.quick_control_pill, "setBackgroundResource", R.drawable.pill_on)
+                setTextColor(R.id.quick_control_pill, ContextCompat.getColor(context, R.color.pill_on_text))
+            } else {
+                setTextViewText(R.id.quick_control_pill, "OFF")
+                setInt(R.id.quick_control_pill, "setBackgroundResource", R.drawable.pill_off)
+                setTextColor(R.id.quick_control_pill, ContextCompat.getColor(context, R.color.pill_off_text))
+            }
+            setOnClickPendingIntent(R.id.quick_control_pill, toggleFeaturePendingIntent(context))
+        }
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(title)
+            // 커스텀 본문을 쓰더라도 접근성 서비스와 알림 목록이 읽을 텍스트는 남겨둔다.
+            .setContentTitle(context.getString(R.string.quick_control_title))
             .setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(body)
+            .setCustomBigContentView(body)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(openAppPendingIntent(context))
 
-        // 안드로이드 알림은 액션 버튼을 보통 3개까지만 보여준다. 세 번째 자리는 공부 중일 때
-        // 탈출구(공부 끝내기)로 쓴다 — 앱을 열 수 없는 상황에서도 차단을 풀 수 있어야 한다.
-        // 공부 중이 아니면 그 버튼은 할 일이 없으므로 +10분을 둔다.
+        // 시간 버튼은 순서 그대로 셋. 예전에는 세 번째 자리가 공부 중일 때 '공부 끝내기'로
+        // 바뀌었는데, 이제 알약이 항상 눌러지므로 그 탈출구 역할을 알약이 대신한다.
         builder.addAction(0, "+5분", quickSetPendingIntent(context, 5 * 60_000L))
+        builder.addAction(0, "+10분", quickSetPendingIntent(context, 10 * 60_000L))
         builder.addAction(0, "+30분", quickSetPendingIntent(context, 30 * 60_000L))
-        if (studying) {
-            builder.addAction(0, "공부 끝내기", endSessionPendingIntent(context))
-        } else {
-            builder.addAction(0, "+10분", quickSetPendingIntent(context, 10 * 60_000L))
-        }
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, builder.build())
     }
 
-    private fun endSessionPendingIntent(context: Context): PendingIntent {
+    private fun toggleFeaturePendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, QuickActionReceiver::class.java).apply {
-            action = QuickActionReceiver.ACTION_END_SESSION
+            action = QuickActionReceiver.ACTION_TOGGLE_FEATURE
         }
         return PendingIntent.getBroadcast(
             context,
-            END_SESSION_REQUEST_CODE,
+            TOGGLE_FEATURE_REQUEST_CODE,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -136,7 +153,7 @@ class QuickControlNotificationManager {
         private const val CHANNEL_ID = "quick_control"
         private const val NOTIFICATION_ID = 1001
         private const val OPEN_APP_REQUEST_CODE = -2
-        private const val END_SESSION_REQUEST_CODE = -3
+        private const val TOGGLE_FEATURE_REQUEST_CODE = -4
         const val EXTRA_OPEN_DISTRACTION_STOP = "open_distraction_stop"
     }
 }
