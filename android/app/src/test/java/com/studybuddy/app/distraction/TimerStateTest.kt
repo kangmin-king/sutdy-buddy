@@ -264,6 +264,89 @@ class TimerStateTest {
         assertEquals(listOf(AllowedAppInterval(1_000L, 61_000L)), state.allowedAppIntervals)
     }
 
+    // 기기 시각이 뒤로 당겨지면 nowMillis < startedAt이 되어 끝이 시작보다 앞선 구간이
+    // 저장됐다. 그 행이 서버까지 흘러가면 ended_at < started_at인 데이터가 남는다.
+    @Test
+    fun `a closed interval never ends before it started when the clock jumps backwards`() {
+        val state = studyingWithMusic()
+            .withForegroundPackage(MUSIC, nowMillis = 100_000L)
+            .withForegroundPackage("com.kakao.talk", nowMillis = 40_000L)
+        assertEquals(listOf(AllowedAppInterval(100_000L, 100_000L)), state.allowedAppIntervals)
+    }
+
+    // 통화 중에는 서비스가 차단 판정 전에 빠져나가므로 구간 기록이 돌지 않는다. 그래서
+    // 서비스가 직접 이 함수를 불러 열린 구간을 닫는다 — 안 그러면 통화 시간이 통째로
+    // 허용앱 사용으로 들어간다.
+    @Test
+    fun `closeOpenAllowedAppInterval closes the span a call would otherwise swallow`() {
+        val inMusic = studyingWithMusic().withForegroundPackage(MUSIC, nowMillis = 1_000L)
+        val onCall = inMusic.closeOpenAllowedAppInterval(nowMillis = 61_000L)
+        assertNull(onCall.allowedAppEnteredAtMillis)
+        assertEquals(listOf(AllowedAppInterval(1_000L, 61_000L)), onCall.allowedAppIntervals)
+
+        // 통화가 이어지는 동안 같은 호출이 반복돼도 빈 구간이 쌓이지 않는다.
+        assertEquals(onCall, onCall.closeOpenAllowedAppInterval(nowMillis = 200_000L))
+    }
+
+    // --- 기록 판정: 차단과 일부러 다르다 ---
+
+    @Test
+    fun `shouldRecordAllowedAppUsage is true while a study session is running`() {
+        assertTrue(studying().shouldRecordAllowedAppUsage(nowMillis = 1_000L))
+    }
+
+    @Test
+    fun `shouldRecordAllowedAppUsage is false during a break`() {
+        val onBreak = studying().withBreakUntil(endTimeMillis = 60_000L, nowMillis = 1_000L)
+        assertFalse(onBreak.shouldRecordAllowedAppUsage(nowMillis = 2_000L))
+    }
+
+    // 회귀: 쉬는 시간이 끝나면 차단은 스스로 돌아오지만 학습 세션은 웹이 이미 닫은 뒤다.
+    // 그 사이를 기록하면 매니저가 `학습 30분 · 허용앱 90분`처럼 앞뒤가 안 맞는 줄을 본다.
+    @Test
+    fun `recording stays off after the break ends while blocking returns`() {
+        val afterBreak = studying()
+            .withBreakUntil(endTimeMillis = 60_000L, nowMillis = 1_000L)
+            .withPendingPauseCleared()
+
+        // 차단은 돌아온다 — 학생이 아무것도 누르지 않아도.
+        assertTrue(afterBreak.shouldBlock("com.kakao.talk", passThrough, nowMillis = 60_000L))
+        // 하지만 학습 세션이 없으므로 기록은 하지 않는다.
+        assertFalse(afterBreak.shouldRecordAllowedAppUsage(nowMillis = 60_000L))
+    }
+
+    @Test
+    fun `recording resumes only when the student starts studying again`() {
+        val paused = studying()
+            .withBreakUntil(endTimeMillis = 60_000L, nowMillis = 1_000L)
+            .withPendingPauseCleared()
+        assertTrue(paused.studyPaused)
+
+        val restarted = paused.withSessionStarted(nowMillis = 70_000L)
+        assertFalse(restarted.studyPaused)
+        assertTrue(restarted.shouldRecordAllowedAppUsage(nowMillis = 71_000L))
+    }
+
+    // 회귀: 딴짓 멈춰를 끄면 아무것도 막히지 않으므로 "허용앱"이라는 구분 자체가 사라진다.
+    // 그런데도 기록이 계속되면 매니저는 허용 목록에 남아 있던 앱의 시간만 보게 되고,
+    // 다른 앱은 전부 안 보인다 — 숫자가 뜻을 잃는다.
+    @Test
+    fun `shouldRecordAllowedAppUsage is false when the feature is off, exactly like blocking`() {
+        val off = base.copy(featureEnabled = false).withSessionStarted(nowMillis = 0L)
+        assertFalse(off.shouldBlock("com.kakao.talk", passThrough, nowMillis = 1_000L))
+        assertFalse(off.shouldRecordAllowedAppUsage(nowMillis = 1_000L))
+    }
+
+    @Test
+    fun `shouldRecordAllowedAppUsage is false when no session is running`() {
+        assertFalse(base.shouldRecordAllowedAppUsage(nowMillis = 1_000L))
+    }
+
+    @Test
+    fun `shouldRecordAllowedAppUsage is false once the session has expired`() {
+        assertFalse(studying().shouldRecordAllowedAppUsage(TimerState.SESSION_MAX_MILLIS))
+    }
+
     @Test
     fun `withAllowedAppIntervalsCleared empties the list but keeps an open interval`() {
         val state = studyingWithMusic()
@@ -308,6 +391,7 @@ class TimerStateTest {
         assertFalse(TimerState.DEFAULT.sessionActive)
         assertNull(TimerState.DEFAULT.sessionStartedAtMillis)
         assertNull(TimerState.DEFAULT.pendingPauseAtMillis)
+        assertFalse(TimerState.DEFAULT.studyPaused)
         assertEquals(emptySet<String>(), TimerState.DEFAULT.allowedApps)
     }
 

@@ -40,8 +40,13 @@ class TimerStateStore(context: Context) {
         save(currentState().copy(gracePeriodSeconds = seconds))
     }
 
-    suspend fun setFeatureEnabled(enabled: Boolean) {
-        save(currentState().copy(featureEnabled = enabled))
+    // 딴짓 멈춰를 끄면 기록도 멈춘다(shouldRecordAllowedAppUsage). 그래서 끄는 순간 열려 있던
+    // 구간을 여기서 닫아야 한다 — 그냥 두면 기록이 멈춘 뒤로도 구간이 열린 채 남았다가
+    // 세션 종료 시점에 그동안의 시간이 통째로 허용앱 사용으로 닫힌다.
+    suspend fun setFeatureEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
+        val current = currentState()
+        val next = if (enabled) current else current.closeOpenAllowedAppInterval(nowMillis)
+        save(next.copy(featureEnabled = enabled))
     }
 
     suspend fun setAllowedApps(apps: Set<String>) {
@@ -59,6 +64,12 @@ class TimerStateStore(context: Context) {
 
     suspend fun updateForegroundPackage(packageName: String, nowMillis: Long = System.currentTimeMillis()) {
         save(currentState().withForegroundPackage(packageName, nowMillis))
+    }
+
+    // 통화가 시작될 때 접근성 서비스가 부른다. 통화 화면은 차단 판정 자체를 건너뛰므로,
+    // 열려 있던 허용앱 구간을 여기서 닫지 않으면 통화 시간이 통째로 그 구간 안에 들어간다.
+    suspend fun closeOpenAllowedAppInterval(nowMillis: Long = System.currentTimeMillis()) {
+        save(currentState().closeOpenAllowedAppInterval(nowMillis))
     }
 
     suspend fun clearAllowedAppIntervals(count: Int) {
@@ -90,6 +101,7 @@ class TimerStateStore(context: Context) {
         json.put("sessionActive", state.sessionActive)
         json.put("sessionStartedAtMillis", state.sessionStartedAtMillis ?: JSONObject.NULL)
         json.put("pendingPauseAtMillis", state.pendingPauseAtMillis ?: JSONObject.NULL)
+        json.put("studyPaused", state.studyPaused)
         json.put("allowedAppEnteredAtMillis", state.allowedAppEnteredAtMillis ?: JSONObject.NULL)
         json.put(
             "allowedAppIntervals",
@@ -141,6 +153,10 @@ class TimerStateStore(context: Context) {
             sessionActive = !isPreAllowListFormat && json.optBoolean("sessionActive", false),
             sessionStartedAtMillis = if (isPreAllowListFormat) null else optLongOrNull(json, "sessionStartedAtMillis"),
             pendingPauseAtMillis = optLongOrNull(json, "pendingPauseAtMillis"),
+            // 위 두 값과 같은 이유로 optBoolean이다 — 이 키가 없는(= 이전 APK가 쓴) JSON에서
+            // getBoolean은 예외를 던지고, 그러면 이 함수 전체가 DEFAULT로 떨어져 학생의
+            // 허용앱 목록이 통째로 날아간다. 키가 없으면 false, 즉 "멈춰 있지 않다"로 읽는다.
+            studyPaused = json.optBoolean("studyPaused", false),
             allowedAppEnteredAtMillis = optLongOrNull(json, "allowedAppEnteredAtMillis"),
             allowedAppIntervals = intervals
         )

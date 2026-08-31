@@ -19,6 +19,9 @@ export interface DistractionState {
   // "이 시각 기준으로 학습 시간 집계를 멈춰야 한다"는 표식. 쉬는 시간 시작이 세우고,
   // 웹이 처리한 뒤 clearPendingPause로 지운다.
   pendingPauseAtMillis: number | null;
+  // "지금은 학습 세션이 돌고 있지 않다". 쉬는 시간이 세우고 학생이 다시 시작을 누를 때 풀린다.
+  // 차단은 그대로 두고 허용앱 사용 기록만 멈춘다 — 이유는 TimerState.shouldRecordAllowedAppUsage.
+  studyPaused: boolean;
   // 아직 진행 중인 허용앱 구간의 시작 시각.
   allowedAppEnteredAtMillis: number | null;
   // 닫힌 구간들. 웹이 서버로 보낸 뒤 clearAllowedAppIntervals로 비운다.

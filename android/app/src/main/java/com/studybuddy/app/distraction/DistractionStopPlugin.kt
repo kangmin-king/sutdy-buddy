@@ -242,6 +242,7 @@ class DistractionStopPlugin : Plugin() {
         obj.put("sessionActive", sessionActive)
         obj.put("sessionStartedAtMillis", sessionStartedAtMillis ?: JSObject.NULL)
         obj.put("pendingPauseAtMillis", pendingPauseAtMillis ?: JSObject.NULL)
+        obj.put("studyPaused", studyPaused)
         obj.put("allowedAppEnteredAtMillis", allowedAppEnteredAtMillis ?: JSObject.NULL)
         obj.put(
             "allowedAppIntervals",

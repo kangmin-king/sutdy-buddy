@@ -39,16 +39,22 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         // AudioManager.mode는 권한 없이 읽을 수 있고 모든 OEM에서 동일하게 동작해서, 어떤
         // 패키지가 화면에 있든 통화 중이면 차단 자체가 일어나지 않게 한다 — 벨이 울리는 동안
         // goHome()이 수신 화면을 치워버리거나 차단 화면이 응답 UI를 덮는 사고를 막는다.
-        if (isCallActive()) return
+        // 다만 열려 있던 허용앱 구간은 닫고 나간다. 통화 중에는 아래 구간 기록이 아예 돌지
+        // 않으므로, 그냥 빠져나오면 음악을 듣다 전화를 받았을 때 통화가 끝나고 학생이 음악에서
+        // 나올 때까지 구간이 열린 채 남고, 통화 시간이 통째로 "허용앱 사용"으로 기록된다.
+        if (isCallActive()) {
+            scope.launch { store.closeOpenAllowedAppInterval(System.currentTimeMillis()) }
+            return
+        }
 
         scope.launch {
             val state = store.observeState().first()
             val now = System.currentTimeMillis()
 
-            // 허용앱 사용 구간 기록. 공부 중이고 쉬는 시간이 아닐 때만 의미가 있다.
-            // 차단 판정보다 앞에 있어야 하는 이유: 허용앱은 차단되지 않으므로 차단 경로
-            // 뒤에 두면 기록될 기회가 없다.
-            if (state.isSessionActive(now) && !state.isBreakActive(now)) {
+            // 허용앱 사용 구간 기록. 차단 판정보다 앞에 있어야 하는 이유: 허용앱은 차단되지
+            // 않으므로 차단 경로 뒤에 두면 기록될 기회가 없다.
+            // 조건은 shouldBlock과 일부러 다르다 — 이유는 shouldRecordAllowedAppUsage 주석에 있다.
+            if (state.shouldRecordAllowedAppUsage(now)) {
                 store.updateForegroundPackage(packageName, now)
             }
 

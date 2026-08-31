@@ -17,6 +17,9 @@ data class TimerState(
     // 처리한 뒤 지운다. 이벤트가 아니라 상태인 이유: 딴짓멈춰 화면을 열면 학생 홈이
     // 언마운트되어 그 순간의 이벤트를 받을 컴포넌트가 없지만, 표식은 남아 다음에 처리된다.
     val pendingPauseAtMillis: Long? = null,
+    // "지금은 학습 세션이 돌고 있지 않다"는 표식. 쉬는 시간이 세우고 학생이 다시 시작을
+    // 누를 때 풀린다. sessionActive와 따로 두는 이유는 shouldRecordAllowedAppUsage 주석 참조.
+    val studyPaused: Boolean = false,
     // 아직 진행 중인 허용앱 구간의 시작 시각. 허용앱에 들어간 순간 세우고 나오는 순간 지운다.
     val allowedAppEnteredAtMillis: Long? = null,
     // 닫힌 구간들. 웹이 서버로 보낸 뒤 비운다. 이벤트가 아니라 상태인 이유는
@@ -47,6 +50,25 @@ data class TimerState(
             packageName !in passThrough &&
             packageName !in allowedApps
 
+    // 허용앱 사용 구간을 기록해도 되는지. 차단(shouldBlock)과 일부러 다르게 판정한다 —
+    // 하나로 합치려는 다음 사람을 위해 이유를 남긴다.
+    //
+    // 쉬는 시간은 sessionActive를 끄지 않는다. 그래야 쉬는 시간이 끝났을 때 학생이 아무것도
+    // 누르지 않아도 차단이 스스로 돌아온다. 그런데 쉬는 시간이 시작될 때 웹은
+    // pendingPauseAtMillis를 보고 학습 세션을 닫아버린다. 즉 쉬는 시간이 끝난 뒤에는
+    // "차단은 돌아왔지만 학습 세션은 없는" 구간이 생기고, 학생이 다시 시작을 누를 때까지
+    // 이어진다. 이 구간까지 기록하면 매니저에게 `학습 30분 · 허용앱 90분`처럼 앞뒤가 맞지
+    // 않는 숫자가 보인다. studyPaused가 그 구간만 골라 기록에서 뺀다 — 차단은 그대로 둔 채로.
+    //
+    // featureEnabled도 함께 본다. 딴짓 멈춰를 끄면 아무것도 막히지 않으므로 "허용앱"이라는
+    // 구분 자체가 사라진다. 그때 허용 목록에 남아 있던 앱만 계속 기록하면, 매니저는 다른 앱은
+    // 하나도 안 보이는 채로 그 앱 시간만 보게 되어 숫자가 뜻을 잃는다.
+    fun shouldRecordAllowedAppUsage(nowMillis: Long): Boolean =
+        featureEnabled &&
+            isSessionActive(nowMillis) &&
+            !isBreakActive(nowMillis) &&
+            !studyPaused
+
     fun hasPendingPause(): Boolean = pendingPauseAtMillis != null
 
     // 세션 경계에서는 표식도 함께 지운다. 어떤 이유로든 처리되지 않고 남은 표식은 withBreakUntil의
@@ -59,6 +81,8 @@ data class TimerState(
             sessionStartedAtMillis = nowMillis,
             endTimeMillis = null,
             pendingPauseAtMillis = null,
+            // 다시 시작을 누른 순간이 곧 학습 세션이 다시 도는 순간이다. 기록도 여기서 재개된다.
+            studyPaused = false,
             allowedAppEnteredAtMillis = null
         )
 
@@ -69,10 +93,14 @@ data class TimerState(
     // 쉬는 시간은 endTimeMillis만 세우고 공부 모드는 그대로 둔다. 공부 중이었다면 집계를
     // 멈추라는 표식을 남기되, 이미 처리 안 된 표식이 있으면 덮어쓰지 않는다 — 첫 표식 시각이
     // 실제로 공부를 멈춘 순간이고, 덮어쓰면 그만큼 쉬는 시간이 학습 시간으로 들어간다.
+    //
+    // studyPaused는 그 표식과 같은 순간에 선다. pendingPauseAtMillis는 웹이 학습 세션을 닫고
+    // 나면 지워지지만, "학습 세션이 없다"는 사실은 학생이 다시 시작을 누를 때까지 계속
+    // 유효해야 하므로 별도의 플래그가 필요하다.
     fun withBreakUntil(endTimeMillis: Long, nowMillis: Long): TimerState {
         val next = closeOpenAllowedAppInterval(nowMillis).copy(endTimeMillis = endTimeMillis)
         return if (sessionActive && pendingPauseAtMillis == null) {
-            next.copy(pendingPauseAtMillis = nowMillis)
+            next.copy(pendingPauseAtMillis = nowMillis, studyPaused = true)
         } else {
             next
         }
@@ -98,10 +126,12 @@ data class TimerState(
         copy(allowedAppIntervals = allowedAppIntervals.drop(count))
 
     // 학습 세션이 3시간에 만료되므로 정직한 구간이 그보다 길 수 없다. 상한을 두면 기기
-    // 시각이 앞으로 당겨진 경우도 함께 막힌다.
-    private fun closeOpenAllowedAppInterval(nowMillis: Long): TimerState {
+    // 시각이 앞으로 당겨진 경우도 함께 막힌다. 하한(startedAt)은 시각이 뒤로 당겨진 경우다 —
+    // 그대로 두면 endedAt < startedAt인 구간이 저장되고, 서버까지 흘러가 ended_at이 앞선
+    // 행이 남는다. 길이 0으로 접어 두면 웹의 toIntervalRows가 걸러낸다.
+    fun closeOpenAllowedAppInterval(nowMillis: Long): TimerState {
         val startedAt = allowedAppEnteredAtMillis ?: return this
-        val endedAt = minOf(nowMillis, startedAt + SESSION_MAX_MILLIS)
+        val endedAt = minOf(maxOf(nowMillis, startedAt), startedAt + SESSION_MAX_MILLIS)
         return copy(
             allowedAppEnteredAtMillis = null,
             allowedAppIntervals = allowedAppIntervals + AllowedAppInterval(startedAt, endedAt)
@@ -127,6 +157,7 @@ data class TimerState(
             sessionActive = false,
             sessionStartedAtMillis = null,
             pendingPauseAtMillis = null,
+            studyPaused = false,
             allowedAppEnteredAtMillis = null,
             allowedAppIntervals = emptyList()
         )
