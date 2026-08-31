@@ -1,4 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, StudySession, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
+import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
 import { QuickTimeChipId } from './constants';
 
 function pad2(n: number): string {
@@ -268,38 +268,13 @@ export function resolveQuickTimeChip(chipId: QuickTimeChipId, blocks: ScheduleBl
   return QUICK_TIME_FALLBACK[chipId];
 }
 
-export interface TimelineBlock {
-  startTime: string;
-  endTime: string;
-  subjectLabel: string;
-}
-
-// 세션 시각은 timestamptz(ISO/UTC)로 저장되지만, 타임라인은 사용자가 실제로 겪은 시각을
+// 관리자 홈의 과목별 학습 타임라인 차트가 세션을 자정 기준 분 단위 위치로 배치할 때 쓴다.
+// 세션 시각은 timestamptz(ISO/UTC)로 저장되지만 타임라인은 사용자가 실제로 겪은 시각을
 // 보여줘야 한다(todayKey()·날짜 선택기도 전부 로컬 기준). 문자열을 그대로 잘라 쓰면 KST에서
 // 9시간 어긋나므로 로컬 시각으로 변환한 뒤 시/분을 뽑는다.
-function toHHMM(isoString: string): string {
-  const d = new Date(isoString);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-// 관리자 홈의 과목별 학습 타임라인 차트가 세션을 자정 기준 분 단위 위치로 배치할 때 쓴다.
-// toHHMM과 같은 이유로 로컬 시각 기준이어야 한다.
 export function toMinutesOfDay(isoString: string): number {
   const d = new Date(isoString);
   return d.getHours() * 60 + d.getMinutes();
-}
-
-export function sessionsToTimelineBlocks(
-  entries: { session: StudySession; subjectLabel: string }[],
-  nowIso: string = new Date().toISOString()
-): TimelineBlock[] {
-  return entries
-    .map(({ session, subjectLabel }) => ({
-      startTime: toHHMM(session.startedAt),
-      endTime: toHHMM(session.endedAt ?? nowIso),
-      subjectLabel,
-    }))
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
 // 선택된 날짜(오름차순 정렬) 수만큼 [startPage, endPage] 총 페이지를 균등 분배한다.

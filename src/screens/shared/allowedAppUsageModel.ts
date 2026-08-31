@@ -19,6 +19,20 @@ export function toIntervalRows(
     }));
 }
 
+// flush 한 번의 결정 전체. 보낼 행과 네이티브에서 지울 개수를 한 곳에서 정한다.
+//
+// count가 rows.length가 아니라 intervals.length여야 하는 것이 이 함수의 존재 이유다.
+// toIntervalRows는 길이가 0 이하인 구간을 걸러내므로 rows가 스냅샷보다 짧을 수 있는데,
+// rows.length만 지우면 걸러진 구간이 네이티브에 영영 남아 flush 때마다 다시 읽힌다.
+// 반대로 스냅샷보다 많이 지우면, 전송하는 동안 서비스가 새로 append한 구간이 서버로
+// 가보지도 못하고 사라진다. 주석이 아니라 테스트가 지키도록 순수 함수로 뽑아 두었다.
+export function intervalsToFlush(
+  intervals: NativeAllowedAppInterval[],
+  userId: string
+): { rows: { user_id: string; started_at: string; ended_at: string }[]; count: number } {
+  return { rows: toIntervalRows(intervals, userId), count: intervals.length };
+}
+
 export function totalUsageSeconds(intervals: AllowedAppInterval[]): number {
   return intervals.reduce(
     (sum, i) => sum + Math.max(0, Math.floor((Date.parse(i.endedAt) - Date.parse(i.startedAt)) / 1000)),
@@ -39,7 +53,9 @@ export function allowedAppSummary(intervals: AllowedAppInterval[], nowMillis: nu
   const lastEnd = lastUsageEndMillis(intervals);
   if (lastEnd == null) return null;
 
-  const sinceMillis = nowMillis - lastEnd;
+  // 0에서 끊는다. 기기 시각이 서버보다 뒤처져 있으면 lastEnd가 미래로 보여 차이가 음수가
+  // 되고, 그대로 나누면 `-1분 전까지 허용앱 사용`이 렌더된다.
+  const sinceMillis = Math.max(0, nowMillis - lastEnd);
   if (sinceMillis <= RECENT_WINDOW_MILLIS) {
     const minutes = Math.floor(sinceMillis / 60_000);
     return minutes === 0 ? '방금 전까지 허용앱 사용' : `${minutes}분 전까지 허용앱 사용`;
