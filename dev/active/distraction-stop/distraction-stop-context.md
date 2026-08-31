@@ -1,6 +1,6 @@
 # Context — 딴짓 멈춰
 
-**Last Updated**: 2026-08-28
+**Last Updated**: 2026-08-31
 
 ## 핵심 파일 위치
 - 포팅 원본 (읽기 전용 참고): `C:\Users\DELL\Desktop\reels-stop\app\src\main\java\com\reelsstop\app\{data,exit,notification,service,ui}`
@@ -19,6 +19,7 @@
 - **차단 조건(2026-08-27)**: reels-stop에서 이식한 "쉬는 시간 종료 후 lockout 창" 조건을 버리고 `sessionActive`(학습 타이머) 기반으로 전환. lockout 개념과 설정 UI 삭제. 쉬는 시간 시작 = 학습 일시정지. 앱 강제 종료 대비 3시간 자동 만료 + 알림 `공부 끝내기` 버튼. 스펙: `docs/superpowers/specs/2026-08-27-distraction-stop-session-gated-blocking-design.md`
 - **허용 목록 전환(2026-08-27)**: 차단할 앱 목록(인스타/유튜브/틱톡)을 버리고 허용 목록으로 뒤집었다 — 공부 중에는 학생이 고른 허용앱과 생활 필수 앱(전화·시계·설정·런처·시스템UI·키보드, 시스템 조회) 외에 열리지 않는다. 그 결과 이탈 감지 기능이 필요 없어져 삭제했고, `sessionActive`를 차단과 이탈 감지가 다투던 구조(홈 버튼만 눌러도 차단이 스스로 꺼지던 버그)가 근본에서 사라졌다. `BlockedApp` enum, `setAppEnabled`, `classifySessionStop`, `selfInitiatedStop` ref도 함께 삭제. 쉬는 시간은 공부 모드를 끄지 않아 끝나면 차단이 자동 복귀한다. 허용앱 선택 UI는 `<queries>` + `queryIntentActivities`로 런처 앱만 조회하므로 `QUERY_ALL_PACKAGES`가 필요 없다. 스펙: `docs/superpowers/specs/2026-08-27-distraction-stop-allowlist-design.md`
 - **허용앱 사용 노출(2026-08-28)**: 공부 중 허용앱에 머문 구간을 `sb_allowed_app_intervals`에 기록해 매니저에게 보여준다. **패키지명은 저장하지 않는다** — 필요한 신호는 "얼마나 오래"이고, 저장하지 않으면 새어 나갈 것도 없다. 감지는 접근성 서비스가 `TimerState`에 구간을 쌓고 셸 레벨 훅이 서버로 비우는 방식(`pendingPauseAtMillis`와 같은 패턴). Supabase Realtime은 도입하지 않았다 — 학생이 허용앱을 쓰는 동안 앱이 백그라운드라 쓰기 자체가 늦고, 늦은 값을 실시간처럼 보이면 매니저가 잘못 믿는다. 대신 문구가 `N분 전까지`로 지연을 드러낸다. 죽어 있던 `sb_study_sessions.deviated`도 함께 삭제 — 다만 마이그레이션 `0021`은 `supabase/migrations/`가 아니라 `supabase/deferred-migrations/0021_drop_study_session_deviated.sql`에 보류해 두었다. 밀린 마이그레이션을 순서대로 적용하면 구버전 APK를 쓰는 학생의 학습 시간이 통째로 기록되지 않기 때문이다(구버전 앱은 세션 insert와 update 양쪽에서 이 컬럼에 쓴다). 전제 조건과 적용 절차는 `supabase/deferred-migrations/README.md` 참조. 스펙: `docs/superpowers/specs/2026-08-28-allowed-app-usage-visibility-design.md`
+- **알림 커스텀 본문(2026-08-31)**: 상단바 알림의 시간 버튼을 `+5 +10 +30`으로 고정하고 본문 오른쪽에 기능 on/off `ON`/`OFF` 알약을 넣었다. 표준 템플릿은 본문 오른쪽에 컨트롤을 놓을 자리가 없고 액션도 세 개까지만 보여주므로, `DecoratedCustomViewStyle`로 본문만 `RemoteViews`로 바꿨다 — **이식 당시 "커스텀 RemoteViews를 피한다"는 결정을 되돌린 것**이며, 전면 커스텀보다 위험이 작은 중간 지점을 택했다. 제목에서 `On`/`Off`를 떼어 상태를 말하는 곳을 알약 하나로 줄였다. `공부 끝내기` 액션은 제거했고 알약이 그 탈출구를 대신한다 — 차단 해제가 언제나 한 탭이 되므로 강도가 낮아지지만, 소유자가 그 성질을 알고 택했고 기능이 꺼진 사실은 딴짓 멈춰 화면 배너가 알린다. One UI 재스타일링 위험이 있어 실기기 확인이 필수이며, 보기 흉하면 아이콘 토글이나 표준 3버튼으로 후퇴한다. 스펙: `docs/superpowers/specs/2026-08-31-quick-control-notification-redesign-design.md`
 
 ## 알려진 제약
 - **자정을 넘는 허용앱 구간은 어느 날에도 안 잡힌다(2026-08-28)**: 23:50에 시작해 00:10에 끝난 구간은 전날 화면에도, 다음 날 화면에도, 두 날의 합계 어디에도 나타나지 않는다. 로더는 `started_at >= 오늘 00:00`으로 거르는데 그 구간의 `started_at`은 어제이고, 타임라인은 자정 기준 분 단위로 그리므로 어제 것으로 실어도 자리를 잡을 수 없다. 방향은 **과소 보고**라 매니저가 학생을 과하게 의심할 일은 없다 — 그래서 급하지 않다. 제대로 고치려면 로더의 조회 창, 타임라인 셀 계산, 하루 합계 세 곳에서 "자정을 걸친 구간이 무엇을 뜻하는가"를 한꺼번에 정해야 한다(잘라서 양쪽 날에 나눠 넣을 것인가, 시작한 날에 몰아줄 것인가). 한 곳만 고치면 숫자와 그림이 어긋난다.
