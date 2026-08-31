@@ -2,7 +2,9 @@ package com.studybuddy.app.distraction
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class PluginCallNumbersTest {
 
@@ -49,9 +51,10 @@ class PluginCallNumbersTest {
     }
 
     // 위 테스트들은 millisOrNull만 검사하므로, 호출부를 call.getLong으로 되돌려도 전부
-    // 통과한다. 이 테스트가 그 구멍을 막는다 — Capacitor의 getLong이 왜 못 쓰는지를
-    // 그 구현을 그대로 재현해 고정한다. 여기가 실패하면 getLong의 동작이 바뀐 것이므로
-    // 그때는 헬퍼를 없앨 수 있는지 다시 판단하면 된다.
+    // 통과한다 — 이 테스트도 마찬가지다. 이 함수는 그 구멍을 막지 *않는다*; Capacitor의
+    // getLong이 왜 못 쓰는지를 그 구현을 그대로 재현해서 문서로 남겨둘 뿐이다. 실제로
+    // 호출부가 되돌아가는 것을 막는 가드는 아래
+    // `DistractionStopPlugin routes every numeric PluginCall read through millisOrNull`이다.
     private fun capacitorGetLong(value: Any?): Long? = if (value is Long) value else null
 
     @Test
@@ -67,5 +70,59 @@ class PluginCallNumbersTest {
     fun `a non-positive millis value is null`() {
         assertNull(millisOrNull(0))
         assertNull(millisOrNull(-300_000))
+    }
+
+    // 위 테스트들은 모두 millisOrNull 자체만 검사한다 — DistractionStopPlugin의 호출부가
+    // call.getLong/call.getInt로 되돌아가도 전부 그대로 통과한다. 이 프로젝트에는
+    // Robolectric도 계측 테스트 하네스도 없어서 실제 PluginCall을 만들어 플러그인
+    // 메서드를 호출하는 테스트는 쓸 수 없다. 대신 플러그인의 실제 소스를 읽어서, 숫자를
+    // 읽는 자리가 여전히 millisOrNull을 거치는지 문자열로 확인한다 — 투박하지만
+    // 호출부가 되돌아가면 실제로 실패한다.
+    @Test
+    fun `DistractionStopPlugin routes every numeric PluginCall read through millisOrNull`() {
+        val pluginSource = readDistractionStopPluginSource()
+
+        val rawNumericReads = Regex("""call\.getLong\(|call\.getInt\(""").findAll(pluginSource).map { it.value }.toList()
+        assertTrue(
+            "DistractionStopPlugin.kt must not read numeric PluginCall values with " +
+                "call.getLong(/call.getInt( — found: $rawNumericReads. Use " +
+                "millisOrNull(call.data.opt(...)) instead (see PluginCallNumbers.kt) so an " +
+                "Integer-valued field from the JS bridge isn't silently dropped.",
+            rawNumericReads.isEmpty()
+        )
+
+        val millisOrNullReads = Regex("""millisOrNull\(call\.data\.opt\(""").findAll(pluginSource).count()
+        assertTrue(
+            "Expected DistractionStopPlugin.kt's four numeric PluginCall reads " +
+                "(durationMillis, extraMillis, seconds, count) to go through " +
+                "millisOrNull(call.data.opt(...)), but found only $millisOrNullReads " +
+                "occurrence(s) — a call site may have regressed to a different numeric read.",
+            millisOrNullReads >= 4
+        )
+    }
+
+    // DistractionStopPlugin.kt는 이 테스트 모듈이 아니라 main 소스셋에 있으므로 읽으려면
+    // 파일시스템 경로를 알아야 한다. Gradle의 단위 테스트 작업 디렉터리는 보통 app 모듈
+    // 루트지만, 어느 디렉터리에서 실행되든 버티도록 cwd부터 위로 올라가며 두 가지 후보
+    // 경로를 모두 찾는다.
+    private fun readDistractionStopPluginSource(): String {
+        val relativeSuffix = "src/main/java/com/studybuddy/app/distraction/DistractionStopPlugin.kt"
+        val tried = mutableListOf<String>()
+        var dir: File? = File(".").absoluteFile
+        while (dir != null) {
+            val direct = File(dir, relativeSuffix)
+            tried += direct.path
+            if (direct.isFile) return direct.readText()
+
+            val viaAppModule = File(dir, "app/$relativeSuffix")
+            tried += viaAppModule.path
+            if (viaAppModule.isFile) return viaAppModule.readText()
+
+            dir = dir.parentFile
+        }
+        error(
+            "Could not locate DistractionStopPlugin.kt to guard against a regression. " +
+                "Tried (cwd=${File(".").absolutePath}): $tried"
+        )
     }
 }
