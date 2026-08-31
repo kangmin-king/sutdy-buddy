@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 알림 본문 글자색의 다크 모드 짝. pill_on_background/pill_off_background는 여기 넣지
+         않는다 — 리뷰에서 그 알약은 부드러운 테두리가 코스메틱 수준이라 인정했고
+         (라벨 텍스트가 6:1대로 이미 통과), 여기 추가하면 범위를 벗어난다.
+         어두운 알림 배경(#1F1F1F) 위에서 primary #F5F5F5 ≈ 15.1:1, secondary #B0B0B0 ≈ 7.6:1
+         (둘 다 WCAG AA 4.5:1 이상). -->
+    <color name="notification_body_primary">#F5F5F5</color>
+    <color name="notification_body_secondary">#B0B0B0</color>
+</resources>

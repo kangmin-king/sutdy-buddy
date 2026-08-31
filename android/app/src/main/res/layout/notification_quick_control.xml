@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 알림 본문. DecoratedCustomViewStyle이 상단 헤더(앱 아이콘·이름·시간)를 그려주므로
-     여기서는 본문 한 줄만 채운다. 글자색은 시스템 테마를 참조해 다크모드를 따라간다 —
-     하드코딩하면 한쪽 모드에서 글자가 안 보인다. -->
+     여기서는 본문 한 줄만 채운다. ?android:attr/textColorPrimary 같은 테마 attribute는
+     여기서 다크모드를 따라가지 않는다 — RemoteViews의 인플레이션 컨텍스트는
+     CONTEXT_RESTRICTED 애플리케이션 컨텍스트라 테마가 항상 라이트 DeviceDefault로
+     고정 해석된다(targetSdk 36). 대신 리소스 컨피그레이션(다크 모드 여부)은 호스트를
+     따라가므로, @color/notification_body_* 를 values/ 와 values-night/ 로 나눠 직접
+     스위칭한다. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -21,7 +25,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/quick_control_title"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@color/notification_body_primary"
             android:textSize="14sp"
             android:textStyle="bold"
             android:maxLines="1"
@@ -31,7 +35,7 @@
             android:id="@+id/quick_control_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/notification_body_secondary"
             android:textSize="13sp"
             android:maxLines="2"
             android:ellipsize="end" />

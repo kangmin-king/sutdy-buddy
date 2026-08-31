@@ -6,4 +6,12 @@
     <color name="pill_on_text">#FFFFFF</color>
     <color name="pill_off_background">#616161</color>
     <color name="pill_off_text">#FFFFFF</color>
+
+    <!-- 알림 본문(제목/상태) 글자색. RemoteViews 인플레이션 컨텍스트는 알림창 테마를
+         따라가지 않으므로(?android:attr/textColorPrimary 등은 항상 라이트로 해석됨),
+         values-night/colors.xml로 직접 다크 모드 값을 스위칭한다. 라이트 대비 기준:
+         흰색(#FFFFFF) 알림 배경 위에서 primary #212121 ≈ 16.1:1, secondary #5F5F5F ≈ 6.4:1
+         (둘 다 WCAG AA 4.5:1 이상). -->
+    <color name="notification_body_primary">#212121</color>
+    <color name="notification_body_secondary">#5F5F5F</color>
 </resources>
