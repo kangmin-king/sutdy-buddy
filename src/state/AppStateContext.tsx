@@ -972,26 +972,44 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       // 학생이 멈춤을 누르지 않아 3시간이 지난 세션을 닫는다. endStudySession을 재사용하지
       // 않는 이유는 그쪽이 endedAt을 항상 "지금"으로 잡기 때문이다 — 자동 마감은
       // startedAt + 3시간이라는 과거 시각을 써야 한다.
+      //
+      // 여기서는 낙관적 갱신을 하지 않는다(이웃 액션들과 다른 이유가 있다): 자동 마감은
+      // 백그라운드 정합화라서 사용자가 결과를 기다리지 않는다. .is('ended_at', null) 가드가
+      // 서버에서 0건으로 거부될 수 있는데 — 스캔과 이 쓰기 사이에 학생이 직접 멈춤을 눌러
+      // 이미 정직한 값이 들어간 경우다 — 그건 에러가 아니라서 낙관적으로 먼저 반영해두면
+      // 되돌릴 신호가 없다. 그래서 순서를 뒤집는다: 먼저 쓰고, 서버가 실제로 무엇을 했는지
+      // 확인한 뒤에만 로컬 상태를 반영한다. 다음에 이 코드를 읽는 사람이 "왜 낙관적이 아니지"
+      // 하며 이웃 액션들 모양으로 되돌리지 않도록 남긴다.
       async autoCloseStudySession(itemId, sessionId, endedAt, durationSeconds) {
-        setState((s) => {
-          const list = s.studySessions[itemId] ?? [];
-          const updated = list.map((sess) =>
-            sess.id === sessionId ? { ...sess, endedAt, durationSeconds, autoClosed: true } : sess
-          );
-          return { ...s, studySessions: { ...s.studySessions, [itemId]: updated } };
-        });
-
         // .is('ended_at', null)이 핵심이다. 스캔과 이 쓰기 사이에 학생이 직접 멈춤을 눌렀다면
         // 그 정직한 값이 남아야 한다. 조건이 없으면 자동 마감이 실제 기록을 이긴다.
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('sb_study_sessions')
           .update({ ended_at: endedAt, duration_seconds: durationSeconds, auto_closed: true })
           .eq('id', sessionId)
-          .is('ended_at', null);
+          .is('ended_at', null)
+          .select();
+
         if (error) {
           console.error('autoCloseStudySession failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
         }
+
+        const updatedRow = data?.[0];
+        // 행이 안 돌아오면 가드가 막았다는 뜻 — 학생이 그새 직접 멈춰서 ended_at이 이미
+        // 채워져 있었다. endStudySession이 로컬 상태를 이미 갱신했으니 여기서는 그대로 둔다.
+        // 실패가 아니라 가드가 제 역할을 한 것이므로 에러도 세우지 않는다.
+        if (!updatedRow) return;
+
+        // 보낸 값을 그대로 단정하지 않고 studySessionFromRow로 실제 행을 매핑한다 —
+        // 로컬 상태가 DB와 정확히 일치하게 한다.
+        const updatedSession = studySessionFromRow(updatedRow);
+        setState((s) => {
+          const list = s.studySessions[itemId] ?? [];
+          const updated = list.map((sess) => (sess.id === sessionId ? updatedSession : sess));
+          return { ...s, studySessions: { ...s.studySessions, [itemId]: updated } };
+        });
       },
 
       async updateStudentLabel(studentId, label) {
