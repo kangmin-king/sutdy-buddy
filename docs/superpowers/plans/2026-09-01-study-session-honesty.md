@@ -20,7 +20,7 @@
 - 자동 마감 쓰기에는 반드시 `.is('ended_at', null)` 조건을 건다. 학생이 직접 누른 멈춤이 자동 마감을 이겨야 한다.
 - 쓰기를 1초 렌더 틱에서 발사하지 않는다.
 - **기준선: 웹 단위 테스트 149개(6개 파일) 통과.** 이 변경으로 줄지 않아야 한다 — 예외는 Task 1이 `secondsUntil` 테스트를 지우는 것 하나뿐이고, 그 자리는 새 `cappedSessionSeconds` 테스트가 같은 경계를 더 넓게 덮는다. 최종 합계는 149보다 커야 한다.
-- 게이트: `npm run lint && npx tsc --noEmit && npm test -- --run`. 모두 통과해야 커밋한다.
+- 게이트: `npx tsc --noEmit && npm test -- --run`. 둘 다 통과해야 커밋한다. **이 저장소에는 `lint` 스크립트가 없다** — package.json의 스크립트는 dev/build/preview/test/android:sync/ios:sync뿐이다.
 
 ---
 
@@ -236,7 +236,7 @@ await actions.endStudySession(itemId, sessionId, cappedSessionSeconds(startedAt,
 
 - [ ] **Step 6: 게이트를 돌린다**
 
-Run: `npm run lint && npx tsc --noEmit && npm test -- --run`
+Run: `npx tsc --noEmit && npm test -- --run`
 Expected: 전부 통과. 테스트 수는 `secondsUntil` 테스트가 빠진 만큼 줄고 새 파일의 11개가 늘어 **순증**이어야 한다.
 
 - [ ] **Step 7: 커밋**
@@ -413,7 +413,7 @@ export function studySessionFromRow(row: SbStudySessionRow): StudySession {
 
 - [ ] **Step 5: 게이트를 돌린다**
 
-Run: `npm run lint && npx tsc --noEmit && npm test -- --run`
+Run: `npx tsc --noEmit && npm test -- --run`
 Expected: 전부 통과. `autoClosed` 필수화로 깨진 자리를 전부 고친 뒤여야 한다.
 
 - [ ] **Step 6: 커밋**
@@ -566,7 +566,7 @@ Expected: PASS
 
 - [ ] **Step 6: 게이트를 돌린다**
 
-Run: `npm run lint && npx tsc --noEmit && npm test -- --run`
+Run: `npx tsc --noEmit && npm test -- --run`
 Expected: 전부 통과
 
 - [ ] **Step 7: 커밋**
@@ -683,7 +683,7 @@ import { useExpiredSessionClose } from './screens/student/useExpiredSessionClose
 
 - [ ] **Step 3: 게이트를 돌린다**
 
-Run: `npm run lint && npx tsc --noEmit && npm test -- --run`
+Run: `npx tsc --noEmit && npm test -- --run`
 Expected: 전부 통과. 이 태스크는 훅이라 새 단위 테스트가 없다 — 로직은 Task 1의 순수 함수에 있고 여기 남은 것은 배선뿐이다.
 
 - [ ] **Step 4: 커밋**
@@ -791,7 +791,7 @@ export interface TimelineSegment {
 
 - [ ] **Step 3: 게이트를 돌린다**
 
-Run: `npm run lint && npx tsc --noEmit && npm test -- --run`
+Run: `npx tsc --noEmit && npm test -- --run`
 Expected: 전부 통과. `TimelineSegment`에 필수 필드가 생겼으므로 세그먼트를 만드는 다른 자리가 있으면 `tsc`가 짚어준다.
 
 - [ ] **Step 4: 커밋**
