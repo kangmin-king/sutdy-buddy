@@ -1,7 +1,8 @@
 import React from 'react';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../../native/distractionStop';
 import { useAppState } from '../../state/AppStateContext';
-import { findOpenStudySessionsBefore, secondsUntil } from './pendingPauseModel';
+import { findOpenStudySessionsBefore } from './pendingPauseModel';
+import { cappedSessionSeconds } from './studySessionModel';
 
 // 네이티브가 "이 시각 기준으로 학습 집계를 멈춰라"는 표식을 남기면(쉬는 시간 시작) 열려 있던
 // 학습 세션을 그 시각까지로 닫는다. StudentAppShell에서 부르기 때문에 딴짓멈춰 오버레이가
@@ -29,7 +30,7 @@ export function usePendingStudyPause(): void {
     void (async () => {
       try {
         for (const { itemId, sessionId, startedAt } of open) {
-          await actions.endStudySession(itemId, sessionId, secondsUntil(startedAt, pendingAt));
+          await actions.endStudySession(itemId, sessionId, cappedSessionSeconds(startedAt, pendingAt));
         }
         await DistractionStop.clearPendingPause();
       } finally {

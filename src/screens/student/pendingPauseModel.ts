@@ -38,13 +38,3 @@ export function findOpenStudySessionsBefore(
   return open;
 }
 
-// 표식 시각까지 실제로 공부한 초. 지금 시각이 아니라 표식 시각을 쓰는 것이 요점이다 —
-// 웹이 늦게 알아차린 지연이 학습 시간에 더해지면 쉬는 시간이 공부 시간으로 들어간다.
-// 위쪽은 네이티브 세션 자동 만료(3시간)로 자른다: 정직한 한 세션이 그보다 길 수 없고,
-// 기기 시계가 앞으로 튄 경우에도 말이 안 되는 값이 저장되지 않는다.
-const MAX_SESSION_SECONDS = SESSION_MAX_MILLIS / 1000;
-
-export function secondsUntil(startedAt: string, atMillis: number): number {
-  const seconds = Math.floor((atMillis - Date.parse(startedAt)) / 1000);
-  return Math.min(MAX_SESSION_SECONDS, Math.max(0, seconds));
-}

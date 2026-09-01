@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findOpenStudySessionsBefore, secondsUntil } from './pendingPauseModel';
+import { findOpenStudySessionsBefore } from './pendingPauseModel';
 import { SESSION_MAX_MILLIS } from '../distractionStopModel';
 import type { StudySession } from '../../types';
 
@@ -84,25 +84,3 @@ describe('findOpenStudySessionsBefore', () => {
   });
 });
 
-describe('secondsUntil', () => {
-  it('counts the whole seconds up to the mark', () => {
-    expect(secondsUntil('2026-08-27T09:50:00.000Z', Date.parse('2026-08-27T10:00:00.000Z'))).toBe(600);
-  });
-
-  it('clamps to zero when the mark is earlier than the start', () => {
-    expect(secondsUntil('2026-08-27T10:00:00.000Z', Date.parse('2026-08-27T09:50:00.000Z'))).toBe(0);
-  });
-
-  // 반올림하면 화면에 보이던 값보다 1초 많은 값이 저장된다.
-  it('floors a fractional second rather than rounding it', () => {
-    expect(secondsUntil('2026-08-27T09:50:00.000Z', Date.parse('2026-08-27T10:00:00.900Z'))).toBe(600);
-  });
-
-  // 회귀: 기기 시계가 앞으로 튀거나 아래 경계를 빠져나간 세션이 있으면 말이 안 되는 값이
-  // duration_seconds에 저장되고 선생님 화면에 수백 시간으로 보인다.
-  it('clamps to the session expiry window', () => {
-    const startedAt = '2026-08-01T00:00:00.000Z';
-    const at = Date.parse(startedAt) + SESSION_MAX_MILLIS * 10;
-    expect(secondsUntil(startedAt, at)).toBe(SESSION_MAX_MILLIS / 1000);
-  });
-});
