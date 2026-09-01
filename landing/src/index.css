@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 html {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Plus Jakarta Sans는 라틴 전용이라 한글 글리프가 없다. 라틴 글자는 앞쪽 얼굴이 맡고
+     한글은 Pretendard가 받도록 순서를 이대로 유지해야 한다. */
+  font-family: 'Plus Jakarta Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
   scroll-behavior: smooth;
   /* 한글은 음절(글자) 단위로 줄바꿈이 가능해서, 이게 없으면 "안녕하세/요"처럼 한 단어가
      중간에서 잘려 보일 수 있다. 띄어쓰기 단위로만 줄바꿈되게 사이트 전체에 적용한다. */
