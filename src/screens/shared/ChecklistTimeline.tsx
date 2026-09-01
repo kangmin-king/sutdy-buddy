@@ -31,6 +31,7 @@ export default function ChecklistTimeline({
 
   const segments: TimelineSegment[] = [];
   const elapsedSecondsByItem: Record<string, number> = {};
+  const hasAutoClosedByItem: Record<string, boolean> = {};
   for (const item of items) {
     const subject = getSubject(item.subjectId);
     const color = resolveSubjectColor(item.subjectId, customColors);
@@ -44,11 +45,12 @@ export default function ChecklistTimeline({
       const endedAtMs = Date.parse(session.endedAt);
       if (endedAtMs <= startedAtMs) continue; // 실제로 끝난 시각이 시작보다 앞선(잘못된) 기록만 건너뛴다.
       elapsedSeconds += session.durationSeconds;
+      if (session.autoClosed) hasAutoClosedByItem[item.id] = true;
       const startMinutes = toMinutesOfDay(session.startedAt);
       // 시작~종료가 1분 안에 끝나면 분 단위로 내림했을 때 startMinutes와 같아진다. 실제로는
       // 유효한 기록이므로 통째로 버리지 않고 최소 한 칸(1분)은 보이게 한다.
       const endMinutes = Math.max(startMinutes + 1, toMinutesOfDay(session.endedAt));
-      segments.push({ subjectLabel: subject.label, color, startMinutes, endMinutes });
+      segments.push({ subjectLabel: subject.label, color, startMinutes, endMinutes, autoClosed: session.autoClosed });
     }
     elapsedSecondsByItem[item.id] = elapsedSeconds;
   }
@@ -83,7 +85,12 @@ export default function ChecklistTimeline({
                 <span className="text-sm text-on-surface-variant">{item.material || item.pageRange || '할 일'}</span>
                 {managerLabelFor?.(item) && <span className="text-[10px] text-tertiary ml-1">· {managerLabelFor(item)}</span>}
                 {elapsedSeconds > 0 && (
-                  <span className="text-sm text-primary font-semibold ml-1">{formatMinutes(Math.round(elapsedSeconds / 60))}</span>
+                  <span className="text-sm text-primary font-semibold ml-1">
+                    {formatMinutes(Math.round(elapsedSeconds / 60))}
+                    {hasAutoClosedByItem[item.id] && (
+                      <span className="text-[10px] font-normal text-on-surface-variant ml-0.5">(자동 마감)</span>
+                    )}
+                  </span>
                 )}
               </p>
               <span

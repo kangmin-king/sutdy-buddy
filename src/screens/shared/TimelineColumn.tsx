@@ -3,6 +3,7 @@ export interface TimelineSegment {
   color: string;
   startMinutes: number;
   endMinutes: number;
+  autoClosed: boolean;
 }
 
 const ROW_HEIGHT = 18;
@@ -54,13 +55,19 @@ export function TimelineColumn({
               return (
                 <div
                   key={c}
-                  title={allowed ? `${seg?.subjectLabel ?? ''} · 허용앱`.trim() : seg?.subjectLabel}
+                  title={
+                    [seg?.subjectLabel, allowed ? '허용앱' : null, seg?.autoClosed ? '자동 마감' : null]
+                      .filter(Boolean)
+                      .join(' · ') || undefined
+                  }
                   className={seg ? undefined : 'bg-surface-container'}
                   style={
                     seg
                       ? {
                           backgroundColor: seg.color,
-                          opacity: 0.8,
+                          // 자동 마감은 "3시간 공부했다"가 아니라 상한이다. 확정치와 같은
+                          // 진하기로 그리면 매니저가 추정치를 사실로 읽는다.
+                          opacity: seg.autoClosed ? 0.35 : 0.8,
                           backgroundImage: allowed
                             ? 'repeating-linear-gradient(45deg, rgba(0,0,0,0.35) 0 2px, transparent 2px 4px)'
                             : undefined,
