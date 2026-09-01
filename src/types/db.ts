@@ -107,6 +107,7 @@ export type SbStudySessionRow = {
   started_at: string;
   ended_at: string | null;
   duration_seconds: number | null;
+  auto_closed: boolean;
 };
 
 export type SbStudentManagerLinkRow = {

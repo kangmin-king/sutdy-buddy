@@ -149,6 +149,12 @@ interface AppStateActions {
   updateHomeworkAssignment: (id: string, patch: Partial<HomeworkAssignment>) => Promise<void>;
   startStudySession: (plannerItemId: string) => Promise<string>;
   endStudySession: (plannerItemId: string, sessionId: string, displayedSeconds?: number) => Promise<void>;
+  autoCloseStudySession: (
+    itemId: string,
+    sessionId: string,
+    endedAt: string,
+    durationSeconds: number
+  ) => Promise<void>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   registerDeviceToken: (token: string) => Promise<void>;
@@ -894,7 +900,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             ...s.studySessions,
             [plannerItemId]: [
               ...(s.studySessions[plannerItemId] ?? []),
-              { id, plannerItemId, startedAt, endedAt: null, durationSeconds: null },
+              { id, plannerItemId, startedAt, endedAt: null, durationSeconds: null, autoClosed: false },
             ],
           },
         }));
@@ -911,6 +917,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             started_at: startedAt,
             ended_at: null,
             duration_seconds: null,
+            auto_closed: false,
           })
           .then(({ error }) => {
             if (error) {
@@ -938,16 +945,51 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         setState((s) => {
           const list = s.studySessions[plannerItemId] ?? [];
-          const updated = list.map((sess) => (sess.id === sessionId ? { ...sess, endedAt, durationSeconds } : sess));
+          const updated = list.map((sess) =>
+            sess.id === sessionId
+              ? { ...sess, endedAt, durationSeconds: durationSeconds ?? sess.durationSeconds }
+              : sess
+          );
           return { ...s, studySessions: { ...s.studySessions, [plannerItemId]: updated } };
         });
 
+        // existing을 못 찾으면 duration을 계산할 근거가 없다. 그렇다고 null을 써넣으면
+        // ended_at은 있는데 duration_seconds가 없는 행이 되어, 매니저 화면에서 그 시간이
+        // 통째로 사라진다(합계는 ?? 0, 타임라인은 건너뜀). 모르면 건드리지 않는다.
+        const patch: { ended_at: string; duration_seconds?: number } =
+          durationSeconds == null ? { ended_at: endedAt } : { ended_at: endedAt, duration_seconds: durationSeconds };
+
         const { error } = await supabase
           .from('sb_study_sessions')
-          .update({ ended_at: endedAt, duration_seconds: durationSeconds })
+          .update(patch)
           .eq('id', sessionId);
         if (error) {
           console.error('endStudySession failed:', error.message);
+          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        }
+      },
+
+      // 학생이 멈춤을 누르지 않아 3시간이 지난 세션을 닫는다. endStudySession을 재사용하지
+      // 않는 이유는 그쪽이 endedAt을 항상 "지금"으로 잡기 때문이다 — 자동 마감은
+      // startedAt + 3시간이라는 과거 시각을 써야 한다.
+      async autoCloseStudySession(itemId, sessionId, endedAt, durationSeconds) {
+        setState((s) => {
+          const list = s.studySessions[itemId] ?? [];
+          const updated = list.map((sess) =>
+            sess.id === sessionId ? { ...sess, endedAt, durationSeconds, autoClosed: true } : sess
+          );
+          return { ...s, studySessions: { ...s.studySessions, [itemId]: updated } };
+        });
+
+        // .is('ended_at', null)이 핵심이다. 스캔과 이 쓰기 사이에 학생이 직접 멈춤을 눌렀다면
+        // 그 정직한 값이 남아야 한다. 조건이 없으면 자동 마감이 실제 기록을 이긴다.
+        const { error } = await supabase
+          .from('sb_study_sessions')
+          .update({ ended_at: endedAt, duration_seconds: durationSeconds, auto_closed: true })
+          .eq('id', sessionId)
+          .is('ended_at', null);
+        if (error) {
+          console.error('autoCloseStudySession failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
       },

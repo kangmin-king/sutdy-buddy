@@ -132,6 +132,10 @@ export function studySessionFromRow(row: SbStudySessionRow): StudySession {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
+    // 마이그레이션 0022 이전에 저장된 행은 이 컬럼이 없을 수 있다(로컬 캐시·구버전 응답).
+    // 없으면 "학생이 직접 닫았다"로 읽는 편이 안전하다 — 있지도 않은 자동 마감 표시를
+    // 매니저에게 보여주지 않는다.
+    autoClosed: row.auto_closed ?? false,
   };
 }
 

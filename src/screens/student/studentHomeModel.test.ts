@@ -35,6 +35,7 @@ function session(id: string, plannerItemId: string, overrides: Partial<StudySess
     startedAt: '2026-08-21T09:00:00.000Z',
     endedAt: '2026-08-21T09:10:00.000Z',
     durationSeconds: 600,
+    autoClosed: false,
     ...overrides,
   };
 }

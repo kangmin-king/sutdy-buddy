@@ -178,6 +178,7 @@ export interface StudySession {
   startedAt: string;
   endedAt: string | null;
   durationSeconds: number | null;
+  autoClosed: boolean;
 }
 
 export interface TomorrowRecommendationItem {

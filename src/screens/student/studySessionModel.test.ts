@@ -12,6 +12,7 @@ function session(overrides: Partial<StudySession> & { id: string; startedAt: str
     plannerItemId: 'item-1',
     endedAt: null,
     durationSeconds: null,
+    autoClosed: false,
     ...overrides,
   };
 }
