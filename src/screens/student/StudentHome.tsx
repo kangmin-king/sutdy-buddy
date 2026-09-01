@@ -8,7 +8,7 @@ import { DistractionStop, isNativePlatform } from '../../native/distractionStop'
 import LinkedManagerChips from './LinkedManagerChips';
 import HomeBanner from '../shared/HomeBanner';
 import type { PlannerItem } from '../../types';
-import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
+import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, filterOpenRunningSessions, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
 import type { NextItemGroup } from './studentHomeModel';
 
 function formatElapsed(seconds: number): string {
@@ -109,9 +109,16 @@ export default function StudentHomeScreen({
     setRunningSessionId(recovered);
   }, [actions, allTodayItems, state.loading, state.studySessions]);
 
+  // 셸의 자동 마감이나 쉬는 시간 처리가 세션을 닫으면 runningSessionId에는 항목이 그대로
+  // 남는다. 아래 모든 판단은 "정말 열려 있는" 것만 봐야 한다.
+  const openRunningSessionId = React.useMemo(
+    () => filterOpenRunningSessions(runningSessionId, state.studySessions),
+    [runningSessionId, state.studySessions],
+  );
+
   const homeModel = React.useMemo(
-    () => buildStudentHomeModel(allTodayItems, state.studySessions, runningSessionId, now),
-    [allTodayItems, state.studySessions, runningSessionId, now],
+    () => buildStudentHomeModel(allTodayItems, state.studySessions, openRunningSessionId, now),
+    [allTodayItems, state.studySessions, openRunningSessionId, now],
   );
   // 선생님이 여러 명일 때만 의미가 있는 정렬 토글 — 세션 안에서만 기억하고 서버엔 저장하지 않는다.
   const [sortMode, setSortMode] = React.useState<'time' | 'manager'>('time');
@@ -133,7 +140,7 @@ export default function StudentHomeScreen({
   }, []);
 
   const handleStart = async (itemId: string) => {
-    if (startPending[itemId] || !canStartStudyItem(runningSessionId, itemId)) return;
+    if (startPending[itemId] || !canStartStudyItem(openRunningSessionId, itemId)) return;
     setStartPending((m) => ({ ...m, [itemId]: true }));
     try {
       const sessionId = await actions.startStudySession(itemId);
@@ -203,7 +210,7 @@ export default function StudentHomeScreen({
           proposalManagerLabel,
         );
   const currentItem = homeModel.currentItem;
-  const currentIsRunning = currentItem ? Boolean(runningSessionId[currentItem.id]) : false;
+  const currentIsRunning = currentItem ? Boolean(openRunningSessionId[currentItem.id]) : false;
   const itemOriginLabel = (item: PlannerItem) =>
     item.source === 'homework'
       ? ['숙제', managerLabelFor(item)].filter(Boolean).join(' · ')
@@ -272,11 +279,11 @@ export default function StudentHomeScreen({
             {itemGroups.map((group) => <div key={group.header ?? 'all'}>
               {group.header && <p className="pb-1 pt-3 text-[10px] font-semibold text-tertiary">{group.header}</p>}
               {group.items.map((item) => {
-                const isRunning = Boolean(runningSessionId[item.id]);
+                const isRunning = Boolean(openRunningSessionId[item.id]);
                 const elapsed = homeModel.elapsedSecondsByItemId[item.id] ?? 0;
                 return <article key={item.id} className="flex min-w-0 items-center gap-3 py-3.5">
                   <div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><h3 className="truncate text-sm font-bold text-on-surface">{getSubject(item.subjectId).label}</h3><span className="shrink-0 text-[10px] font-medium text-tertiary">{itemOriginLabel(item)}</span></div><p className="mt-0.5 break-words text-xs leading-relaxed text-on-surface-variant">{itemDetails(item) || '학습 내용 미입력'}</p>{elapsed > 0 && <p className="mt-1 font-mono text-[11px] font-bold tabular-nums text-primary">{formatElapsed(elapsed)} 학습</p>}</div>
-                  <button onClick={() => isRunning ? handleStop(item.id, false) : handleStart(item.id)} disabled={Boolean(startPending[item.id]) || !canStartStudyItem(runningSessionId, item.id)} aria-label={`${getSubject(item.subjectId).label} ${isRunning ? '일시정지' : '시작'}`} className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-[0.96] disabled:opacity-50 ${isRunning ? 'bg-surface-container text-on-surface' : 'bg-primary/10 text-primary'}`}><Icon name={isRunning ? 'pause' : 'play_arrow'} className="!text-[17px]" />{isRunning ? '멈춤' : '시작'}</button>
+                  <button onClick={() => isRunning ? handleStop(item.id, false) : handleStart(item.id)} disabled={Boolean(startPending[item.id]) || !canStartStudyItem(openRunningSessionId, item.id)} aria-label={`${getSubject(item.subjectId).label} ${isRunning ? '일시정지' : '시작'}`} className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-[0.96] disabled:opacity-50 ${isRunning ? 'bg-surface-container text-on-surface' : 'bg-primary/10 text-primary'}`}><Icon name={isRunning ? 'pause' : 'play_arrow'} className="!text-[17px]" />{isRunning ? '멈춤' : '시작'}</button>
                 </article>;
               })}
             </div>)}

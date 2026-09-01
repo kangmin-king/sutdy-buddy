@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PlannerItem, StudySession } from '../../types';
-import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
+import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, filterOpenRunningSessions, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
+import { SESSION_MAX_MILLIS } from '../distractionStopModel';
+import { MAX_SESSION_SECONDS } from './studySessionModel';
 
 function item(id: string, order: number, status: PlannerItem['status'] = 'planned'): PlannerItem {
   return {
@@ -224,6 +226,37 @@ describe('buildStudentHomeModel', () => {
     expect(items[1]).toBe(first);
     expect(sessions).toEqual(sessionsBefore);
     expect(runningSessionIds).toEqual(runningBefore);
+  });
+});
+
+describe('filterOpenRunningSessions', () => {
+  it('keeps an entry whose session is still open', () => {
+    const sessions = { 'item-1': [session('s1', 'item-1', { endedAt: null, durationSeconds: null })] };
+    expect(filterOpenRunningSessions({ 'item-1': 's1' }, sessions)).toEqual({ 'item-1': 's1' });
+  });
+
+  it('drops an entry whose session was closed elsewhere', () => {
+    // 셸의 자동 마감이나 쉬는 시간 처리가 닫은 경우. 남겨두면 canStartStudyItem이
+    // 키 개수만 보기 때문에 학생이 다른 항목을 시작할 수 없다.
+    expect(filterOpenRunningSessions({ 'item-1': 's1' }, { 'item-1': [session('s1', 'item-1')] })).toEqual({});
+  });
+
+  it('drops an entry whose session is not in state at all', () => {
+    expect(filterOpenRunningSessions({ 'item-1': 's-missing' }, {})).toEqual({});
+  });
+});
+
+describe('buildStudentHomeModel elapsed cap', () => {
+  it('caps the live elapsed time of a forgotten session at three hours', () => {
+    const startedAt = '2026-08-21T09:00:00.000Z';
+    const nowMs = Date.parse(startedAt) + SESSION_MAX_MILLIS * 4;
+    const model = buildStudentHomeModel(
+      [item('item-1', 1)],
+      { 'item-1': [session('s1', 'item-1', { startedAt, endedAt: null, durationSeconds: null })] },
+      { 'item-1': 's1' },
+      nowMs,
+    );
+    expect(model.elapsedSecondsByItemId['item-1']).toBe(MAX_SESSION_SECONDS);
   });
 });
 

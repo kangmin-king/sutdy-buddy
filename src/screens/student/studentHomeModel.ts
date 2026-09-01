@@ -1,4 +1,5 @@
 import type { PlannerItem, StudySession } from '../../types';
+import { cappedSessionSeconds } from './studySessionModel';
 
 export interface StudentHomeModel {
   currentItem: PlannerItem | null;
@@ -31,7 +32,9 @@ export function buildStudentHomeModel(
       // 세션을 닫아도 화면의 runningSessionId는 그대로 남을 수 있는데, endedAt을 보지 않으면
       // durationSeconds와 실시간 경과가 둘 다 더해져 표시 시간이 두 배로 뛰고 쉬는 동안 계속 올라간다.
       if (runningSession && runningSession.endedAt == null) {
-        elapsedSeconds += Math.max(0, Math.floor((nowMs - Date.parse(runningSession.startedAt)) / 1000));
+        // 상한이 없으면 멈춤을 안 누른 세션이 "12:00:00 학습"으로 표시된다. 자동 마감이
+        // 쓰는 값과 같은 함수를 써서 화면과 저장값이 어긋날 수 없게 한다.
+        elapsedSeconds += cappedSessionSeconds(runningSession.startedAt, nowMs);
       }
       return [item.id, elapsedSeconds];
     }),
@@ -147,4 +150,21 @@ export function groupNextItemsByManager(
     items: itemsByManagerId.get(managerId) ?? [],
   }));
   return selfAdded.length > 0 ? [...groups, { header: '직접 추가', items: selfAdded }] : groups;
+}
+
+// 화면의 runningSessionIds에서 이미 닫힌 세션을 걸러낸다.
+//
+// runningSessionIds는 StudentHome의 화면 상태라, 세션을 닫은 주체가 화면 밖이면(쉬는 시간
+// 처리, 자동 마감) 항목이 키로 남는다. canStartStudyItem은 키 개수만 보므로 그 상태에서는
+// 학생이 다른 항목을 시작할 수 없다. 어디서 닫혔든 화면이 스스로 회복하게 한다.
+export function filterOpenRunningSessions(
+  runningSessionIds: Readonly<Record<string, string>>,
+  studySessions: Readonly<Record<string, readonly StudySession[]>>,
+): Record<string, string> {
+  const open: Record<string, string> = {};
+  for (const [itemId, sessionId] of Object.entries(runningSessionIds)) {
+    const session = (studySessions[itemId] ?? []).find((s) => s.id === sessionId);
+    if (session && session.endedAt == null) open[itemId] = sessionId;
+  }
+  return open;
 }
