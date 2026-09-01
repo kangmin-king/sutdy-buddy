@@ -15,6 +15,9 @@ export function useExpiredSessionClose(): void {
   const { state, actions } = useAppState();
   const [minuteTick, setMinuteTick] = React.useState(() => Math.floor(Date.now() / 60_000));
   const closing = React.useRef(false);
+  // 이 Set이 막는 것은 "정산이 끝난 세션을 또 보내는 것"이다 — 재시도 폭주 방지가 전부다.
+  // 쓰기가 실패하면(서버 에러) id를 넣지 않으므로 다음 스캔에서 다시 시도된다. 동시 배치
+  // 자체는 이미 closing.current가 막는다.
   const sentSessionIds = React.useRef<Set<string>>(new Set());
 
   // useAllowedAppUsageFlush와 같은 이유로 actions와 studySessions를 ref로 든다: 이 훅이
@@ -51,12 +54,29 @@ export function useExpiredSessionClose(): void {
     if (expired.length === 0) return;
 
     closing.current = true;
-    for (const session of expired) sentSessionIds.current.add(session.sessionId);
 
     void (async () => {
       try {
         for (const { itemId, sessionId, endedAt, durationSeconds } of expired) {
-          await actionsRef.current.autoCloseStudySession(itemId, sessionId, endedAt, durationSeconds);
+          try {
+            // settled === true는 "쓰기 성공" 또는 "가드가 0건으로 거부"(학생이 먼저 멈춤을
+            // 눌러 이미 정직한 값이 들어간 경우) 둘 다를 뜻한다 — 둘 다 재시도할 게 없다.
+            // false는 서버 에러뿐이고, 그때만 id를 표시하지 않아 다음 스캔에서 다시 시도된다.
+            const settled = await actionsRef.current.autoCloseStudySession(
+              itemId,
+              sessionId,
+              endedAt,
+              durationSeconds,
+            );
+            if (settled) sentSessionIds.current.add(sessionId);
+          } catch (err) {
+            // autoCloseStudySession 자체가 reject하는 경우(네트워크 예외 등, PostgREST가
+            // { error }로 돌려주는 정상 실패 경로와 다르다) 여기서 잡아 로그만 남긴다.
+            // id를 표시하지 않으므로 다음 스캔에서 다시 시도된다 — 삼키지 않되, 사용자에게
+            // 보이는 에러 배너는 액션 내부의 실패 경로에서 이미 담당하므로 여기서 또
+            // 세우지는 않는다.
+            console.error('autoCloseStudySession threw unexpectedly:', err);
+          }
         }
       } finally {
         closing.current = false;

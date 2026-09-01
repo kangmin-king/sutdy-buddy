@@ -150,12 +150,16 @@ interface AppStateActions {
   updateHomeworkAssignment: (id: string, patch: Partial<HomeworkAssignment>) => Promise<void>;
   startStudySession: (plannerItemId: string) => Promise<string>;
   endStudySession: (plannerItemId: string, sessionId: string, displayedSeconds?: number) => Promise<void>;
+  // 반환값은 "이 세션은 더 손댈 게 남았는가"가 아니라 "정산이 끝났는가"를 뜻한다: 실제
+  // 쓰기가 성공했든, 가드가 0건으로 거부했든(학생이 먼저 멈춤을 눌러 이미 정직한 값이
+  // 들어간 경우) 둘 다 true — 재시도할 이유가 없다. 서버 에러일 때만 false이고, 그때만
+  // 호출자가 다음 스캔에서 다시 시도해야 한다.
   autoCloseStudySession: (
     itemId: string,
     sessionId: string,
     endedAt: string,
     durationSeconds: number
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   registerDeviceToken: (token: string) => Promise<void>;
@@ -997,14 +1001,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('autoCloseStudySession failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-          return;
+          return false;
         }
 
         const updatedRow = data?.[0];
         // 행이 안 돌아오면 가드가 막았다는 뜻 — 학생이 그새 직접 멈춰서 ended_at이 이미
         // 채워져 있었다. endStudySession이 로컬 상태를 이미 갱신했으니 여기서는 그대로 둔다.
-        // 실패가 아니라 가드가 제 역할을 한 것이므로 에러도 세우지 않는다.
-        if (!updatedRow) return;
+        // 실패가 아니라 가드가 제 역할을 한 것이므로 에러도 세우지 않는다 — 그리고 정산은
+        // 끝난 것이므로 호출자에게는 true를 돌려준다.
+        if (!updatedRow) return true;
 
         // 보낸 값을 그대로 단정하지 않고 studySessionFromRow로 실제 행을 매핑한다 —
         // 로컬 상태가 DB와 정확히 일치하게 한다.
@@ -1014,6 +1019,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           const updated = list.map((sess) => (sess.id === sessionId ? updatedSession : sess));
           return { ...s, studySessions: { ...s.studySessions, [itemId]: updated } };
         });
+        return true;
       },
 
       async updateStudentLabel(studentId, label) {
