@@ -51,6 +51,7 @@ import type {
   AllowedAppInterval,
 } from '../types';
 import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
+import { cappedSessionSeconds } from '../screens/student/studySessionModel';
 
 interface AppState {
   profile: Profile | null;
@@ -938,9 +939,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 기준으로 다시 정밀 계산하면(Date.now() 재조회) 마지막으로 화면에 보이던 값과 어긋나
         // 정지하는 순간 숫자가 위아래로 튀어 보인다. 호출자가 화면에 보이던 그 값을
         // displayedSeconds로 넘겨주면 그걸 그대로 저장해서 "보이던 값 = 저장되는 값"을 보장한다.
-        // (자동 이탈 종료처럼 화면 값이 없는 호출은 기존대로 정밀 계산한다.)
+        // (자동 이탈 종료처럼 화면 값이 없는 호출은 기존대로 정밀 계산한다.) 지금은 모든 호출자가
+        // displayedSeconds를 넘기므로 이 분기가 실행되지는 않지만, 그렇더라도 상한 없이 계산하면
+        // 이 함수가 막으려는 것과 같은 결함(부풀려진 시간)이 그대로 재현된다 — 앞으로 이 인자를
+        // 생략하는 호출자가 생겨도 안전하도록 여기도 같은 cappedSessionSeconds를 쓴다.
         const durationSeconds = existing
-          ? (displayedSeconds ?? Math.floor((Date.parse(endedAt) - Date.parse(existing.startedAt)) / 1000))
+          ? (displayedSeconds ?? cappedSessionSeconds(existing.startedAt, Date.parse(endedAt)))
           : null;
 
         setState((s) => {

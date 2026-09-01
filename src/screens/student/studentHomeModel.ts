@@ -1,5 +1,5 @@
 import type { PlannerItem, StudySession } from '../../types';
-import { cappedSessionSeconds } from './studySessionModel';
+import { cappedSessionSeconds, MAX_SESSION_SECONDS } from './studySessionModel';
 
 export interface StudentHomeModel {
   currentItem: PlannerItem | null;
@@ -99,9 +99,15 @@ export function findStaleRunningSessions(
   return running.slice(0, -1).map(({ itemId, session }, index) => ({
     itemId,
     sessionId: session.id,
-    durationSeconds: Math.max(
-      0,
-      Math.floor((Date.parse(running[index + 1].session.startedAt) - Date.parse(session.startedAt)) / 1000),
+    // 다음 세션이 시작되기까지의 벽시계 간격을 그대로 쓰면, 며칠을 건너뛰고 다시 시작한
+    // 학생의 세션이 그 며칠을 전부 학습 시간으로 떠안는다. 자동 마감/화면 표시와 같은
+    // 상한을 적용해 정직한 값만 저장한다.
+    durationSeconds: Math.min(
+      MAX_SESSION_SECONDS,
+      Math.max(
+        0,
+        Math.floor((Date.parse(running[index + 1].session.startedAt) - Date.parse(session.startedAt)) / 1000),
+      ),
     ),
   }));
 }

@@ -203,6 +203,57 @@ describe('buildStudentHomeModel', () => {
       { itemId: 'current', sessionId: 'session-a', durationSeconds: 0 },
     ]);
   });
+
+  // 회귀: 월요일에 열어둔 세션을 수요일에 다시 시작하면, 다음 세션 시작까지의 벽시계 간격을
+  // 그대로 쓸 경우 이틀치가 학습 시간으로 잡힌다. 화면 표시/자동 마감과 같은 상한을 걸어야 한다.
+  it('caps a stale session gap of multiple days at the session max', () => {
+    const sessions = {
+      current: [
+        session('older-active', 'current', {
+          startedAt: '2026-08-17T09:00:00.000Z',
+          endedAt: null,
+          durationSeconds: null,
+        }),
+      ],
+      next: [
+        session('newer-active', 'next', {
+          startedAt: '2026-08-19T09:00:00.000Z',
+          endedAt: null,
+          durationSeconds: null,
+        }),
+      ],
+    };
+    const visibleItemIds = new Set(['current', 'next']);
+
+    expect(findStaleRunningSessions(sessions, visibleItemIds)).toEqual([
+      { itemId: 'current', sessionId: 'older-active', durationSeconds: MAX_SESSION_SECONDS },
+    ]);
+  });
+
+  it('preserves an honest gap under the session max unchanged', () => {
+    const sessions = {
+      current: [
+        session('older-active', 'current', {
+          startedAt: '2026-08-21T09:00:00.000Z',
+          endedAt: null,
+          durationSeconds: null,
+        }),
+      ],
+      next: [
+        session('newer-active', 'next', {
+          startedAt: '2026-08-21T10:00:00.000Z',
+          endedAt: null,
+          durationSeconds: null,
+        }),
+      ],
+    };
+    const visibleItemIds = new Set(['current', 'next']);
+
+    expect(findStaleRunningSessions(sessions, visibleItemIds)).toEqual([
+      { itemId: 'current', sessionId: 'older-active', durationSeconds: 3600 },
+    ]);
+  });
+
   it('allows starting only when no other item is running', () => {
     expect(canStartStudyItem({}, 'next')).toBe(true);
     expect(canStartStudyItem({ current: 'active' }, 'current')).toBe(true);
