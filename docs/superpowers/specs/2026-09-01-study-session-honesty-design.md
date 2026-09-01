@@ -54,8 +54,8 @@ const durationSeconds = existing ? (displayedSeconds ?? …) : null;
 | `src/screens/student/studySessionModel.ts` (신규) | 상한 규칙과 만료 세션 탐색. 순수 함수만. |
 | `src/screens/student/pendingPauseModel.ts` (수정) | `secondsUntil` 삭제, 새 모듈의 `cappedSessionSeconds`를 쓴다 |
 | `src/screens/student/useExpiredSessionClose.ts` (신규) | 마감 쓰기를 발사하는 훅. 트리거와 중복 방지 담당. |
-| `src/screens/student/StudentHome.tsx` (수정) | 훅 연결, 화면 경과에 상한 적용 |
-| `src/screens/student/studentHomeModel.ts` (수정) | 실시간 경과를 `cappedSessionSeconds`로 |
+| `src/App.tsx` (수정) | 훅을 학생 셸에서 부른다 |
+| `src/screens/student/studentHomeModel.ts` (수정) | 실시간 경과에 상한, 닫힌 세션을 실행 중 목록에서 걸러냄 |
 | `src/state/AppStateContext.tsx` (수정) | `autoCloseStudySession` 액션, 결함 3 수정 |
 | `src/state/mappers.ts`, `src/types/index.ts`, `src/types/db.ts` (수정) | `autoClosed` 필드 |
 | `src/screens/shared/ChecklistTimeline.tsx`, `src/screens/manager/ManagerHome.tsx` (수정) | 자동 마감 표시 |
@@ -105,6 +105,21 @@ export function findExpiredOpenSessions(
 
 `isNativePlatform()`이 아닐 때는 resume 리스너를 걸지 않는다(웹에서는 마운트 트리거만).
 
+### 닫힌 세션이 화면을 막지 않게 하기
+
+`StudentHome`의 `runningSessionId`는 화면 상태이고, 셸의 훅이 세션을 닫아도 그대로 남는다. `canStartStudyItem`은 그 **키만** 보므로(`Object.keys(...).length`) 닫힌 세션이 남아 있는 동안 학생은 **다른 항목을 시작할 수 없다.** 지금도 `usePendingStudyPause`가 같은 상황을 만들지만(`handleStop`의 주석이 그 사실을 기록하고 있다) 자동 마감이 들어오면 훨씬 자주 벌어진다.
+
+순수 함수 하나를 더한다:
+
+```ts
+export function filterOpenRunningSessions(
+  runningSessionIds: Readonly<Record<string, string>>,
+  studySessions: Readonly<Record<string, readonly StudySession[]>>,
+): Record<string, string>;
+```
+
+세션이 이미 닫힌 항목은 결과에서 뺀다. `StudentHome`은 원본 대신 이 값을 `canStartStudyItem`·버튼 표시·`buildStudentHomeModel`에 넘긴다. 이렇게 하면 마감이 어디서 일어났든(쉬는 시간, 자동 마감, 다른 탭) 화면이 스스로 회복한다.
+
 ### `autoCloseStudySession` 액션
 
 ```ts
@@ -151,7 +166,7 @@ where ended_at is not null and duration_seconds is null;
 
 ### 매니저 표시
 
-- `ChecklistTimeline`: 자동 마감 블록은 채도를 낮춰(`opacity-50`) 그린다. 빗금 패턴은 얇은 타임라인 막대에서 읽히지 않으므로 쓰지 않는다. 접근성 라벨에 `자동 마감`을 넣는다 — 색만으로 정보를 전달하지 않는다.
+- `TimelineColumn`: 자동 마감 칸은 채도를 낮춰(`opacity` 0.8 → 0.35) 그린다. **빗금은 쓸 수 없다** — 45° 빗금은 이미 허용앱 칸이 쓰고 있어서(`TimelineColumn.tsx`) 겹치면 둘을 구분할 수 없다. 칸의 `title`에 `자동 마감`을 넣는다 — 색만으로 정보를 전달하지 않는다. `TimelineSegment`에 `autoClosed: boolean`을 추가한다.
 - `ManagerHome`: 세션 시간을 문자로 보여주는 자리에 `(자동 마감)`을 붙인다.
 
 합계에는 **포함한다.** 3시간은 상한이지 0이 아니고, 빼버리면 결함 2(시간이 사라진다)를 다시 만드는 셈이다.
