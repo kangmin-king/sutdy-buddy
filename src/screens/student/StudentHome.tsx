@@ -10,6 +10,7 @@ import HomeBanner from '../shared/HomeBanner';
 import type { PlannerItem } from '../../types';
 import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, filterOpenRunningSessions, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
 import type { NextItemGroup } from './studentHomeModel';
+import { cappedSessionSeconds } from './studySessionModel';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -174,7 +175,9 @@ export default function StudentHomeScreen({
     if (running == null || running.endedAt == null) {
       // 화면에 이미 보이고 있던 값을 그대로 저장한다. 정지 시각 기준으로 다시 정밀 계산하면
       // 1초 주기로만 갱신되는 화면 표시값과 어긋나, 정지하는 순간 숫자가 위아래로 튀어 보인다.
-      const displayedSeconds = running ? Math.floor((now - Date.parse(running.startedAt)) / 1000) : undefined;
+      // 화면 표시(buildStudentHomeModel)도 같은 cappedSessionSeconds를 쓰므로, 3시간을
+      // 넘겨 손으로 멈춘 세션도 화면에 보인 값과 저장되는 값이 갈라지지 않는다.
+      const displayedSeconds = running ? cappedSessionSeconds(running.startedAt, now) : undefined;
       actions.endStudySession(itemId, sessionId, displayedSeconds);
     }
     if (isNativePlatform()) {
