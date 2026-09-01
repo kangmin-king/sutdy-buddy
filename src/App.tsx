@@ -30,6 +30,7 @@ import { useOpenDistractionStopRequest, isNativePlatform } from './native/distra
 import { usePushRegistration } from './native/push';
 import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
 import { useAllowedAppUsageFlush } from './screens/student/useAllowedAppUsageFlush';
+import { useExpiredSessionClose } from './screens/student/useExpiredSessionClose';
 import type { PlannerItem } from './types';
 
 type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
@@ -86,6 +87,10 @@ function StudentAppShell() {
 
   // 허용앱 사용 구간도 같은 이유로 셸에서 처리한다 — 오버레이가 떠도 계속 돌아야 한다.
   useAllowedAppUsageFlush();
+
+  // 멈춤을 누르지 않아 3시간이 지난 학습 세션을 닫는다. 같은 이유로 셸에서 부른다 —
+  // 오버레이가 떠 있는 동안에도 돌아야 하고, 학생 홈의 마운트 여부와 무관해야 한다.
+  useExpiredSessionClose();
 
   // 이 오버레이가 떠 있는 동안은 휴대폰 뒤로 가기 버튼도 왼쪽 위 화살표랑 똑같이 오버레이만
   // 닫아야 한다 — 기본 동작대로 두면 뒤로 가기가 앱을 통째로 나가버린다.
