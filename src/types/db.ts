@@ -150,6 +150,14 @@ export type SbDeviceTokenRow = {
   updated_at: string;
 };
 
+export type SbHomeworkReminderSettingRow = {
+  student_id: string;
+  remind_at: string; // Postgres time → "HH:MM:SS"
+  enabled: boolean;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type AllowedAppIntervalRow = {
   id: string;
   user_id: string;
@@ -200,6 +208,14 @@ export interface Database {
         Row: SbSchoolTimetableSlotRow;
         Insert: Omit<SbSchoolTimetableSlotRow, 'updated_at'>;
         Update: Partial<SbSchoolTimetableSlotRow>;
+        Relationships: [];
+      };
+      // updated_at은 DB 기본값에 맡긴다. sb_homework_reminder_log는 여기 없다 — 알림 함수만
+      // (service role로) 읽고 쓰는 표라 클라이언트에서 접근하지 않는다(0023 마이그레이션).
+      sb_homework_reminder_settings: {
+        Row: SbHomeworkReminderSettingRow;
+        Insert: Omit<SbHomeworkReminderSettingRow, 'updated_at'>;
+        Update: Partial<SbHomeworkReminderSettingRow>;
         Relationships: [];
       };
       // id는 DB의 gen_random_uuid() 기본값에 맡긴다(0020 마이그레이션). 재전송 안전은

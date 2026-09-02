@@ -40,6 +40,10 @@ export function resolveSubjectColor(id: SubjectId, customColors?: Record<string,
 
 export const GRADES: Grade[] = ['중1', '중2', '중3', '고1', '고2', '고3'];
 
+// 숙제 미시작 알림의 기본 시각. 설정 행이 없는 학생에게 이 값이 적용된다 —
+// 0023 마이그레이션의 컬럼 기본값, 알림 함수의 DEFAULT_REMIND_AT과 같은 값이어야 한다.
+export const DEFAULT_HOMEWORK_REMIND_AT = '21:00';
+
 // 딴짓 멈춰는 초기 설정 이후로는 대부분 네이티브 알림(상단바 내려서)으로 여닫아서, 하단 탭 대신
 // 오른쪽 아래 떠 있는 원형 버튼으로 옮겼다(App.tsx의 StudentAppShell).
 // "캘린더"는 선생님 캘린더 탭과 같은 월간 그리드(과외 요일/시험일 표시). 오늘 시간대별 타임라인은

@@ -1,8 +1,8 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
-import { Icon, BottomSheet, Button, TextField, ChipGroup, useConfirm } from '../../primitives';
-import { SUBJECTS, getSubject } from '../../constants';
+import { Icon, BottomSheet, Button, TextField, ChipGroup, ToggleSwitch, useConfirm } from '../../primitives';
+import { SUBJECTS, getSubject, DEFAULT_HOMEWORK_REMIND_AT } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
 import { DayProgressRing } from '../shared/DayProgressRing';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
@@ -25,6 +25,9 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const [proposalMaterial, setProposalMaterial] = React.useState('');
   const [proposalPageRange, setProposalPageRange] = React.useState('');
   const [timetableSheetOpen, setTimetableSheetOpen] = React.useState(false);
+  const [reminderSheetOpen, setReminderSheetOpen] = React.useState(false);
+  const [draftRemindAt, setDraftRemindAt] = React.useState(DEFAULT_HOMEWORK_REMIND_AT);
+  const [draftReminderEnabled, setDraftReminderEnabled] = React.useState(true);
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
@@ -46,6 +49,10 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
     getTutoringDaysInRange(schedule?.weekdays ?? [], scheduleExceptions, grid[0].key, grid[grid.length - 1].key)
   );
   const [draftWeekdays, setDraftWeekdays] = React.useState<number[]>(schedule?.weekdays ?? []);
+  // 설정 행이 없는 학생은 기본값으로 동작한다(0023 마이그레이션) — 화면에도 같은 값을 보여준다.
+  const reminderSetting = state.homeworkReminderSettings[studentId];
+  const remindAt = reminderSetting?.remindAt ?? DEFAULT_HOMEWORK_REMIND_AT;
+  const reminderEnabled = reminderSetting?.enabled ?? true;
 
   const itemsByDate = state.studentPlannerItems[studentId] ?? {};
   const selectedItems = (itemsByDate[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
@@ -72,7 +79,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
 
       {/* 예전엔 화면마다 작은 밑줄 텍스트 링크로 흩어져 있던 기능들이라 있는지도 잘 몰랐다는
           피드백을 받았다. 항상 같은 자리, 같은 아이콘으로 보이게 한 줄로 모았다. */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-4 gap-2 mb-4">
         <button
           onClick={() => {
             setProposalSubjectId('math');
@@ -98,6 +105,20 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
         >
           <Icon name="event_repeat" className="!text-[20px] text-primary" />
           <span className="text-[11px] text-on-surface-variant">요일 설정</span>
+        </button>
+        <button
+          onClick={() => {
+            setDraftRemindAt(remindAt);
+            setDraftReminderEnabled(reminderEnabled);
+            setReminderSheetOpen(true);
+          }}
+          className="flex flex-col items-center gap-1 py-2 rounded-2xl bg-surface-container"
+        >
+          <Icon
+            name={reminderEnabled ? 'notifications_active' : 'notifications_off'}
+            className={`!text-[20px] ${reminderEnabled ? 'text-primary' : 'text-on-surface-variant'}`}
+          />
+          <span className="text-[11px] text-on-surface-variant">{reminderEnabled ? `미시작 ${remindAt}` : '미시작 알림'}</span>
         </button>
       </div>
 
@@ -281,6 +302,25 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             }}
           >
             제안 보내기
+          </Button>
+        </div>
+      </BottomSheet>
+      <BottomSheet open={reminderSheetOpen} onClose={() => setReminderSheetOpen(false)} title="숙제 미시작 알림">
+        <div className="space-y-3">
+          <p className="text-xs text-on-surface-variant">
+            이 시각까지 오늘 숙제를 <b>하나도 시작하지 않으면</b> 알림을 보내요. 하루에 한 번만 오고, 학생이 시작만 해도
+            오지 않아요. 오늘 배정된 숙제가 없는 날은 보내지 않아요.
+          </p>
+          <ToggleSwitch label="알림 받기" checked={draftReminderEnabled} onChange={setDraftReminderEnabled} />
+          {draftReminderEnabled && <TextField label="알림 시각" type="time" value={draftRemindAt} onChange={setDraftRemindAt} />}
+          <Button
+            className="w-full"
+            onClick={() => {
+              actions.upsertHomeworkReminderSetting(studentId, { remindAt: draftRemindAt, enabled: draftReminderEnabled });
+              setReminderSheetOpen(false);
+            }}
+          >
+            저장
           </Button>
         </div>
       </BottomSheet>

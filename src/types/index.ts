@@ -129,6 +129,14 @@ export interface HomeworkProposal {
   respondedAt: string | null;
 }
 
+// 숙제 미시작 알림 설정. 학생마다 행이 있는 게 아니라, 매니저가 한 번이라도 손댄 학생에게만
+// 행이 생긴다 — 행이 없으면 DEFAULT_HOMEWORK_REMIND_AT · 켜짐으로 동작한다.
+export interface HomeworkReminderSetting {
+  studentId: string;
+  remindAt: string; // "HH:MM" (Asia/Seoul)
+  enabled: boolean;
+}
+
 export interface StudySession {
   id: string;
   plannerItemId: string;

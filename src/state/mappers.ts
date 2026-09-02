@@ -10,6 +10,7 @@ import type {
   TutoringScheduleException,
   HomeworkProposal,
   SchoolTimetableSlot,
+  HomeworkReminderSetting,
   AllowedAppInterval,
 } from '../types';
 import type {
@@ -24,6 +25,7 @@ import type {
   SbTutoringScheduleRow,
   SbTutoringScheduleExceptionRow,
   SbSchoolTimetableSlotRow,
+  SbHomeworkReminderSettingRow,
   AllowedAppIntervalRow,
 } from '../types/db';
 
@@ -129,6 +131,12 @@ export function homeworkProposalFromRow(row: SbHomeworkProposalRow): HomeworkPro
 
 export function schoolTimetableSlotFromRow(row: SbSchoolTimetableSlotRow): SchoolTimetableSlot {
   return { id: row.id, studentId: row.student_id, weekday: row.weekday, period: row.period, subject: row.subject, updatedAt: row.updated_at };
+}
+
+// Postgres time은 "21:00:00"으로 오는데 UI(TextField type="time")와 비교·표시는 "HH:MM"으로
+// 한다. scheduleBlockFromRow가 하던 slice(0, 5)와 같은 처리다.
+export function homeworkReminderSettingFromRow(row: SbHomeworkReminderSettingRow): HomeworkReminderSetting {
+  return { studentId: row.student_id, remindAt: row.remind_at.slice(0, 5), enabled: row.enabled };
 }
 
 export function allowedAppIntervalFromRow(row: AllowedAppIntervalRow): AllowedAppInterval {

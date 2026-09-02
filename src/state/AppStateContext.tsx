@@ -23,6 +23,7 @@ import {
   tutoringScheduleExceptionFromRow,
   homeworkProposalFromRow,
   schoolTimetableSlotFromRow,
+  homeworkReminderSettingFromRow,
   allowedAppIntervalFromRow,
 } from './mappers';
 import type {
@@ -39,6 +40,7 @@ import type {
   SubjectId,
   HomeworkProposal,
   SchoolTimetableSlot,
+  HomeworkReminderSetting,
   AllowedAppInterval,
 } from '../types';
 import type { SbPlannerItemRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
@@ -63,6 +65,9 @@ interface AppState {
   sentHomeworkProposals: Record<string, HomeworkProposal[]>;
   schoolTimetable: SchoolTimetableSlot[];
   studentSchoolTimetables: Record<string, SchoolTimetableSlot[]>;
+  // 숙제 미시작 알림 설정. 관리자 로그인에서만 채운다(설정 UI가 관리자 쪽에만 있다).
+  // 키가 없는 학생은 기본값(DEFAULT_HOMEWORK_REMIND_AT · 켜짐)이다 — DB에 행이 없는 것과 같다.
+  homeworkReminderSettings: Record<string, HomeworkReminderSetting>;
   loading: boolean;
   error: string | null;
 }
@@ -87,6 +92,7 @@ const EMPTY_STATE: AppState = {
   sentHomeworkProposals: {},
   schoolTimetable: [],
   studentSchoolTimetables: {},
+  homeworkReminderSettings: {},
   loading: true,
   error: null,
 };
@@ -160,6 +166,7 @@ interface AppStateActions {
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
+  upsertHomeworkReminderSetting: (studentId: string, setting: { remindAt: string; enabled: boolean }) => Promise<void>;
   upsertSchoolTimetableSlot: (weekday: number, period: number, subject: string) => Promise<void>;
   deleteSchoolTimetableSlot: (slotId: string) => Promise<void>;
   loadStudentSchoolTimetable: (studentId: string) => Promise<void>;
@@ -274,6 +281,7 @@ async function loadAll(userId: string): Promise<AppState> {
   let managerLabels: Record<string, string> = {};
   let homeworkProposals: HomeworkProposal[] = [];
   let schoolTimetable: SchoolTimetableSlot[] = [];
+  let homeworkReminderSettings: Record<string, HomeworkReminderSetting> = {};
 
   if (profile?.role === 'manager') {
     managedStudents = await fetchManagedStudents(userId);
@@ -282,15 +290,20 @@ async function loadAll(userId: string): Promise<AppState> {
     // 관리자 계정에서는 위 병렬 조회(student_id/user_id = 본인)가 항상 비어 있다.
     // 담당 학생들 기준으로 다시 조회해야 등록해둔 숙제와 학습 세션이 보인다.
     if (studentIds.length > 0) {
-      const [managerHomeworkRes, managerSessionsRes, examRes, scheduleRes, exceptionRes] = await Promise.all([
+      const [managerHomeworkRes, managerSessionsRes, examRes, scheduleRes, exceptionRes, reminderRes] = await Promise.all([
         supabase.from('sb_homework_assignments').select('*').in('student_id', studentIds),
         supabase.from('sb_study_sessions').select('*').in('user_id', studentIds),
         supabase.from('sb_exam_records').select('*').in('student_id', studentIds),
         supabase.from('sb_tutoring_schedules').select('*').eq('manager_id', userId),
         supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('manager_id', userId),
+        supabase.from('sb_homework_reminder_settings').select('*').in('student_id', studentIds),
       ]);
       homeworkRows = managerHomeworkRes.data ?? [];
       sessionRows = managerSessionsRes.data ?? [];
+      for (const row of reminderRes.data ?? []) {
+        const setting = homeworkReminderSettingFromRow(row);
+        homeworkReminderSettings[setting.studentId] = setting;
+      }
       examRecords = (examRes.data ?? []).map(examRecordFromRow);
       tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
       tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
@@ -360,6 +373,7 @@ async function loadAll(userId: string): Promise<AppState> {
     sentHomeworkProposals: {},
     schoolTimetable,
     studentSchoolTimetables: {},
+    homeworkReminderSettings,
     loading: false,
     error: null,
   };
@@ -1407,6 +1421,33 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 매니저가 이 학생 화면을 열 때도 그 학생의 허용앱 사용 구간을 불러온다. 부가 정보라
         // 실패해도 위에서 이미 반영된 학생 planner 로드를 막지 않는다.
         void this.loadAllowedAppIntervals(studentId);
+      },
+
+      // 숙제 미시작 알림 설정. 실패하면 이전 값(없었으면 없던 상태)으로 되돌린다 — 낙관적
+      // 업데이트만 하고 롤백을 안 하면 매니저는 "9시로 바꿨다"고 믿는데 서버는 21시로 남는다.
+      async upsertHomeworkReminderSetting(studentId, setting) {
+        const previous = state.homeworkReminderSettings[studentId];
+        const optimistic: HomeworkReminderSetting = { studentId, remindAt: setting.remindAt, enabled: setting.enabled };
+        setState((s) => ({ ...s, homeworkReminderSettings: { ...s.homeworkReminderSettings, [studentId]: optimistic } }));
+
+        const { error } = await supabase.from('sb_homework_reminder_settings').upsert(
+          {
+            student_id: studentId,
+            remind_at: setting.remindAt,
+            enabled: setting.enabled,
+            updated_by: userId,
+          },
+          { onConflict: 'student_id' }
+        );
+        if (error) {
+          console.error('upsertHomeworkReminderSetting failed:', error.message);
+          setState((s) => {
+            const next = { ...s.homeworkReminderSettings };
+            if (previous) next[studentId] = previous;
+            else delete next[studentId];
+            return { ...s, homeworkReminderSettings: next, error: WRITE_FAILURE_MESSAGE };
+          });
+        }
       },
 
       async upsertSchoolTimetableSlot(weekday, period, subject) {
