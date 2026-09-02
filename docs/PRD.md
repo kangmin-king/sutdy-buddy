@@ -1,7 +1,7 @@
 # 스터디 벅스 — PRD (Product Requirements Document)
 
 **최신화 기준일:** 2026-08-20
-**브랜치:** `tutor-student-two-track`
+**브랜치:** `main` (2026-09-02에 `tutor-student-two-track`에서 개명, 기본 브랜치)
 **작성 배경:** 투트랙(과외쌤·학부모용 / 학생용) 전환 이후 지금까지 실제로 구현·배포된 기능을 기준으로 정리한 문서. 계획 단계 문서가 아니라 **현재 서비스 중인 앱의 스냅샷**입니다. (구 프로젝트명 "스터디 버디" → "스터디 벅스"로 개명)
 
 ---
@@ -47,7 +47,7 @@
 
 | 배포 단위 | 도메인 | 성격 |
 |---|---|---|
-| 메인 앱 (`tutor-student-two-track`) | `app.studybuks.store` | 학생/매니저가 실제로 쓰는 React SPA. Capacitor로 감싸 안드로이드 APK로도 배포 |
+| 메인 앱 (저장소 루트, `main` 브랜치) | `app.studybuks.store` | 학생/매니저가 실제로 쓰는 React SPA. Capacitor로 감싸 안드로이드 APK로도 배포 |
 | 관리자 웹 (`admin/`) | `app.studybuks.store/admin` (메인 앱 도메인의 rewrite로 프록시) | 별도 Vite 프로젝트, 별도 Vercel 배포 — 배너/회원/브로드캐스트 푸시 관리 |
 | 소개 랜딩페이지 (`landing/`) | `studybuks.store` (루트 도메인) | 별도 Vite 프로젝트, 별도 Vercel 배포 — 서비스 소개 + 다운로드 안내. 앱 로직 없음 |
 
