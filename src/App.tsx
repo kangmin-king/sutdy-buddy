@@ -2,18 +2,10 @@ import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { BottomNav, Card, Button, TopAppBar } from './primitives';
-import type { TabId } from './primitives';
-import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
+import { STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
 import ResetPasswordScreen from './screens/ResetPassword';
 import OnboardingScreen from './screens/Onboarding';
-import HomeScreen from './screens/Home';
-import CalendarScreen from './screens/Calendar';
-import PlannerCreateScreen from './screens/PlannerCreate';
-import ExecutionCheckScreen from './screens/ExecutionCheck';
-import ConditionInputScreen from './screens/ConditionInput';
-import StudyLogScreen from './screens/StudyLog';
-import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
 import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import MockExamTimerScreen from './screens/student/MockExamTimer';
@@ -30,9 +22,6 @@ import { useOpenDistractionStopRequest, isNativePlatform } from './native/distra
 import { usePushRegistration } from './native/push';
 import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
 import { useAllowedAppUsageFlush } from './screens/student/useAllowedAppUsageFlush';
-import type { PlannerItem } from './types';
-
-type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
 
 const MANAGER_TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
@@ -60,8 +49,9 @@ function AppShell() {
   // 학생/선생님 셸 공통 진입점이라 여기 한 번만 등록하면 역할과 무관하게 기기 토큰이 저장된다.
   usePushRegistration(React.useCallback((token: string) => actions.registerDeviceToken(token), [actions]));
 
+  // 프로필이 아직 없으면 역할을 알 수 없다 — 로딩 중이거나 온보딩을 안 끝낸 계정이다.
   if (state.loading || !state.profile) {
-    return <LegacyStudentAppShell />;
+    return <BootstrapShell />;
   }
 
   if (state.profile.role === 'manager') {
@@ -155,13 +145,10 @@ function ManagerAppShell() {
   );
 }
 
-function LegacyStudentAppShell() {
+// 역할이 확정되기 전(로드 중)과 온보딩 전용 셸. 온보딩이 프로필을 저장하면 AppShell이 곧바로
+// 학생/관리자 셸로 넘어가므로, 여기서 따로 화면을 전환할 필요가 없다.
+function BootstrapShell() {
   const { state } = useAppState();
-  const [activeTab, setActiveTab] = React.useState<TabId>('home');
-  const [overlay, setOverlay] = React.useState<Overlay>(null);
-  const [studyLogItem, setStudyLogItem] = React.useState<PlannerItem | null>(null);
-
-  useOpenDistractionStopRequest(React.useCallback(() => setActiveTab('distractionStop'), []));
 
   if (state.loading) {
     return (
@@ -171,42 +158,10 @@ function LegacyStudentAppShell() {
     );
   }
 
-  if (!state.profile) {
-    return (
-      <div id="app-shell">
-        <OnboardingScreen onComplete={() => setActiveTab('home')} />
-      </div>
-    );
-  }
-
-  const openStudyLog = (item: PlannerItem) => {
-    setStudyLogItem(item);
-    setOverlay('studyLog');
-  };
-  const closeOverlay = () => setOverlay(null);
-
-  let overlayScreen: React.ReactNode = null;
-  if (overlay === 'condition') {
-    overlayScreen = <ConditionInputScreen onBack={closeOverlay} />;
-  } else if (overlay === 'studyLog' && studyLogItem) {
-    overlayScreen = <StudyLogScreen plannerItem={studyLogItem} onBack={closeOverlay} />;
-  } else if (overlay === 'aiRecommendation') {
-    overlayScreen = <TomorrowRecommendationScreen onBack={closeOverlay} />;
-  }
-
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {overlayScreen ?? (
-        <>
-          {activeTab === 'home' && <HomeScreen onNavigate={setActiveTab} onOpenOverlay={setOverlay} />}
-          {activeTab === 'calendar' && <CalendarScreen onNavigate={setActiveTab} />}
-          {activeTab === 'planner' && <PlannerCreateScreen />}
-          {activeTab === 'check' && <ExecutionCheckScreen onOpenStudyLog={openStudyLog} onOpenAiRecommendation={() => setOverlay('aiRecommendation')} />}
-          {activeTab === 'distractionStop' && <DistractionStopScreen />}
-          <BottomNav tabs={NAV_TABS} active={activeTab} onChange={setActiveTab} />
-        </>
-      )}
+      <OnboardingScreen onComplete={() => undefined} />
     </div>
   );
 }

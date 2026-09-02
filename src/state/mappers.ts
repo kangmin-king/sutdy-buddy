@@ -1,10 +1,6 @@
 import type {
   Profile,
-  DailyCondition,
-  ScheduleBlock,
   PlannerItem,
-  StudyLogEntry,
-  StudyMaterial,
   HomeworkAssignment,
   StudySession,
   ExamRecord,
@@ -18,11 +14,7 @@ import type {
 } from '../types';
 import type {
   SbProfileRow,
-  SbDailyConditionRow,
-  SbScheduleBlockRow,
   SbPlannerItemRow,
-  SbStudyLogRow,
-  SbStudyMaterialRow,
   SbHomeworkAssignmentRow,
   SbStudySessionRow,
   SbExamRecordRow,
@@ -50,14 +42,6 @@ export function profileFromRow(row: SbProfileRow): Profile {
   };
 }
 
-export function conditionFromRow(row: SbDailyConditionRow): DailyCondition {
-  return { date: row.date, sleepHours: row.sleep_hours, fatigue: row.fatigue, focus: row.focus, mood: row.mood, notes: row.notes };
-}
-
-export function scheduleBlockFromRow(row: SbScheduleBlockRow): ScheduleBlock {
-  return { id: row.id, date: row.date, type: row.type, label: row.label, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5) };
-}
-
 export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
   return {
     id: row.id,
@@ -81,33 +65,6 @@ export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
     source: row.source,
     homeworkAssignmentId: row.homework_assignment_id,
     examSubjectRangeId: row.exam_subject_range_id,
-  };
-}
-
-export function studyLogFromRow(row: SbStudyLogRow): StudyLogEntry {
-  return {
-    id: row.id,
-    date: row.date,
-    plannerItemId: row.planner_item_id,
-    subjectId: row.subject_id,
-    rating: row.rating,
-    blockedTags: row.blocked_tags,
-    detailNote: row.detail_note,
-    selfMessage: row.self_message,
-  };
-}
-
-export function studyMaterialFromRow(row: SbStudyMaterialRow): StudyMaterial {
-  return {
-    id: row.id,
-    subjectId: row.subject_id,
-    materialName: row.material_name,
-    totalScope: row.total_scope,
-    currentProgress: row.current_progress,
-    targetPasses: row.target_passes,
-    targetDate: row.target_date,
-    sessionIntervalDays: row.session_interval_days,
-    createdAt: row.created_at,
   };
 }
 

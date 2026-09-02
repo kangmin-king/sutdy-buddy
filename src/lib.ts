@@ -1,5 +1,4 @@
-import type { ScheduleBlock, PlannerItem, StudyMaterial, DateKey, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
-import { QuickTimeChipId } from './constants';
+import type { PlannerItem, DateKey, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -146,54 +145,6 @@ export function formatMinutes(mins: number): string {
   return `${h}시간 ${m}분`;
 }
 
-export interface FreeGap {
-  start: string;
-  end: string;
-  minutes: number;
-}
-
-export function computeFreeGaps(blocks: ScheduleBlock[], windowStart = '07:00', windowEnd = '24:00'): FreeGap[] {
-  const start = timeToMinutes(windowStart);
-  const end = timeToMinutes(windowEnd === '24:00' ? '23:59' : windowEnd) + (windowEnd === '24:00' ? 1 : 0);
-  const busy = (blocks || [])
-    .map((b) => [timeToMinutes(b.startTime), timeToMinutes(b.endTime)] as [number, number])
-    .filter(([s, e]) => e > s)
-    .sort((a, b) => a[0] - b[0]);
-
-  const merged: [number, number][] = [];
-  for (const range of busy) {
-    if (merged.length && range[0] <= merged[merged.length - 1][1]) {
-      merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], range[1]);
-    } else {
-      merged.push([...range]);
-    }
-  }
-
-  const gaps: FreeGap[] = [];
-  let cursor = start;
-  for (const [s, e] of merged) {
-    const gapStart = Math.max(cursor, start);
-    const gapEnd = Math.min(s, end);
-    if (gapEnd - gapStart >= 10) {
-      gaps.push({ start: minutesToTime(gapStart), end: minutesToTime(gapEnd), minutes: gapEnd - gapStart });
-    }
-    cursor = Math.max(cursor, e);
-  }
-  if (cursor < end && end - cursor >= 10) {
-    gaps.push({ start: minutesToTime(cursor), end: minutesToTime(end === 1440 ? 1439 : end), minutes: end - cursor });
-  }
-  return gaps;
-}
-
-export function sumFreeMinutes(gaps: FreeGap[]): number {
-  return gaps.reduce((sum, g) => sum + g.minutes, 0);
-}
-
-export function getBestGap(gaps: FreeGap[]): FreeGap | null {
-  if (!gaps.length) return null;
-  return gaps.reduce((best, g) => (g.minutes > best.minutes ? g : best), gaps[0]);
-}
-
 export function getPlannerProgress(items: PlannerItem[]) {
   const total = items.length;
   const completed = items.filter((i) => i.status === 'completed').length;
@@ -233,39 +184,10 @@ export function managerDisplayLabel(managerId: string | null, labels: Record<str
   return labels[managerId] ?? `선생님 ${index + 1}`;
 }
 
-export function withEul(word: string): string {
-  if (!word) return word;
-  const last = word.charCodeAt(word.length - 1);
-  if (last < 0xac00 || last > 0xd7a3) return word + '을';
-  const hasBatchim = (last - 0xac00) % 28 !== 0;
-  return word + (hasBatchim ? '을' : '를');
-}
-
 // DB 기본 키 컬럼이 모두 `uuid` 타입이므로 반드시 유효한 UUID를 반환해야 한다
 // (낙관적 로컬 업데이트에 쓰는 id가 그대로 insert 문의 id 컬럼 값이 된다).
 export function uid(): string {
   return crypto.randomUUID();
-}
-
-const QUICK_TIME_FALLBACK: Record<QuickTimeChipId, string> = {
-  now: '', // "now"는 항상 nowTime 인자를 그대로 쓴다 (fallback 미사용)
-  after_school: '17:00',
-  after_dinner: '19:30',
-  before_sleep: '22:00',
-};
-
-// 빠른 선택 칩을 구체적인 "HH:MM"으로 변환한다.
-// "학교·학원 끝나고"는 오늘 일정 중 type이 school/academy인 블록의 가장 늦은 종료 시각 + 10분,
-// 해당하는 일정이 없으면 상수 기본값을 쓴다.
-export function resolveQuickTimeChip(chipId: QuickTimeChipId, blocks: ScheduleBlock[], nowTime: string): string {
-  if (chipId === 'now') return nowTime;
-  if (chipId === 'after_school') {
-    const matching = blocks.filter((b) => b.type === 'school' || b.type === 'academy');
-    if (matching.length === 0) return QUICK_TIME_FALLBACK.after_school;
-    const latestEnd = matching.reduce((max, b) => Math.max(max, timeToMinutes(b.endTime)), 0);
-    return minutesToTime(latestEnd + 10);
-  }
-  return QUICK_TIME_FALLBACK[chipId];
 }
 
 // 관리자 홈의 과목별 학습 타임라인 차트가 세션을 자정 기준 분 단위 위치로 배치할 때 쓴다.
@@ -392,25 +314,3 @@ export function getTutoringDaysInRange(
   return Array.from(dates).sort();
 }
 
-export interface MaterialPace {
-  remainingDays: number;
-  remainingSessions: number;
-  remainingScope: number;
-  scopePerSession: number;
-  isOverdue: boolean;
-}
-
-// 남은 세션 수(며칠에 한 번 × 남은 일수) 기준으로 세션당 분량을 역산한다.
-// 목표일이 지났으면(remainingDays < 0) 나눗셈 없이 isOverdue만 표시한다.
-export function computeMaterialPace(material: StudyMaterial, todayDateKey: DateKey): MaterialPace {
-  const remainingDays = daysBetween(todayDateKey, material.targetDate);
-  const remainingScope = Math.max(0, material.totalScope * material.targetPasses - material.currentProgress);
-
-  if (remainingDays < 0) {
-    return { remainingDays, remainingSessions: 0, remainingScope, scopePerSession: 0, isOverdue: true };
-  }
-
-  const remainingSessions = Math.max(1, Math.floor(remainingDays / material.sessionIntervalDays));
-  const scopePerSession = remainingScope === 0 ? 0 : Math.ceil(remainingScope / remainingSessions);
-  return { remainingDays, remainingSessions, remainingScope, scopePerSession, isOverdue: false };
-}

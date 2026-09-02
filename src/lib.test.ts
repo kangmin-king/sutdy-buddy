@@ -3,13 +3,7 @@ import {
   timeToMinutes,
   minutesToTime,
   formatMinutes,
-  computeFreeGaps,
-  sumFreeMinutes,
-  getBestGap,
   getPlannerProgress,
-  withEul,
-  resolveQuickTimeChip,
-  computeMaterialPace,
   addDaysToKey,
   addMonthsToKey,
   monthGrid,
@@ -23,7 +17,7 @@ import {
   resolvePlannerItemManagerId,
   managerDisplayLabel,
 } from './lib';
-import type { ScheduleBlock, PlannerItem, StudyMaterial, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
+import type { PlannerItem, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
 
 describe('timeToMinutes / minutesToTime', () => {
   it('converts HH:MM to minutes and back', () => {
@@ -38,64 +32,6 @@ describe('formatMinutes', () => {
     expect(formatMinutes(45)).toBe('45분');
     expect(formatMinutes(60)).toBe('1시간');
     expect(formatMinutes(125)).toBe('2시간 5분');
-  });
-});
-
-function block(overrides: Partial<ScheduleBlock>): ScheduleBlock {
-  return {
-    id: 'b1',
-    date: '2026-07-30',
-    type: 'school',
-    label: '학교',
-    startTime: '08:00',
-    endTime: '16:00',
-    ...overrides,
-  };
-}
-
-describe('computeFreeGaps', () => {
-  it('returns the whole window when there are no blocks', () => {
-    const gaps = computeFreeGaps([], '07:00', '23:00');
-    expect(gaps).toEqual([{ start: '07:00', end: '23:00', minutes: 960 }]);
-  });
-
-  it('excludes busy ranges and merges overlaps', () => {
-    const blocks = [block({ startTime: '08:00', endTime: '16:00' }), block({ id: 'b2', startTime: '15:30', endTime: '17:00' })];
-    const gaps = computeFreeGaps(blocks, '07:00', '23:00');
-    expect(gaps).toEqual([
-      { start: '07:00', end: '08:00', minutes: 60 },
-      { start: '17:00', end: '23:00', minutes: 360 },
-    ]);
-  });
-
-  it('drops gaps shorter than 10 minutes', () => {
-    const blocks = [block({ startTime: '07:00', endTime: '07:55' }), block({ id: 'b2', startTime: '08:00', endTime: '23:00' })];
-    const gaps = computeFreeGaps(blocks, '07:00', '23:00');
-    expect(gaps).toEqual([]);
-  });
-
-  it('drops trailing gap if it is shorter than 10 minutes', () => {
-    // Block ends at 23:51, window end is 24:00, leaving only 9 minutes (too small)
-    const blocks = [block({ startTime: '08:00', endTime: '23:51' })];
-    const gaps = computeFreeGaps(blocks, '07:00', '24:00');
-    // Should have gap from 07:00-08:00 (60 min) but NO trailing gap since 9 minutes < 10
-    expect(gaps).toEqual([{ start: '07:00', end: '08:00', minutes: 60 }]);
-  });
-});
-
-describe('sumFreeMinutes / getBestGap', () => {
-  const gaps = [
-    { start: '07:00', end: '08:00', minutes: 60 },
-    { start: '17:00', end: '23:00', minutes: 360 },
-  ];
-  it('sums minutes across gaps', () => {
-    expect(sumFreeMinutes(gaps)).toBe(420);
-  });
-  it('returns the largest gap', () => {
-    expect(getBestGap(gaps)).toEqual(gaps[1]);
-  });
-  it('returns null for an empty gap list', () => {
-    expect(getBestGap([])).toBeNull();
   });
 });
 
@@ -184,70 +120,6 @@ describe('managerDisplayLabel', () => {
   });
   it('falls back to 선생님 N when unlabeled', () => {
     expect(managerDisplayLabel('m1', {}, 2)).toBe('선생님 3');
-  });
-});
-
-describe('withEul', () => {
-  it('appends 을 after a syllable with batchim', () => {
-    expect(withEul('수학')).toBe('수학을');
-  });
-  it('appends 를 after a syllable without batchim', () => {
-    expect(withEul('영어')).toBe('영어를');
-  });
-});
-
-describe('resolveQuickTimeChip', () => {
-  const blocks = [block({ type: 'school', label: '학교', startTime: '08:00', endTime: '16:00' })];
-
-  it('resolves "now" to the current time', () => {
-    expect(resolveQuickTimeChip('now', blocks, '14:00')).toBe('14:00');
-  });
-
-  it('resolves "after_school" to 10 minutes after the last matching block today', () => {
-    expect(resolveQuickTimeChip('after_school', blocks, '10:00')).toBe('16:10');
-  });
-
-  it('falls back to a constant when there is no matching block', () => {
-    expect(resolveQuickTimeChip('after_school', [], '10:00')).toBe('17:00');
-  });
-
-  it('resolves the remaining presets to their constants', () => {
-    expect(resolveQuickTimeChip('after_dinner', [], '10:00')).toBe('19:30');
-    expect(resolveQuickTimeChip('before_sleep', [], '10:00')).toBe('22:00');
-  });
-});
-
-function material(overrides: Partial<StudyMaterial>): StudyMaterial {
-  return {
-    id: 'm1',
-    subjectId: 'math',
-    materialName: '개념원리',
-    totalScope: 220,
-    currentProgress: 0,
-    targetPasses: 1,
-    targetDate: '2026-08-18', // today(07-30) + 19 days
-    sessionIntervalDays: 3,
-    createdAt: '2026-07-30T00:00:00.000Z',
-    ...overrides,
-  };
-}
-
-describe('computeMaterialPace', () => {
-  it('computes remaining sessions and per-session scope', () => {
-    const pace = computeMaterialPace(material({}), '2026-07-30');
-    // 19일 남음, 3일에 1번 -> floor(19/3) = 6세션, 220p 남음 -> ceil(220/6) = 37
-    expect(pace).toEqual({ remainingDays: 19, remainingSessions: 6, remainingScope: 220, scopePerSession: 37, isOverdue: false });
-  });
-
-  it('accounts for progress and multiple passes', () => {
-    const pace = computeMaterialPace(material({ totalScope: 120, currentProgress: 24, targetPasses: 2, targetDate: '2026-08-11' }), '2026-07-30');
-    // 12일 남음, 3일에 1번 -> 4세션. 남은분량 = 120*2 - 24 = 216 -> ceil(216/4) = 54
-    expect(pace).toEqual({ remainingDays: 12, remainingSessions: 4, remainingScope: 216, scopePerSession: 54, isOverdue: false });
-  });
-
-  it('flags overdue targets instead of dividing by zero', () => {
-    const pace = computeMaterialPace(material({ targetDate: '2026-07-29' }), '2026-07-30');
-    expect(pace).toEqual({ remainingDays: -1, remainingSessions: 0, remainingScope: 220, scopePerSession: 0, isOverdue: true });
   });
 });
 

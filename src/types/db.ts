@@ -1,4 +1,4 @@
-import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, MoodId, PlannerItemStatus, Role } from './index';
+import type { Grade, SubjectId, StudyTypeId, DifficultyId, RestPatternId, PlannerItemStatus, Role } from './index';
 
 // 아래 Row 타입들은 반드시 `type`(object literal type)으로 선언한다. `interface`로 선언하면
 // TypeScript가 암묵적 문자열 인덱스 시그니처를 추론하지 않아 `Record<string, unknown>`에
@@ -15,27 +15,6 @@ export type SbProfileRow = {
   role: Role;
   invite_code: string | null;
   subject_colors: Record<string, string> | null;
-};
-
-export type SbDailyConditionRow = {
-  id: string;
-  user_id: string;
-  date: string;
-  sleep_hours: number;
-  fatigue: number;
-  focus: number;
-  mood: MoodId;
-  notes: string;
-};
-
-export type SbScheduleBlockRow = {
-  id: string;
-  user_id: string;
-  date: string;
-  type: string;
-  label: string;
-  start_time: string;
-  end_time: string;
 };
 
 export type SbPlannerItemRow = {
@@ -61,31 +40,6 @@ export type SbPlannerItemRow = {
   source: 'homework' | 'self';
   homework_assignment_id: string | null;
   exam_subject_range_id: string | null;
-};
-
-export type SbStudyLogRow = {
-  id: string;
-  user_id: string;
-  date: string;
-  planner_item_id: string;
-  subject_id: SubjectId;
-  rating: number;
-  blocked_tags: string[];
-  detail_note: string;
-  self_message: string;
-};
-
-export type SbStudyMaterialRow = {
-  id: string;
-  user_id: string;
-  subject_id: SubjectId;
-  material_name: string;
-  total_scope: number;
-  current_progress: number;
-  target_passes: number;
-  target_date: string;
-  session_interval_days: number;
-  created_at: string;
 };
 
 export type SbHomeworkAssignmentRow = {
@@ -219,25 +173,13 @@ export type SbBannerRow = {
 export interface Database {
   public: {
     Tables: {
-      // schedule_blocks/planner_items/study_logs/study_materials는 낙관적 로컬 업데이트를 위해
-      // 클라이언트가 uid()로 UUID를 미리 만들어 그대로 insert하므로 Insert 타입에 id를 포함한다.
-      // daily_conditions만 DB의 gen_random_uuid() 기본값에 맡기고(upsert 대상 식별은 user_id+date 유니크 제약을 쓴다), id를 생략한다.
+      // planner_items는 낙관적 로컬 업데이트를 위해 클라이언트가 uid()로 UUID를 미리 만들어
+      // 그대로 insert하므로 Insert 타입에 id를 포함한다.
+      // 프로토타입 시절 테이블(sb_daily_conditions / sb_schedule_blocks / sb_study_logs /
+      // sb_study_materials)은 클라이언트가 더 이상 쓰지 않아 여기서 뺐다. 서버에는 아직 남아 있고,
+      // 삭제 계획은 supabase/deferred-migrations/0022에 있다.
       sb_profiles: { Row: SbProfileRow; Insert: SbProfileRow; Update: Partial<SbProfileRow>; Relationships: [] };
-      sb_daily_conditions: {
-        Row: SbDailyConditionRow;
-        Insert: Omit<SbDailyConditionRow, 'id'>;
-        Update: Partial<SbDailyConditionRow>;
-        Relationships: [];
-      };
-      sb_schedule_blocks: { Row: SbScheduleBlockRow; Insert: SbScheduleBlockRow; Update: Partial<SbScheduleBlockRow>; Relationships: [] };
       sb_planner_items: { Row: SbPlannerItemRow; Insert: SbPlannerItemRow; Update: Partial<SbPlannerItemRow>; Relationships: [] };
-      sb_study_logs: { Row: SbStudyLogRow; Insert: SbStudyLogRow; Update: Partial<SbStudyLogRow>; Relationships: [] };
-      sb_study_materials: {
-        Row: SbStudyMaterialRow;
-        Insert: Omit<SbStudyMaterialRow, 'created_at'>;
-        Update: Partial<SbStudyMaterialRow>;
-        Relationships: [];
-      };
       sb_homework_assignments: { Row: SbHomeworkAssignmentRow; Insert: Omit<SbHomeworkAssignmentRow, 'updated_at'>; Update: Partial<SbHomeworkAssignmentRow>; Relationships: [] };
       sb_study_sessions: { Row: SbStudySessionRow; Insert: SbStudySessionRow; Update: Partial<SbStudySessionRow>; Relationships: [] };
       sb_student_manager_links: { Row: SbStudentManagerLinkRow; Insert: Omit<SbStudentManagerLinkRow, 'id' | 'linked_at' | 'label' | 'student_label'>; Update: Partial<Pick<SbStudentManagerLinkRow, 'label' | 'student_label'>>; Relationships: [] };

@@ -1,5 +1,4 @@
 import React from 'react';
-import { NAV_TABS, MOODS } from './constants';
 import { useAuth } from './state/AuthContext';
 import mascotFaceUrl from './assets/mascot-face.png';
 
@@ -65,8 +64,6 @@ export function BackBar({ title, onBack }: { title: string; onBack: () => void }
     </header>
   );
 }
-
-export type TabId = (typeof NAV_TABS)[number]['id'];
 
 export function BottomNav<T extends { id: string; label: string; icon: string }>({
   tabs,
@@ -216,23 +213,6 @@ export function SliderField({
         <span>{minLabel}</span>
         <span>{maxLabel}</span>
       </div>
-    </div>
-  );
-}
-
-export function EmojiPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  return (
-    <div className="grid grid-cols-5 gap-2">
-      {MOODS.map((m) => (
-        <button
-          key={m.id}
-          onClick={() => onChange(m.id)}
-          className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition ${value === m.id ? 'border-primary bg-primary-container/20' : 'border-transparent bg-surface-container'}`}
-        >
-          <span className="text-2xl">{m.emoji}</span>
-          <span className="text-[11px] font-medium text-on-surface-variant">{m.label}</span>
-        </button>
-      ))}
     </div>
   );
 }

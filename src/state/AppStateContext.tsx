@@ -12,11 +12,7 @@ import {
 } from '../lib';
 import {
   profileFromRow,
-  conditionFromRow,
-  scheduleBlockFromRow,
   plannerItemFromRow,
-  studyLogFromRow,
-  studyMaterialFromRow,
   homeworkAssignmentFromRow,
   studySessionFromRow,
   groupByDate,
@@ -31,15 +27,10 @@ import {
 } from './mappers';
 import type {
   Profile,
-  DailyCondition,
-  ScheduleBlock,
   PlannerItem,
-  StudyLogEntry,
-  StudyMaterial,
   HomeworkAssignment,
   StudySession,
   DateKey,
-  TomorrowRecommendationItem,
   ExamRecord,
   ExamSubject,
   ExamSubjectRange,
@@ -50,15 +41,11 @@ import type {
   SchoolTimetableSlot,
   AllowedAppInterval,
 } from '../types';
-import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
+import type { SbPlannerItemRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
 
 interface AppState {
   profile: Profile | null;
-  conditions: Record<DateKey, DailyCondition>;
-  scheduleBlocks: Record<DateKey, ScheduleBlock[]>;
   plannerItems: Record<DateKey, PlannerItem[]>;
-  studyLogs: Record<DateKey, StudyLogEntry[]>;
-  studyMaterials: StudyMaterial[];
   homeworkAssignments: HomeworkAssignment[];
   studySessions: Record<string, StudySession[]>;
   allowedAppIntervals: Record<string, AllowedAppInterval[]>;
@@ -82,11 +69,7 @@ interface AppState {
 
 const EMPTY_STATE: AppState = {
   profile: null,
-  conditions: {},
-  scheduleBlocks: {},
   plannerItems: {},
-  studyLogs: {},
-  studyMaterials: [],
   homeworkAssignments: [],
   studySessions: {},
   allowedAppIntervals: {},
@@ -129,18 +112,10 @@ type HomeworkScope = { mode: 'pages'; startPage: number; endPage: number } | { m
 interface AppStateActions {
   saveProfile: (profile: Profile) => Promise<void>;
   updateSubjectColor: (subjectId: SubjectId, color: string) => Promise<void>;
-  saveCondition: (date: DateKey, condition: DailyCondition) => Promise<void>;
-  upsertScheduleBlock: (date: DateKey, block: ScheduleBlock) => Promise<void>;
-  deleteScheduleBlock: (date: DateKey, id: string) => Promise<void>;
   addPlannerItem: (date: DateKey, item: Omit<PlannerItem, 'id' | 'order'>) => Promise<void>;
   updatePlannerItem: (date: DateKey, id: string, patch: Partial<PlannerItem>) => Promise<void>;
   deletePlannerItem: (date: DateKey, id: string) => Promise<void>;
   carryOverPlannerItem: (date: DateKey, id: string) => Promise<void>;
-  addStudyLog: (date: DateKey, entry: Omit<StudyLogEntry, 'id'>) => Promise<void>;
-  addStudyMaterial: (material: Omit<StudyMaterial, 'id' | 'createdAt'>) => Promise<void>;
-  updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
-  deleteStudyMaterial: (id: string) => Promise<void>;
-  applyTomorrowRecommendation: (date: DateKey, items: TomorrowRecommendationItem[]) => Promise<void>;
   linkByInviteCode: (code: string) => Promise<void>;
   createHomeworkAssignment: (
     studentId: string,
@@ -277,20 +252,12 @@ async function deleteRangeLinkedItems(
 }
 
 async function loadAll(userId: string): Promise<AppState> {
-  const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes, homeworkRes, sessionsRes] = await Promise.all([
+  const [profileRes, itemsRes, homeworkRes, sessionsRes] = await Promise.all([
     supabase.from('sb_profiles').select('*').eq('id', userId).maybeSingle(),
-    supabase.from('sb_daily_conditions').select('*').eq('user_id', userId),
-    supabase.from('sb_schedule_blocks').select('*').eq('user_id', userId),
     supabase.from('sb_planner_items').select('*').eq('user_id', userId).order('order'),
-    supabase.from('sb_study_logs').select('*').eq('user_id', userId),
-    supabase.from('sb_study_materials').select('*').eq('user_id', userId),
     supabase.from('sb_homework_assignments').select('*').eq('student_id', userId),
     supabase.from('sb_study_sessions').select('*').eq('user_id', userId),
   ]);
-
-  const conditionRows = (conditionsRes.data ?? []).map(conditionFromRow);
-  const conditions: Record<DateKey, DailyCondition> = {};
-  for (const c of conditionRows) conditions[c.date] = c;
 
   const profile = profileRes.data ? profileFromRow(profileRes.data) : null;
 
@@ -374,11 +341,7 @@ async function loadAll(userId: string): Promise<AppState> {
 
   return {
     profile,
-    conditions,
-    scheduleBlocks: groupByDate((blocksRes.data ?? []).map(scheduleBlockFromRow)),
     plannerItems: groupByDate((itemsRes.data ?? []).map(plannerItemFromRow)),
-    studyLogs: groupByDate((logsRes.data ?? []).map(studyLogFromRow)),
-    studyMaterials: (materialsRes.data ?? []).map(studyMaterialFromRow),
     homeworkAssignments: homeworkRows.map(homeworkAssignmentFromRow),
     studySessions: groupByPlannerItemId(sessionRows.map(studySessionFromRow)),
     // loadAll과 별도로 로그인 직후 loadAllowedAppIntervals가 채운다(아래 useEffect 참고).
@@ -466,51 +429,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('updateSubjectColor failed:', error.message);
           setState((s) => (s.profile ? { ...s, profile: { ...s.profile, subjectColors: previous.subjectColors }, error: WRITE_FAILURE_MESSAGE } : s));
-        }
-      },
-
-      async saveCondition(date, condition) {
-        setState((s) => ({ ...s, conditions: { ...s.conditions, [date]: condition } }));
-        const { error } = await supabase.from('sb_daily_conditions').upsert(
-          {
-            user_id: userId,
-            date,
-            sleep_hours: condition.sleepHours,
-            fatigue: condition.fatigue,
-            focus: condition.focus,
-            mood: condition.mood,
-            notes: condition.notes,
-          },
-          { onConflict: 'user_id,date' }
-        );
-        if (error) {
-          console.error('saveCondition failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async upsertScheduleBlock(date, block) {
-        const list = state.scheduleBlocks[date] ?? [];
-        const exists = list.some((b) => b.id === block.id);
-        const nextList = exists ? list.map((b) => (b.id === block.id ? block : b)) : [...list, block];
-        nextList.sort((a, b) => a.startTime.localeCompare(b.startTime));
-        setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: nextList } }));
-
-        const row = { id: block.id, user_id: userId, date, type: block.type, label: block.label, start_time: block.startTime, end_time: block.endTime };
-        const { error } = await supabase.from('sb_schedule_blocks').upsert(row);
-        if (error) {
-          console.error('upsertScheduleBlock failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async deleteScheduleBlock(date, id) {
-        const previous = state.scheduleBlocks[date] ?? [];
-        setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: previous.filter((b) => b.id !== id) } }));
-        const { error } = await supabase.from('sb_schedule_blocks').delete().eq('id', id);
-        if (error) {
-          console.error('deleteScheduleBlock failed:', error.message);
-          setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: previous }, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 
@@ -670,140 +588,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         });
         if (insertError) {
           console.error('carryOverPlannerItem (insert) failed:', insertError.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async addStudyLog(date, entry) {
-        const list = state.studyLogs[date] ?? [];
-        const id = uid();
-        const fullEntry: StudyLogEntry = { ...entry, id };
-        setState((s) => ({ ...s, studyLogs: { ...s.studyLogs, [date]: [...list, fullEntry] } }));
-
-        const { error } = await supabase.from('sb_study_logs').insert({
-          id,
-          user_id: userId,
-          date,
-          planner_item_id: fullEntry.plannerItemId,
-          subject_id: fullEntry.subjectId,
-          rating: fullEntry.rating,
-          blocked_tags: fullEntry.blockedTags,
-          detail_note: fullEntry.detailNote,
-          self_message: fullEntry.selfMessage,
-        });
-        if (error) {
-          console.error('addStudyLog failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async addStudyMaterial(material) {
-        const id = uid();
-        const createdAt = new Date().toISOString();
-        const fullMaterial: StudyMaterial = { ...material, id, createdAt };
-        setState((s) => ({ ...s, studyMaterials: [...s.studyMaterials, fullMaterial] }));
-
-        const { error } = await supabase.from('sb_study_materials').insert({
-          id,
-          user_id: userId,
-          subject_id: fullMaterial.subjectId,
-          material_name: fullMaterial.materialName,
-          total_scope: fullMaterial.totalScope,
-          current_progress: fullMaterial.currentProgress,
-          target_passes: fullMaterial.targetPasses,
-          target_date: fullMaterial.targetDate,
-          session_interval_days: fullMaterial.sessionIntervalDays,
-        });
-        if (error) {
-          console.error('addStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async updateStudyMaterial(id, patch) {
-        setState((s) => ({ ...s, studyMaterials: s.studyMaterials.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
-
-        const dbPatch: Partial<SbStudyMaterialRow> = {};
-        if ('materialName' in patch) dbPatch.material_name = patch.materialName;
-        if ('totalScope' in patch) dbPatch.total_scope = patch.totalScope;
-        if ('currentProgress' in patch) dbPatch.current_progress = patch.currentProgress;
-        if ('targetPasses' in patch) dbPatch.target_passes = patch.targetPasses;
-        if ('targetDate' in patch) dbPatch.target_date = patch.targetDate;
-        if ('sessionIntervalDays' in patch) dbPatch.session_interval_days = patch.sessionIntervalDays;
-
-        const { error } = await supabase.from('sb_study_materials').update(dbPatch).eq('id', id);
-        if (error) {
-          console.error('updateStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async deleteStudyMaterial(id) {
-        const previous = state.studyMaterials;
-        setState((s) => ({ ...s, studyMaterials: s.studyMaterials.filter((m) => m.id !== id) }));
-        const { error } = await supabase.from('sb_study_materials').delete().eq('id', id);
-        if (error) {
-          console.error('deleteStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, studyMaterials: previous, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async applyTomorrowRecommendation(date, items) {
-        const existing = state.plannerItems[date] ?? [];
-        const baseOrder = existing.length === 0 ? 1 : Math.max(...existing.map((i) => i.order)) + 1;
-        const newItems: PlannerItem[] = items.map((it, idx) => ({
-          id: uid(),
-          date,
-          order: baseOrder + idx,
-          subjectId: it.subjectId,
-          startTime: it.startTime,
-          studyType: it.studyType,
-          material: it.material,
-          unit: it.unit,
-          pageRange: it.pageRange,
-          endTime: it.endTime,
-          difficulty: it.difficulty,
-          restPattern: null,
-          mustDo: it.mustDo,
-          status: 'planned',
-          actualMinutes: null,
-          understanding: null,
-          partialReason: null,
-          incompleteReason: null,
-          source: 'self' as const,
-          homeworkAssignmentId: null,
-          examSubjectRangeId: null,
-        }));
-        setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...existing, ...newItems] } }));
-
-        const { error } = await supabase.from('sb_planner_items').insert(
-          newItems.map((it) => ({
-            id: it.id,
-            user_id: userId,
-            date: it.date,
-            order: it.order,
-            subject_id: it.subjectId,
-            start_time: it.startTime,
-            study_type: it.studyType,
-            material: it.material,
-            unit: it.unit,
-            page_range: it.pageRange,
-            end_time: it.endTime,
-            difficulty: it.difficulty,
-            rest_pattern: it.restPattern,
-            must_do: it.mustDo,
-            status: it.status,
-            actual_minutes: it.actualMinutes,
-            understanding: it.understanding,
-            partial_reason: it.partialReason,
-            incomplete_reason: it.incompleteReason,
-            source: it.source,
-            homework_assignment_id: it.homeworkAssignmentId,
-            exam_subject_range_id: it.examSubjectRangeId,
-          }))
-        );
-        if (error) {
-          console.error('applyTomorrowRecommendation failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
       },
