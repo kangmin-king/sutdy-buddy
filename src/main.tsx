@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import { initAnalytics, track } from './lib/analytics';
 
 class SBErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -29,6 +30,11 @@ class SBErrorBoundary extends React.Component<
 }
 
 async function bootstrap() {
+  // App 청크를 기다리기 전에 초기화한다. SDK는 초기화가 끝나기 전에 부른 이벤트를 큐에 담아두므로
+  // 여기서 바로 App Opened를 보내도 유실되지 않는다.
+  initAnalytics();
+  track('App Opened', { prompt_version: 'BA400.4' }); // helps improve this setup flow — safe to remove once you've verified the event lands
+
   try {
     const { default: App } = await import('./App');
     ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -22,6 +22,7 @@ import { useOpenDistractionStopRequest, isNativePlatform } from './native/distra
 import { usePushRegistration } from './native/push';
 import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
 import { useAllowedAppUsageFlush } from './screens/student/useAllowedAppUsageFlush';
+import { track } from './lib/analytics';
 
 const MANAGER_TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
@@ -66,9 +67,16 @@ function StudentAppShell() {
   const [showDistractionStop, setShowDistractionStop] = React.useState(false);
   const [showMockExam, setShowMockExam] = React.useState(false);
 
+  // 알림으로 여는 경로와 화면 버튼으로 여는 경로를 분석에서 구분한다 — 설정을 끝낸 학생이
+  // 실제로 어느 쪽으로 들어오는지가 이 기능의 재방문을 좌우한다.
+  const openDistractionStop = React.useCallback((entryPoint: 'fab' | 'notification') => {
+    setShowDistractionStop(true);
+    track('Opened Distraction Stop', { entry_point: entryPoint });
+  }, []);
+
   // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
   // 탭 전환 대신 이 오버레이를 띄운다.
-  useOpenDistractionStopRequest(React.useCallback(() => setShowDistractionStop(true), []));
+  useOpenDistractionStopRequest(React.useCallback(() => openDistractionStop('notification'), [openDistractionStop]));
 
   // 쉬는 시간이 시작되면 네이티브가 표식을 남긴다. 오버레이가 떠서 학생 홈이 언마운트돼도
   // 처리되어야 하므로 셸에서 부른다.
@@ -113,7 +121,7 @@ function StudentAppShell() {
       )}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
       {activeTab === 'planner' && <StudentPlannerScreen />}
-      {isNativePlatform() && <DistractionFab onOpen={() => setShowDistractionStop(true)} />}
+      {isNativePlatform() && <DistractionFab onOpen={() => openDistractionStop('fab')} />}
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
   );

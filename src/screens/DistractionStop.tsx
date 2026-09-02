@@ -1,6 +1,7 @@
 import React from 'react';
 import { TopAppBar, BackBar, Card, Button, ChipGroup, ToggleSwitch, SectionTitle, Icon } from '../primitives';
 import { DistractionStop, isNativePlatform, useDistractionState } from '../native/distractionStop';
+import { setUserProperties } from '../lib/analytics';
 import type { DistractionState, ExitModeId } from '../types/distraction';
 import { distractionStatus, extendedEndTime, formatRemaining, isBreakActive, statusMessage } from './distractionStopModel';
 import AllowedAppsScreen from './AllowedAppsScreen';
@@ -87,6 +88,9 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
             onChange={(enabled) => {
               setLocal((s) => s && { ...s, featureEnabled: enabled });
               DistractionStop.setFeatureEnabled({ enabled });
+              // 이벤트가 아니라 user property로 남긴다 — "지금 이 기능을 켜둔 사용자"로
+              // 코호트를 나누는 게 켜고 끈 횟수보다 쓸모가 있다.
+              setUserProperties({ distraction_stop_enabled: enabled });
             }}
           />
         </Card>

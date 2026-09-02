@@ -3,6 +3,11 @@ import type { Session } from '@supabase/supabase-js';
 import { App as CapacitorApp } from '@capacitor/app';
 import { supabase } from '../lib/supabase';
 import { completeNativeSignIn, isNativeApp } from '../lib/socialAuth';
+import { track, identifyUser, resetIdentity, setOnceUserProperties } from '../lib/analytics';
+
+// 소셜 로그인은 "가입"과 "재로그인"이 같은 콜백으로 돌아온다. 계정이 방금 만들어졌는지는
+// user.created_at으로만 구분할 수 있어서, 이 창(초) 안에 만들어진 계정이면 가입으로 본다.
+const SIGNUP_DETECTION_WINDOW_MS = 60_000;
 
 interface AuthValue {
   session: Session | null;
@@ -21,14 +26,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
   const [passwordRecovery, setPasswordRecovery] = React.useState(false);
 
+  // 이미 로그인된 사용자로 이 탭에서 이벤트를 보내고 있는지. 새로고침으로 세션이 "복구"된 것과
+  // 실제로 방금 로그인한 것을 구분해서, 새로고침마다 Signed In이 찍히지 않게 한다.
+  const signedInUserId = React.useRef<string | null>(null);
+
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
+      if (data.session) {
+        signedInUserId.current = data.session.user.id;
+        identifyUser(data.session.user.id);
+      }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+
+      if (nextSession && signedInUserId.current !== nextSession.user.id) {
+        const user = nextSession.user;
+        signedInUserId.current = user.id;
+        identifyUser(user.id);
+        // 세션 복구(INITIAL_SESSION)나 토큰 갱신은 "로그인 행동"이 아니다.
+        if (event !== 'SIGNED_IN') return;
+
+        const method = (user.app_metadata.provider as string | undefined) ?? 'email';
+        const isFreshAccount = Date.now() - Date.parse(user.created_at) < SIGNUP_DETECTION_WINDOW_MS;
+        // 이메일 가입은 역할까지 아는 AuthScreen에서 이미 Signed Up을 보냈다. 여기서 또 보내면
+        // 이중 집계가 된다 — 소셜 가입만 여기서 처리한다.
+        if (isFreshAccount && method !== 'email') {
+          setOnceUserProperties({ signup_method: method, signed_up_at: user.created_at });
+          track('Signed Up', { method });
+        }
+        track('Signed In', { method });
+        return;
+      }
+
+      if (!nextSession && signedInUserId.current) {
+        signedInUserId.current = null;
+        track('Signed Out');
+        resetIdentity();
+      }
     });
     return () => listener.subscription.unsubscribe();
   }, []);

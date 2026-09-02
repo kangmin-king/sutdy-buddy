@@ -1,6 +1,7 @@
 import React from 'react';
 import { BackBar, Card, Icon, TextField, ToggleSwitch } from '../primitives';
 import { DistractionStop } from '../native/distractionStop';
+import { track } from '../lib/analytics';
 import type { InstalledAppInfo } from '../types/distraction';
 
 // 허용앱 선택. 목록은 화면을 열 때 한 번만 불러온다 — 아이콘까지 실려 오므로 앱 80개면
@@ -20,6 +21,26 @@ export default function AllowedAppsScreen({
   // 40번째 앱을 켠 순간 그 줄이 맨 위로 올라가고 아래 줄이 전부 밀려, 연달아 고르는 학생이
   // 엉뚱한 앱을 누르게 된다. 스위치만 바뀌고 줄은 제자리에 있어야 한다.
   const orderingAllowed = React.useRef<Set<string>>(new Set());
+
+  // 토글 하나하나를 이벤트로 남기면(앱 80개를 훑으며 열댓 번 누른다) 노이즈만 된다. 화면을
+  // 닫을 때 한 번, 들어올 때와 비교한 결과만 남긴다.
+  const allowedAtOpen = React.useRef<string[]>(allowedApps);
+
+  const handleClose = () => {
+    const before = new Set(allowedAtOpen.current);
+    const after = new Set(allowedApps);
+    const added = allowedApps.filter((p) => !before.has(p)).length;
+    const removed = allowedAtOpen.current.filter((p) => !after.has(p)).length;
+    if (added > 0 || removed > 0) {
+      track('Updated Allowed Apps', {
+        allowed_app_count: allowedApps.length,
+        added_count: added,
+        removed_count: removed,
+        installed_app_count: apps?.length,
+      });
+    }
+    onClose();
+  };
 
   React.useEffect(() => {
     let cancelled = false;
@@ -56,7 +77,7 @@ export default function AllowedAppsScreen({
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
-      <BackBar title="허용앱 고르기" onBack={onClose} />
+      <BackBar title="허용앱 고르기" onBack={handleClose} />
       <div className="pt-2 space-y-4">
         <Card>
           <p className="text-xs text-on-surface-variant">

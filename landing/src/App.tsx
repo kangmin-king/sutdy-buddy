@@ -3,6 +3,7 @@ import mascotBunny from './assets/mascot-bunny-color.png';
 import mascotFace from './assets/mascot-face.png';
 import appHome from './assets/app_home.png';
 import appCalendar from './assets/app_calendar.png';
+import { track } from './analytics';
 
 const APP_URL = 'https://app.studybuks.store';
 const APK_URL = 'https://drive.google.com/file/d/1SxxChy7Qudom_dSSgFPicGawKxOH29hd/view?usp=sharing';
@@ -90,6 +91,7 @@ function NavBar() {
         </div>
         <a
           href={APP_URL}
+          onClick={() => track('Clicked Start App', { placement: 'nav' })}
           className="text-sm font-semibold text-white bg-navy px-4 py-2 rounded-full transition-all hover:bg-navy-light hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0"
         >
           웹으로 시작하기
@@ -134,6 +136,7 @@ function Hero() {
           <div className="flex flex-wrap gap-3">
             <a
               href={APP_URL}
+              onClick={() => track('Clicked Start App', { placement: 'hero' })}
               className="bg-carrot text-white font-bold px-6 py-3.5 rounded-full transition-all hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0"
               style={{ boxShadow: '0 10px 30px -8px rgba(255,107,53,0.55)' }}
             >
@@ -303,6 +306,7 @@ function Download() {
               </p>
               <a
                 href={APK_URL}
+                onClick={() => track('Clicked Download Apk', { placement: 'android_guide' })}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-block bg-navy text-white font-bold px-6 py-3 rounded-full transition-all hover:bg-navy-light hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0"
@@ -323,6 +327,7 @@ function Download() {
               </p>
               <a
                 href={APP_URL}
+                onClick={() => track('Clicked Start App', { placement: 'ios_guide' })}
                 className="inline-block bg-navy text-white font-bold px-6 py-3 rounded-full transition-all hover:bg-navy-light hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0"
               >
                 사파리로 웹앱 열기

@@ -3,6 +3,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName } from '../../lib';
 import { SUBJECTS, getSubject } from '../../constants';
 import { Card, Button, TextField, ToggleSwitch, ChipGroup, SectionTitle, Icon, useConfirm } from '../../primitives';
+import { track } from '../../lib/analytics';
 import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -136,6 +137,9 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
+    // 탭을 열 때마다·학생을 바꿀 때마다 한 번. 담당 학생 수를 같이 실어야 "학생이 여러 명인
+    // 선생님이 실제로 여러 명을 챙기는가"를 볼 수 있다.
+    track('Viewed Student Progress', { managed_student_count: state.managedStudents.length });
     // studentId 바뀔 때만 다시 불러온다 — actions는 매 렌더 재생성되므로 deps에서 제외.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);

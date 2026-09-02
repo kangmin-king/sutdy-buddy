@@ -2,6 +2,7 @@ import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useEnabledSocialProviders, signInWithProvider, type SocialProvider } from '../lib/socialAuth';
 import { Card, Button, Chip, TextField } from '../primitives';
+import { track, setOnceUserProperties } from '../lib/analytics';
 import type { Role } from '../types';
 
 // 메일 링크(가입 확인·비밀번호 재설정)는 앱이 아니라 웹으로 열린다. 앱에서 요청했더라도 폰
@@ -222,6 +223,10 @@ export default function AuthScreen() {
         setError(friendlyAuthError(signUpError.message));
         return;
       }
+      // 이메일 가입만 여기서 보낸다. 소셜 가입은 콜백으로 돌아오는 AuthContext에서 처리한다.
+      setOnceUserProperties({ signup_method: 'email', signed_up_at: new Date().toISOString() });
+      track('Signed Up', { method: 'email', role, email_confirmation_required: !data.session });
+
       // 이메일 인증이 켜져 있으면 세션 없이 사용자만 만들어진다. 그때는 확인 안내로 넘어간다.
       if (!data.session) setPendingConfirmEmail(email);
       return;
