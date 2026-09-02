@@ -2,20 +2,27 @@ import * as amplitude from '@amplitude/unified';
 
 /**
  * 랜딩 페이지의 Amplitude 연동. 본앱(src/lib/analytics.ts)과 같은 프로젝트 키를 쓴다 —
- * 유입(랜딩)에서 가입(앱)까지 한 사람으로 이어 봐야 하기 때문이다.
+ * 유입(랜딩)에서 가입(앱)까지 한 사람으로 이어 봐야 하기 때문이다. 그래서 로컬은 개발용
+ * 프로젝트, 배포본은 프로덕션 프로젝트로 앱과 짝을 맞춰야 한다.
  *
  * 랜딩은 로그인이 없어서 user property를 직접 세팅할 일이 없다. 오토캡처의 Marketing
  * attribution이 붙여주는 utm/referrer user property가 사실상 전부다.
  */
 
-// Amplitude ingestion key — public by design; move to an env var when you set up environments.
-const AMPLITUDE_API_KEY = 'bebf2227715e7463b76c1e33236370fd';
+// VITE_ 접두어가 붙은 값은 빌드 시점에 번들로 박힌다. 배포 환경에 이 변수가 없으면 조용히
+// 분석이 꺼진 채로 나가므로, 아래에서 경고를 남겨 눈에 띄게 한다.
+const AMPLITUDE_API_KEY = import.meta.env.VITE_AMPLITUDE_API_KEY as string | undefined;
 
 let initialized = false;
 
 export function initAnalytics(): void {
   if (initialized) return;
   initialized = true;
+
+  if (!AMPLITUDE_API_KEY) {
+    console.warn('Amplitude API key missing — analytics disabled');
+    return;
+  }
 
   void amplitude.initAll(AMPLITUDE_API_KEY, {
     analytics: {
@@ -39,5 +46,6 @@ export function initAnalytics(): void {
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {
+  if (!AMPLITUDE_API_KEY) return;
   amplitude.track(event, { app_platform: 'landing', ...properties });
 }

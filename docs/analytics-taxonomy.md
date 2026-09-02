@@ -121,8 +121,25 @@ Phase 1(가입~학습 세션 핵심 퍼널 + 랜딩 유입)과 Phase 2(숙제·�
 - 로그아웃 시 `amplitude.reset()` — userId와 deviceId를 함께 끊어 다음 사용자와 섞이지 않게 한다.
 - 새로고침으로 세션이 복구되는 건 `Signed In`으로 세지 않는다(`AuthContext`의 `signedInUserId` ref).
 
-## 키 설정
+## 프로젝트 분리와 키 설정
 
-- 본앱: `VITE_AMPLITUDE_API_KEY` (`.env` / Vercel 환경변수). 없으면 콘솔 경고 후 분석만 비활성.
-- 랜딩: `landing/src/analytics.ts`에 하드코딩. 랜딩엔 env 체계가 없고 ingestion key는 어차피
-  번들에 실려 공개된다 — 랜딩에 환경변수를 도입하면 그때 옮긴다.
+Amplitude 프로젝트를 둘로 나눠 쓴다.
+
+| 환경 | Amplitude 프로젝트 | 키를 읽는 곳 |
+|---|---|---|
+| 로컬 개발 | `study-buddy-dev` (ID 859013) | `.env`, `landing/.env` |
+| 배포 | `default` | Vercel 환경변수 (본앱·랜딩 프로젝트 각각) |
+
+본앱과 랜딩은 **같은 환경에서 같은 프로젝트 키**를 써야 한다. 랜딩 유입에서 앱 가입까지를
+한 사람으로 이어 보는 것(Marketing attribution)이 프로젝트 경계를 넘지 못하기 때문이다.
+
+두 앱 모두 `VITE_AMPLITUDE_API_KEY` 하나만 읽는다. `VITE_` 접두어가 붙은 값은 **빌드 시점에
+번들로 박히므로**, 배포 환경에 변수가 없으면 조용히 분석이 꺼진 채 나간다. 그래서 양쪽 다
+키가 없으면 `console.warn('Amplitude API key missing — analytics disabled')`을 남기고
+`track`은 아무것도 보내지 않는다 — 조용한 실패보다 시끄러운 실패가 낫다.
+
+`.env`는 `.gitignore` 대상이다. 필요한 변수 목록은 `.env.example`과 `landing/.env.example`에
+있다(둘 다 `.env*` 무시 규칙을 `-f`로 넘겨 추적 중).
+
+Amplitude는 한번 기록된 이벤트를 삭제할 수 없다. 새 계측을 시험할 때는 반드시 개발용
+프로젝트에서 먼저 돌린다.
