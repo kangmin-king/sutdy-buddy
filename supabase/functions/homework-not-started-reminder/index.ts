@@ -3,13 +3,10 @@ import { authenticateServiceRole, AuthError } from '../_shared/authClient.ts';
 import { corsHeaders, handleCorsPreflight } from '../_shared/cors.ts';
 import { sendFcmMessage } from '../_shared/fcm.ts';
 import { selectReminderTargets } from './reminderTargets.ts';
-
-// 설정 행이 없는 학생에게 쓰는 기본 알림 시각. 0023 마이그레이션의 컬럼 기본값,
-// src/constants.ts의 DEFAULT_HOMEWORK_REMIND_AT과 같은 값이어야 한다.
-const DEFAULT_REMIND_AT = '21:00';
+import { DEFAULT_HOMEWORK_REMIND_AT } from '../_shared/homeworkReminder.ts';
 
 // 앱의 날짜·시간 계산은 전부 학생이 실제로 겪는 로컬 시각 기준이다(todayKey, toMinutesOfDay).
-// 서버는 UTC로 돌기 때문에 여기서 명시적으로 변환해야 "오늘"과 "21:00"이 학생과 같은 뜻이 된다.
+// 서버는 UTC로 돌기 때문에 여기서 명시적으로 변환해야 "오늘"과 알림 시각이 학생과 같은 뜻이 된다.
 const TIME_ZONE = 'Asia/Seoul';
 
 function nowInSeoul(): { date: string; time: string } {
@@ -84,7 +81,7 @@ Deno.serve(async (req: Request) => {
       homeworkItems,
       settings,
       startedItemIds,
-      defaultRemindAt: DEFAULT_REMIND_AT,
+      defaultRemindAt: DEFAULT_HOMEWORK_REMIND_AT,
     });
 
     if (targets.length === 0) {

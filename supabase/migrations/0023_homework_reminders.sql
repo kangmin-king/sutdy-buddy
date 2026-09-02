@@ -5,15 +5,19 @@
 -- 번호가 0021이 아닌 이유: 0021·0022는 supabase/deferred-migrations/가 잡고 있는 번호다
 -- (구버전 APK가 사라진 뒤에 적용할 것들이라 순서만 예약해 둔 상태).
 
--- 학생별 알림 시각. **행이 없으면 기본값(21:00, 켜짐)으로 동작한다** — 매니저가 아무것도
--- 설정하지 않아도 기능이 돌아야 하고, 학생마다 행을 미리 만들어두면 연결/해제 때마다 그 행을
--- 관리해야 하기 때문이다. 기본값은 클라이언트(constants.ts)와 알림 함수 양쪽에 같은 값으로
--- 박혀 있다 — 바꿀 때 세 군데를 함께 고칠 것.
+-- 학생별 알림 시각. **행이 없으면 기본값으로 동작한다** — 매니저가 아무것도 설정하지 않아도
+-- 기능이 돌아야 하고, 학생마다 행을 미리 만들어두면 연결/해제 때마다 그 행을 관리해야 하기
+-- 때문이다.
+--
+-- 그 기본 시각은 **여기 적지 않는다.** 정의는
+-- supabase/functions/_shared/homeworkReminder.ts 한 곳뿐이고, 앱과 알림 함수가 그 파일을 읽는다.
+-- 컬럼에 default를 두면 같은 값이 두 군데가 되고, 한쪽만 고쳤을 때 조용히 어긋난다.
+-- 행을 만드는 유일한 경로(매니저의 설정 저장)는 remind_at을 항상 명시해서 쓴다.
 --
 -- 시각은 Asia/Seoul 기준으로 해석한다(앱의 날짜·시간 계산이 전부 로컬 기준이다).
 create table sb_homework_reminder_settings (
   student_id uuid primary key references auth.users(id) on delete cascade,
-  remind_at time not null default '21:00',
+  remind_at time not null,
   enabled boolean not null default true,
   updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()

@@ -19,7 +19,8 @@ PRD §5.12의 "숙제 미시작 알림". §8.1 백로그 1순위였던 항목이
 | `supabase/migrations/0024_homework_reminder_cron.sql` | pg_cron 15분 스케줄 (Vault 전제) |
 | `src/screens/manager/ManagerCalendar.tsx` | 매니저 설정 UI (아이콘 줄 → `미시작 알림`) |
 | `src/state/AppStateContext.tsx` | `homeworkReminderSettings` 상태 + `upsertHomeworkReminderSetting` |
-| `src/constants.ts` | `DEFAULT_HOMEWORK_REMIND_AT` |
+| `supabase/functions/_shared/homeworkReminder.ts` | **기본 알림 시각의 유일한 정의** (앱·함수 공용) |
+| `src/constants.ts` | 위 상수를 앱 쪽 import 경로로 re-export |
 
 ## 배포 전제 (이것 없이는 cron이 매번 실패한다)
 
@@ -79,8 +80,11 @@ select * from sb_homework_reminder_log where date = current_date;
 
 ## 알려진 제약 / 다음에 손댈 것
 
-- **기본값이 세 군데에 박혀 있다** — 0023의 컬럼 기본값, `src/constants.ts`,
-  Edge Function의 `DEFAULT_REMIND_AT`. 바꿀 때 함께 고칠 것.
+- **기본 시각을 바꾸려면** `supabase/functions/_shared/homeworkReminder.ts` 한 줄만 고치면 된다.
+  앱(`src/constants.ts`의 re-export), 알림 함수, 그 테스트가 모두 이 파일을 읽는다. DB 컬럼에는
+  기본값을 두지 않았다 — 처음엔 세 군데(컬럼 default · 앱 상수 · 함수 상수)에 같은 "21:00"이
+  박혀 있었고, 한쪽만 고치면 조용히 어긋나는 구조였다.
+  단, **이미 저장된 학생별 설정 값은 바뀌지 않는다**(기본값은 설정 행이 없는 학생에게만 적용).
 - 매니저 앱 안에는 이 알림의 흔적이 남지 않는다(푸시만 간다). "며칠 미시작"처럼 화면에
   누적해 보여주려면 `sb_homework_reminder_log`를 읽는 SELECT 정책부터 추가해야 한다.
 - 시간대가 `Asia/Seoul` 하드코딩이다. 해외 사용자가 생기면 학생별 시간대가 필요하다.

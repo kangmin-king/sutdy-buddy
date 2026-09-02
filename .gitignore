@@ -11,3 +11,10 @@ supabase/.temp
 .idea
 .vercel
 .env*
+
+# 안드로이드 서명·설정 — 절대 커밋하지 말 것 (2026-09-02: Vercel 배포본에서 복원)
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+local.properties
