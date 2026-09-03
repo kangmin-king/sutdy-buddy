@@ -17,6 +17,11 @@ interface AuthValue {
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
   signOut: () => Promise<void>;
+  /**
+   * 회원 탈퇴. 성공하면 계정과 학습 데이터가 지워지고 세션도 끊긴다.
+   * 실패하면 사람이 읽을 메시지를 담아 throw한다 — 호출한 화면이 그걸 보여줘야 한다.
+   */
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthValue | null>(null);
@@ -88,10 +93,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
+  const deleteAccount = React.useCallback(async () => {
+    // 계정이 사라지기 전에 이벤트를 보낸다 — 지운 다음에는 이 사용자로 아무것도 남길 수 없다.
+    track('Deleted Account');
+
+    const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>('delete-account');
+    // invoke는 4xx/5xx를 error로 주지만 본문의 error 메시지는 여기 담기지 않는다. 함수가 돌려준
+    // 한국어 메시지를 살리려고 양쪽을 다 본다.
+    if (error || data?.error || !data?.ok) {
+      throw new Error(data?.error ?? '탈퇴 처리에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    }
+
+    // 계정이 이미 없으므로 서버 쪽 로그아웃은 실패할 수 있다. 로컬 세션을 비우는 게 목적이라
+    // 실패를 삼키고 넘어간다 — 안 그러면 지워진 계정으로 로그인된 화면에 남는다.
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* 무시 */
+    }
+    resetIdentity();
+  }, []);
+
   const clearPasswordRecovery = React.useCallback(() => setPasswordRecovery(false), []);
 
   return (
-    <AuthContext.Provider value={{ session, loading, passwordRecovery, clearPasswordRecovery, signOut }}>
+    <AuthContext.Provider value={{ session, loading, passwordRecovery, clearPasswordRecovery, signOut, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

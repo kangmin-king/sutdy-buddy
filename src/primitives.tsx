@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from './state/AuthContext';
+import { useAppState } from './state/AppStateContext';
 import { useTheme, type Theme } from './state/ThemeContext';
 import mascotFaceUrl from './assets/mascot-face.png';
 
@@ -18,6 +19,9 @@ export function TopAppBar({
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  // 탈퇴 시트는 설정 시트 안이 아니라 이 레벨에 둔다. 설정 시트도 BottomSheet라서 안에 넣으면
+  // 시트가 겹치고, 설정 시트를 닫는 순간 그 자식인 탈퇴 시트까지 언마운트된다.
+  const { requestDeleteAccount, deleteAccountDialog } = useDeleteAccount();
   return (
     <header className={`sticky top-0 z-20 flex items-center justify-between bg-surface/90 px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur ${className}`.trim()}>
       <div className="flex items-center gap-2.5">
@@ -40,7 +44,15 @@ export function TopAppBar({
             </button>
           </>
         )}
-        <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <SettingsSheet
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onRequestDeleteAccount={() => {
+            setSettingsOpen(false);
+            requestDeleteAccount();
+          }}
+        />
+        {deleteAccountDialog}
         {confirmOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setConfirmOpen(false)} />
@@ -74,7 +86,15 @@ export function TopAppBar({
 // 설정은 아직 화면 하나를 차지할 만큼 항목이 많지 않아 바텀시트로 둔다. 학생 셸과 선생님
 // 셸이 라우팅 구조가 서로 달라서, 시트로 두면 TopAppBar 한 곳만 고쳐도 양쪽에 다 붙는다.
 // 항목이 늘어나면 그때 화면으로 승격시키면 된다.
-export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SettingsSheet({
+  open,
+  onClose,
+  onRequestDeleteAccount,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onRequestDeleteAccount?: () => void;
+}) {
   const { theme, setTheme } = useTheme();
   const options: { id: Theme; label: string; icon: string; hint: string }[] = [
     { id: 'light', label: '라이트', icon: 'light_mode', hint: '밝은 배경' },
@@ -107,6 +127,23 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           })}
         </div>
       </div>
+
+      {onRequestDeleteAccount && (
+        <div className="mt-5 border-t border-outline-variant/40 pt-4">
+          <button
+            onClick={onRequestDeleteAccount}
+            className="flex min-h-11 w-full items-center gap-2 rounded-xl px-1 text-left transition hover:bg-surface-container active:scale-[0.99]"
+          >
+            <Icon name="person_remove" className="!text-[18px] shrink-0 text-error" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-error">회원 탈퇴</span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-on-surface-variant">
+                계정과 학습 기록이 모두 삭제되고 되돌릴 수 없어요
+              </span>
+            </span>
+          </button>
+        </div>
+      )}
     </BottomSheet>
   );
 }
@@ -378,6 +415,101 @@ export function useConfirm() {
   );
 
   return { confirm, confirmDialog };
+}
+
+// 회원 탈퇴. useConfirm과 같은 모양({ 여는 함수, 렌더할 다이얼로그 })으로 두어서 학생의 "나"
+// 탭과 선생님의 설정 시트 양쪽에 같은 방식으로 붙는다.
+//
+// 되돌릴 수 없는 동작이라 useConfirm의 "확인" 한 번으로는 부족하다 — 로그아웃과 같은 모양의
+// 버튼을 잘못 눌러 계정이 사라지면 복구가 불가능하다. 그래서 "탈퇴"를 직접 입력해야 버튼이
+// 열린다.
+const DELETE_ACCOUNT_PHRASE = '탈퇴';
+
+export function useDeleteAccount() {
+  const { deleteAccount } = useAuth();
+  const { state } = useAppState();
+  const [open, setOpen] = React.useState(false);
+  const [typed, setTyped] = React.useState('');
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const isManager = state.profile?.role === 'manager';
+
+  const requestDeleteAccount = React.useCallback(() => {
+    setTyped('');
+    setError(null);
+    setPending(false);
+    setOpen(true);
+  }, []);
+
+  const close = () => {
+    if (pending) return; // 삭제가 진행되는 동안 시트를 닫아 상태를 알 수 없게 만들지 않는다
+    setOpen(false);
+  };
+
+  const submit = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await deleteAccount();
+      // 성공하면 세션이 끊겨 AuthProvider가 로그인 화면으로 되돌린다 — 여기서 더 할 일이 없다.
+    } catch (err) {
+      setError((err as Error).message);
+      setPending(false);
+    }
+  };
+
+  const deleteAccountDialog = (
+    <BottomSheet open={open} onClose={close} title="회원 탈퇴">
+      <p className="text-sm leading-relaxed text-on-surface">
+        계정을 지우면 <b className="font-bold">되돌릴 수 없습니다.</b> 다음이 함께 삭제됩니다.
+      </p>
+      <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-on-surface-variant">
+        {isManager ? (
+          <>
+            <li>· 내 계정과 로그인 정보</li>
+            <li>· 연결된 학생과의 연결</li>
+            <li>· 내가 배정하거나 제안한 숙제, 등록한 과외 일정·시험 정보</li>
+            <li>· 학생이 직접 적은 계획과 공부 시간 기록은 그 학생 계정에 남습니다</li>
+          </>
+        ) : (
+          <>
+            <li>· 내 계정과 로그인 정보</li>
+            <li>· 숙제, 계획, 공부 시간 기록, 캘린더</li>
+            <li>· 학교 시간표, 모의고사 기록</li>
+            <li>· 선생님·학부모와의 연결 (상대 화면에서도 내 기록이 사라집니다)</li>
+          </>
+        )}
+      </ul>
+
+      <div className="mt-4">
+        <TextField
+          label={`계속하려면 "${DELETE_ACCOUNT_PHRASE}" 라고 입력하세요`}
+          value={typed}
+          onChange={setTyped}
+          placeholder={DELETE_ACCOUNT_PHRASE}
+        />
+      </div>
+
+      {error && <p className="mt-3 text-xs leading-relaxed text-error">{error}</p>}
+
+      <div className="mt-4 flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={close} disabled={pending}>
+          취소
+        </Button>
+        <Button
+          variant="error"
+          className="flex-1"
+          disabled={pending || typed.trim() !== DELETE_ACCOUNT_PHRASE}
+          onClick={() => void submit()}
+        >
+          {pending ? '삭제 중…' : '탈퇴하기'}
+        </Button>
+      </div>
+    </BottomSheet>
+  );
+
+  return { requestDeleteAccount, deleteAccountDialog };
 }
 
 export function AiTipCard({ text, icon = 'auto_awesome', tint = 'tertiary' }: { text: string; icon?: string; tint?: string }) {
