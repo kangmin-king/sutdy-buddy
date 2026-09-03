@@ -9,7 +9,7 @@ function item(overrides: Partial<HomeworkItem>): HomeworkItem {
   return { id: 'h1', studentId: 's1', status: 'planned', ...overrides };
 }
 
-function select(params: {
+function run(params: {
   now: string;
   homeworkItems: HomeworkItem[];
   settings?: Record<string, { remindAt: string; enabled: boolean }>;
@@ -22,6 +22,11 @@ function select(params: {
     startedItemIds: params.startedItemIds ?? [],
     defaultRemindAt: DEFAULT_HOMEWORK_REMIND_AT,
   });
+}
+
+// 대상 목록만 보는 케이스가 대부분이라 얇게 감싼다.
+function select(params: Parameters<typeof run>[0]) {
+  return run(params).targets;
 }
 
 // 시각 비교 자체를 보는 테스트는 기본값에 기대지 않고 설정을 직접 넣는다 —
@@ -81,6 +86,36 @@ describe('selectReminderTargets', () => {
 
   it('오늘 숙제가 없으면 아무도 대상이 아니다 — 아무것도 배정하지 않은 날은 잔소리할 것도 없다', () => {
     expect(select({ now: '23:59', homeworkItems: [] })).toEqual([]);
+  });
+
+  // 2026-09-03 실전 테스트에서 notified: 0의 원인을 찾느라 DB를 뒤져야 했다 —
+  // 이유별 집계가 응답에 실려야 그 일이 다시 생기지 않는다.
+  it('대상에서 빠진 이유를 이유별로 센다', () => {
+    const items = [
+      item({ id: 'h1', studentId: 'off' }),
+      item({ id: 'h2', studentId: 'early' }),
+      item({ id: 'h3', studentId: 'working' }),
+      item({ id: 'h4', studentId: 'target' }),
+    ];
+    const result = run({
+      now: '21:00',
+      homeworkItems: items,
+      settings: {
+        off: { remindAt: '20:00', enabled: false },
+        early: { remindAt: '23:00', enabled: true },
+        working: { remindAt: '20:00', enabled: true },
+        target: { remindAt: '20:00', enabled: true },
+      },
+      startedItemIds: ['h3'],
+    });
+    expect(result.targets.map((t) => t.studentId)).toEqual(['target']);
+    expect(result.skipped).toEqual({ disabled: 1, beforeTime: 1, started: 1 });
+  });
+
+  it('대상이 있으면 건너뛴 이유는 모두 0이다', () => {
+    const result = run({ now: '23:00', homeworkItems: [item({})] });
+    expect(result.targets).toHaveLength(1);
+    expect(result.skipped).toEqual({ disabled: 0, beforeTime: 0, started: 0 });
   });
 
   it('한 학생이 시작했어도 다른 학생은 따로 판정한다', () => {

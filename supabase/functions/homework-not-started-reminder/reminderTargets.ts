@@ -21,6 +21,23 @@ export interface ReminderTarget {
   homeworkCount: number;
 }
 
+// 대상에서 빠진 학생 수를 이유별로 센다. 응답에 실어 보내려고 만든 값이다 — 2026-09-03 테스트에서
+// "대상 없음"과 "오늘 이미 보냄"이 똑같이 notified: 0으로 나와서, 원인을 찾으려면 매번 DB를
+// 뒤져야 했다. 이유가 보이면 응답 한 줄로 끝난다.
+export interface ReminderSkipCounts {
+  /** 매니저가 알림을 끔 */
+  disabled: number;
+  /** 아직 알림 시각이 되지 않음 */
+  beforeTime: number;
+  /** 하나라도 시작했거나 완료함 */
+  started: number;
+}
+
+export interface ReminderSelection {
+  targets: ReminderTarget[];
+  skipped: ReminderSkipCounts;
+}
+
 export function selectReminderTargets(params: {
   /** Asia/Seoul 기준 현재 시각 "HH:MM" */
   now: string;
@@ -31,7 +48,7 @@ export function selectReminderTargets(params: {
   /** 오늘 숙제 항목 중 학습 세션이 한 번이라도 붙은 항목 id */
   startedItemIds: Iterable<string>;
   defaultRemindAt: string;
-}): ReminderTarget[] {
+}): ReminderSelection {
   const { now, homeworkItems, settings, defaultRemindAt } = params;
   const started = new Set(params.startedItemIds);
 
@@ -43,22 +60,33 @@ export function selectReminderTargets(params: {
   }
 
   const targets: ReminderTarget[] = [];
+  const skipped: ReminderSkipCounts = { disabled: 0, beforeTime: 0, started: 0 };
+
   for (const [studentId, items] of byStudent) {
     const setting = settings[studentId];
-    if (setting && !setting.enabled) continue;
+    if (setting && !setting.enabled) {
+      skipped.disabled += 1;
+      continue;
+    }
 
     // Postgres time은 "21:00:00"으로 오므로 "HH:MM"으로 자른다. 둘 다 0으로 패딩된 24시간
     // 표기라서 문자열 사전순 비교가 곧 시각 비교다.
     const remindAt = (setting?.remindAt ?? defaultRemindAt).slice(0, 5);
-    if (now < remindAt) continue;
+    if (now < remindAt) {
+      skipped.beforeTime += 1;
+      continue;
+    }
 
     // 세션 행은 학생이 "시작"을 눌러야 생긴다. 완료 처리된 항목도 당연히 시작한 것이다
     // (구버전 앱에서 세션 없이 상태만 바뀐 기록이 남아 있을 수 있어 함께 본다).
     const startedAny = items.some((i) => started.has(i.id) || i.status === 'completed');
-    if (startedAny) continue;
+    if (startedAny) {
+      skipped.started += 1;
+      continue;
+    }
 
     targets.push({ studentId, remindAt, homeworkCount: items.length });
   }
 
-  return targets;
+  return { targets, skipped };
 }

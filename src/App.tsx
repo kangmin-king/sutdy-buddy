@@ -130,12 +130,22 @@ function StudentAppShell() {
 function ManagerAppShell() {
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<(typeof MANAGER_TABS)[number]['id']>('home');
+  // 학생 목록의 알림 칩으로 들어온 경우엔 캘린더 탭을 열면서 그 학생의 설정 시트까지 펼친다.
+  // 학생 id로 들고 있는 이유: 시트를 펼치기 전에 다른 학생으로 바꾸면 펼치지 않아야 한다.
+  const [reminderSheetFor, setReminderSheetFor] = React.useState<string | null>(null);
 
   if (!selectedStudentId) {
     return (
       <div id="app-shell">
         <ErrorBanner />
-        <ManagerStudentListScreen onSelectStudent={setSelectedStudentId} />
+        <ManagerStudentListScreen
+          onSelectStudent={setSelectedStudentId}
+          onOpenReminderSetting={(studentId) => {
+            setSelectedStudentId(studentId);
+            setTab('calendar');
+            setReminderSheetFor(studentId);
+          }}
+        />
       </div>
     );
   }
@@ -145,7 +155,13 @@ function ManagerAppShell() {
       <ErrorBanner />
       <TopAppBar />
       <StudentSelector selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />
-      {tab === 'calendar' && <ManagerCalendarScreen studentId={selectedStudentId} />}
+      {tab === 'calendar' && (
+        <ManagerCalendarScreen
+          studentId={selectedStudentId}
+          openReminderSheet={reminderSheetFor === selectedStudentId}
+          onReminderSheetOpened={() => setReminderSheetFor(null)}
+        />
+      )}
       {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
       {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
       <BottomNav tabs={MANAGER_TABS} active={tab} onChange={setTab} />

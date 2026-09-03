@@ -10,7 +10,16 @@ import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
-export default function ManagerCalendarScreen({ studentId }: { studentId: string }) {
+export default function ManagerCalendarScreen({
+  studentId,
+  openReminderSheet = false,
+  onReminderSheetOpened,
+}: {
+  studentId: string;
+  /** 학생 목록의 알림 칩에서 들어왔을 때 true — 마운트 직후 미시작 알림 시트를 펼친다. */
+  openReminderSheet?: boolean;
+  onReminderSheetOpened?: () => void;
+}) {
   const { state, actions } = useAppState();
   const { confirm, confirmDialog } = useConfirm();
   const today = todayKey();
@@ -53,6 +62,17 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const reminderSetting = state.homeworkReminderSettings[studentId];
   const remindAt = reminderSetting?.remindAt ?? DEFAULT_HOMEWORK_REMIND_AT;
   const reminderEnabled = reminderSetting?.enabled ?? true;
+
+  // 학생 목록의 알림 칩으로 들어온 경우. 한 번 펼치면 부모의 신호를 지워서, 시트를 닫고
+  // 다른 걸 만지다가 이 화면이 다시 그려질 때 또 열리지 않게 한다.
+  React.useEffect(() => {
+    if (!openReminderSheet) return;
+    setDraftRemindAt(remindAt);
+    setDraftReminderEnabled(reminderEnabled);
+    setReminderSheetOpen(true);
+    onReminderSheetOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openReminderSheet, studentId]);
 
   const itemsByDate = state.studentPlannerItems[studentId] ?? {};
   const selectedItems = (itemsByDate[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);

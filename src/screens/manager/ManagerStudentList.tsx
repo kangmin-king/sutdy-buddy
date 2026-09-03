@@ -2,9 +2,16 @@ import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { TopAppBar, Card, Button, TextField, Icon } from '../../primitives';
 import { todayKey, getPlannerProgress } from '../../lib';
+import { DEFAULT_HOMEWORK_REMIND_AT } from '../../constants';
 import { allowedAppSummary } from '../shared/allowedAppUsageModel';
 
-export default function ManagerStudentListScreen({ onSelectStudent }: { onSelectStudent: (studentId: string) => void }) {
+export default function ManagerStudentListScreen({
+  onSelectStudent,
+  onOpenReminderSetting,
+}: {
+  onSelectStudent: (studentId: string) => void;
+  onOpenReminderSetting: (studentId: string) => void;
+}) {
   const { state, actions } = useAppState();
   const [code, setCode] = React.useState('');
   const today = todayKey();
@@ -44,17 +51,35 @@ export default function ManagerStudentListScreen({ onSelectStudent }: { onSelect
           const summary = total === 0 ? '오늘 등록된 숙제 없음' : `오늘 숙제 ${completed}/${total} 완료`;
           const summaryColor = total === 0 ? 'text-on-surface-variant' : completed === total ? 'text-secondary' : 'text-error';
           const usageSummary = allowedAppSummary(state.allowedAppIntervals[s.id] ?? [], Date.now());
+          // 설정 행이 없는 학생은 기본값으로 동작한다(0023 마이그레이션) — 그 사실도 그대로 보여준다.
+          const reminder = state.homeworkReminderSettings[s.id];
+          const remindAt = reminder?.remindAt ?? DEFAULT_HOMEWORK_REMIND_AT;
+          const reminderEnabled = reminder?.enabled ?? true;
           return (
-            <button key={s.id} onClick={() => onSelectStudent(s.id)} className="w-full text-left">
-              <Card className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold">{state.studentLabels[s.id] ?? `학생 ${index + 1}`}</p>
-                  <p className={`text-xs mt-0.5 ${summaryColor}`}>{summary}</p>
-                  {usageSummary && <p className="text-xs mt-0.5 text-on-surface-variant">{usageSummary}</p>}
-                </div>
-                <Icon name="chevron_right" className="!text-[20px] text-on-surface-variant shrink-0" />
-              </Card>
-            </button>
+            <Card key={s.id} className="flex items-center justify-between gap-2">
+              {/* 카드 전체를 감싸는 버튼이었지만, 알림 칩이 별도 탭 대상이 되면서 버튼 중첩을
+                  피하려고 왼쪽 영역만 버튼으로 남겼다. */}
+              <button onClick={() => onSelectStudent(s.id)} className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-bold">{state.studentLabels[s.id] ?? `학생 ${index + 1}`}</p>
+                <p className={`text-xs mt-0.5 ${summaryColor}`}>{summary}</p>
+                {usageSummary && <p className="text-xs mt-0.5 text-on-surface-variant">{usageSummary}</p>}
+              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                {/* 알림 시각이 캘린더 탭 안쪽에만 있어서 "설정할 수 있는지"조차 보이지 않던 문제.
+                    여기서 현재 값을 보여주고, 누르면 그 학생의 설정 시트로 바로 들어간다. */}
+                <button
+                  onClick={() => onOpenReminderSetting(s.id)}
+                  aria-label={`${state.studentLabels[s.id] ?? `학생 ${index + 1}`} 미시작 알림 설정`}
+                  className={`inline-flex min-h-11 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold transition active:scale-[0.96] ${
+                    reminderEnabled ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'
+                  }`}
+                >
+                  <Icon name={reminderEnabled ? 'notifications' : 'notifications_off'} className="!text-[15px]" />
+                  {reminderEnabled ? remindAt : '알림 꺼짐'}
+                </button>
+                <Icon name="chevron_right" className="!text-[20px] text-on-surface-variant" />
+              </div>
+            </Card>
           );
         })}
       </div>

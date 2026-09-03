@@ -50,7 +50,10 @@ Deno.serve(async (req: Request) => {
       .eq('source', 'homework');
     if (itemsError) throw itemsError;
     if (!items || items.length === 0) {
-      return new Response(JSON.stringify({ today, now, checked: 0, notified: 0, sent: 0 }), { status: 200, headers: corsHeaders });
+      return new Response(
+        JSON.stringify({ today, now, checked: 0, notified: 0, sent: 0, alreadySent: 0, skipped: { disabled: 0, beforeTime: 0, started: 0 } }),
+        { status: 200, headers: corsHeaders }
+      );
     }
 
     const homeworkItems = items.map((item) => ({ id: item.id, studentId: item.user_id, status: item.status }));
@@ -76,7 +79,7 @@ Deno.serve(async (req: Request) => {
     const startedItemIds = (sessions ?? []).map((s) => s.planner_item_id);
 
     // 누가 대상인지의 판정은 전부 순수 함수에 있다(reminderTargets.ts + 그 테스트).
-    const targets = selectReminderTargets({
+    const { targets, skipped } = selectReminderTargets({
       now,
       homeworkItems,
       settings,
@@ -84,12 +87,15 @@ Deno.serve(async (req: Request) => {
       defaultRemindAt: DEFAULT_HOMEWORK_REMIND_AT,
     });
 
-    if (targets.length === 0) {
-      return new Response(JSON.stringify({ today, now, checked: studentIds.length, notified: 0, sent: 0 }), {
+    // 응답을 한 곳에서 만든다. skipped와 alreadySent를 늘 실어 보내는 이유: notified가 0일 때
+    // "대상이 없었다"와 "오늘 이미 보냈다"를 구분하려고 DB를 뒤지는 일이 없어야 한다.
+    const summary = (counts: { notified: number; sent: number; alreadySent: number }) =>
+      new Response(JSON.stringify({ today, now, checked: studentIds.length, ...counts, skipped }), {
         status: 200,
         headers: corsHeaders,
       });
-    }
+
+    if (targets.length === 0) return summary({ notified: 0, sent: 0, alreadySent: 0 });
 
     // 발송 기록을 **보내기 전에** 남긴다. (student_id, date) 유니크에 걸려 이미 있으면 빈 배열이
     // 돌아오므로, 15분마다 도는 cron 중 하루 첫 번째만 통과한다.
@@ -106,12 +112,7 @@ Deno.serve(async (req: Request) => {
 
     const claimedIds = new Set((claimed ?? []).map((row) => row.student_id));
     const toNotify = targets.filter((t) => claimedIds.has(t.studentId));
-    if (toNotify.length === 0) {
-      return new Response(JSON.stringify({ today, now, checked: studentIds.length, notified: 0, sent: 0 }), {
-        status: 200,
-        headers: corsHeaders,
-      });
-    }
+    if (toNotify.length === 0) return summary({ notified: 0, sent: 0, alreadySent: targets.length });
 
     const { data: links, error: linksError } = await admin
       .from('sb_student_manager_links')
@@ -162,10 +163,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ today, now, checked: studentIds.length, notified: toNotify.length, sent }),
-      { status: 200, headers: corsHeaders }
-    );
+    return summary({ notified: toNotify.length, sent, alreadySent: targets.length - toNotify.length });
   } catch (err) {
     console.error('homework-not-started-reminder failed:', err);
     return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: corsHeaders });

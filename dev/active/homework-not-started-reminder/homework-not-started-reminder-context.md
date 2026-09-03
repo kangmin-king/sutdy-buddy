@@ -49,7 +49,16 @@ curl -s -X POST "$URL/functions/v1/homework-not-started-reminder" \
 select * from cron.job_run_details order by start_time desc limit 20;
 -- 오늘 누구에게 보냈나
 select * from sb_homework_reminder_log where date = current_date;
+-- cron이 받은 응답 (pg_net은 응답을 이 표에 남긴다 — 진단은 대개 여기서 끝난다)
+select status_code, content, created from net._http_response order by id desc limit 5;
 ```
+
+응답 모양: `{today, now, checked, notified, sent, alreadySent, skipped:{disabled, beforeTime, started}}`
+- `checked` 오늘 숙제가 있는 학생 수 · `notified` 이번 호출에서 새로 보낸 수 · `sent` FCM 성공 건수
+- `alreadySent` 대상이지만 오늘 이미 보낸 수 · `skipped` 대상에서 빠진 이유별 학생 수
+
+**실전 검증 (2026-09-03)**: 오늘 숙제 1개를 배정하고 시작하지 않은 상태에서 알림 시각을 앞당겨
+호출 → 매니저 기기에 푸시 도착 확인. 판정·하루 1회 기록·FCM 전달 전 구간이 실제로 동작한다.
 
 되돌리려면 `select cron.unschedule('homework-not-started-reminder');`.
 
@@ -74,6 +83,17 @@ select * from sb_homework_reminder_log where date = current_date;
   RLS에서 학생에게 SELECT만 줬다.
 - **학생에게는 알림을 보내지 않는다** — 미리 알려주면 "안 하면 불편함"이 사라진다. PRD §8.1이
   경계하라고 적어둔 방향이라 의도적으로 뺐다.
+- **서비스 롤 판정을 키 문자열 비교에서 role 클레임 확인으로 바꿨다** (2026-09-03) — 이 프로젝트는
+  새 API 키 체계를 쓰기 때문에 런타임에 주입되는 `SUPABASE_SERVICE_ROLE_KEY`가 `sb_secret_...`
+  형식인데, cron은 Vault에 넣어둔 legacy service_role JWT를 들고 온다. 문자열 비교로는 영원히
+  어긋나 매 실행이 401이었다. 게이트웨이가 서명을 검증한 뒤에 함수가 도니 role 클레임을 신뢰할 수
+  있다 — 단 `--no-verify-jwt`로 배포하면 위조 가능해지므로 그렇게 배포하지 말 것.
+- **응답에 `skipped`·`alreadySent`를 실었다** (2026-09-03) — 그전에는 "대상 없음"과 "오늘 이미
+  보냄"이 똑같이 `notified: 0`이라, 실전 테스트에서 원인을 찾으려고 설정·세션·로그 표를 차례로
+  뒤져야 했다. 응답 한 줄로 끝나야 한다.
+- **알림 시각을 학생 목록 카드에도 노출했다** (2026-09-03) — 설정이 캘린더 탭 안쪽에만 있어서
+  "시각을 정할 수 있다"는 것 자체가 보이지 않았다(사용자가 기능을 만든 다음 날 같은 기능을
+  요청했다). 칩을 누르면 그 학생의 설정 시트로 바로 들어간다.
 - **판정을 순수 함수로 분리했다** — 이 기능의 전부가 그 판정이라 DB·FCM 없이 테스트해야 했다.
   단, `supabase/`는 앱 `tsconfig.json`의 `include: ["src"]` 밖이라 `npx tsc -b`가 타입체크하지
   않는다(나머지 Edge Function과 같은 처지). vitest는 기본 include로 이 테스트를 집어간다.
