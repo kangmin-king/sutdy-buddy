@@ -110,7 +110,7 @@ export function canStartStudyItem(
   const runningItemIds = Object.keys(runningSessionIds);
   return runningItemIds.length === 0 || (runningItemIds.length === 1 && runningItemIds[0] === itemId);
 }
-export interface NextItemGroup {
+export interface ItemGroup {
   header: string | null;
   items: PlannerItem[];
 }
@@ -118,12 +118,12 @@ export interface NextItemGroup {
 // 연결이 끊긴 선생님이 낸 숙제도 managerId는 그대로 남는다. 연결된 선생님 목록만으로 그룹을
 // 만들면 그런 항목이 어느 그룹에도 속하지 못해 목록에서 조용히 사라진다 — 실제로 존재하는
 // managerId를 기준으로 그룹을 만들어 항목이 누락될 수 없게 한다.
-export function groupNextItemsByManager(
+export function groupItemsByManager(
   items: readonly PlannerItem[],
   managerIdOf: (item: PlannerItem) => string | null,
   linkedManagerIds: readonly string[],
   labelFor: (managerId: string) => string,
-): NextItemGroup[] {
+): ItemGroup[] {
   const itemsByManagerId = new Map<string, PlannerItem[]>();
   const selfAdded: PlannerItem[] = [];
   for (const item of items) {

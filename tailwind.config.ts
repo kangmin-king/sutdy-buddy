@@ -1,5 +1,9 @@
 import type { Config } from 'tailwindcss';
 
+// 색 값 자체는 src/index.css의 CSS 변수에 있다. 여기서는 이름만 이어 붙인다.
+// `<alpha-value>` 자리는 Tailwind가 채워주므로 `bg-primary/10` 같은 표기가 그대로 동작한다.
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   darkMode: 'class',
@@ -17,36 +21,38 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: '#f7f9fb',
-        'surface-dim': '#d8dadc',
-        'surface-bright': '#f7f9fb',
-        'surface-container-lowest': '#ffffff',
-        'surface-container-low': '#f2f4f6',
-        'surface-container': '#eceef0',
-        'surface-container-high': '#e6e8ea',
-        'surface-container-highest': '#e0e3e5',
-        'on-surface': '#191c1e',
-        'on-surface-variant': '#42474f',
-        outline: '#737780',
-        'outline-variant': '#c3c6d1',
-        primary: '#366095',
-        'on-primary': '#ffffff',
-        'primary-container': '#6e96cf',
-        'on-primary-container': '#002d58',
-        secondary: '#196b50',
-        'on-secondary': '#ffffff',
-        'secondary-container': '#a2efcd',
-        'on-secondary-container': '#1f6f54',
-        tertiary: '#63568e',
-        'on-tertiary': '#ffffff',
-        'tertiary-container': '#9a8cc8',
-        'on-tertiary-container': '#302459',
-        error: '#ba1a1a',
-        'on-error': '#ffffff',
-        'error-container': '#ffdad6',
-        'on-error-container': '#93000a',
-        background: '#f7f9fb',
-        'on-background': '#191c1e',
+        surface: token('surface'),
+        'surface-dim': token('surface-dim'),
+        'surface-bright': token('surface-bright'),
+        'surface-container-lowest': token('surface-container-lowest'),
+        'surface-container-low': token('surface-container-low'),
+        'surface-container': token('surface-container'),
+        'surface-container-high': token('surface-container-high'),
+        'surface-container-highest': token('surface-container-highest'),
+        'on-surface': token('on-surface'),
+        'on-surface-variant': token('on-surface-variant'),
+        outline: token('outline'),
+        'outline-variant': token('outline-variant'),
+        primary: token('primary'),
+        'on-primary': token('on-primary'),
+        'primary-container': token('primary-container'),
+        'on-primary-container': token('on-primary-container'),
+        secondary: token('secondary'),
+        'on-secondary': token('on-secondary'),
+        'secondary-container': token('secondary-container'),
+        'on-secondary-container': token('on-secondary-container'),
+        tertiary: token('tertiary'),
+        'on-tertiary': token('on-tertiary'),
+        'tertiary-container': token('tertiary-container'),
+        'on-tertiary-container': token('on-tertiary-container'),
+        error: token('error'),
+        'on-error': token('on-error'),
+        'error-container': token('error-container'),
+        'on-error-container': token('on-error-container'),
+        warning: token('warning'),
+        scrim: token('scrim'),
+        background: token('surface'),
+        'on-background': token('on-surface'),
       },
       borderRadius: {
         sm: '0.25rem',
@@ -57,7 +63,9 @@ export default {
         full: '9999px',
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'sans-serif'],
+        // 이전 지정(Plus Jakarta Sans)에는 한글 글리프가 없어 UI 전체가 시스템 폰트로
+        // 떨어지고 있었다. Pretendard는 한글·라틴을 함께 커버한다.
+        sans: ['Pretendard Variable', 'Pretendard', '-apple-system', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 4px 20px -4px rgba(54,96,149,0.12)',

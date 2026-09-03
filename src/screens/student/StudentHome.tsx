@@ -1,15 +1,13 @@
 import React from 'react';
-import { App as CapacitorApp } from '@capacitor/app';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, addDaysToKey, resolvePlannerItemManagerId, managerDisplayLabel } from '../../lib';
 import { getSubject } from '../../constants';
-import { TopAppBar, Icon } from '../../primitives';
+import { TopAppBar, Icon, useConfirm } from '../../primitives';
 import { DistractionStop, isNativePlatform } from '../../native/distractionStop';
-import LinkedManagerChips from './LinkedManagerChips';
 import HomeBanner from '../shared/HomeBanner';
-import type { PlannerItem } from '../../types';
-import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
-import type { NextItemGroup } from './studentHomeModel';
+import TodayList from './TodayList';
+import type { PlannerItem, SubjectId } from '../../types';
+import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions } from './studentHomeModel';
 
 function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -21,14 +19,14 @@ function formatProposalDate(date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   return match ? `${Number(match[2])}월 ${Number(match[3])}일` : date;
 }
+
 export default function StudentHomeScreen({
   onNavigateToCalendar,
-  onOpenMockExam,
-}: { onNavigateToCalendar?: () => void; onOpenMockExam?: () => void } = {}) {
+}: { onNavigateToCalendar?: () => void } = {}) {
   const { state, actions } = useAppState();
+  const { confirm, confirmDialog } = useConfirm();
   const today = todayKey();
   const yesterday = addDaysToKey(today, -1);
-  // 완료 처리한 항목은 홈 목록에서 사라진다 — "오늘의 할 일" 오버레이에서는 체크 표시로 계속 보인다.
   const allTodayItems = (state.plannerItems[today] ?? []).slice().sort((a, b) => a.order - b.order);
   const missedYesterday = (state.plannerItems[yesterday] ?? []).filter((it) => it.status !== 'completed');
   const isPageRangeItem = (it: PlannerItem) => {
@@ -71,29 +69,6 @@ export default function StudentHomeScreen({
   const [runningSessionId, setRunningSessionId] = React.useState<Record<string, string>>({});
   const [startPending, setStartPending] = React.useState<Record<string, boolean>>({});
   const [now, setNow] = React.useState(Date.now());
-  const [showTodo, setShowTodo] = React.useState(false);
-  const todoTriggerRef = React.useRef<HTMLButtonElement>(null);
-  const wasTodoOpen = React.useRef(false);
-  const closeTodo = React.useCallback(() => setShowTodo(false), []);
-
-  React.useEffect(() => {
-    if (showTodo) {
-      wasTodoOpen.current = true;
-      return;
-    }
-    if (!wasTodoOpen.current) return;
-    wasTodoOpen.current = false;
-    const focusTimer = window.setTimeout(() => todoTriggerRef.current?.focus(), 0);
-    return () => window.clearTimeout(focusTimer);
-  }, [showTodo]);
-
-  React.useEffect(() => {
-    if (!showTodo || !isNativePlatform()) return;
-    const listenerPromise = CapacitorApp.addListener('backButton', closeTodo);
-    return () => {
-      void listenerPromise.then((handle) => handle.remove());
-    };
-  }, [closeTodo, showTodo]);
   const didRecoverRunningSession = React.useRef(false);
 
   React.useEffect(() => {
@@ -113,8 +88,6 @@ export default function StudentHomeScreen({
     () => buildStudentHomeModel(allTodayItems, state.studySessions, runningSessionId, now),
     [allTodayItems, state.studySessions, runningSessionId, now],
   );
-  // 선생님이 여러 명일 때만 의미가 있는 정렬 토글 — 세션 안에서만 기억하고 서버엔 저장하지 않는다.
-  const [sortMode, setSortMode] = React.useState<'time' | 'manager'>('time');
   const managerIdFor = (it: PlannerItem) => resolvePlannerItemManagerId(it, state);
   const managerLabelFor = (it: PlannerItem) => {
     const managerId = managerIdFor(it);
@@ -190,18 +163,39 @@ export default function StudentHomeScreen({
       actions.updatePlannerItem(today, itemId, { status: 'completed' });
     }
   };
+  // 목록의 체크는 되돌릴 수 있어야 한다 — 잘못 눌렀을 때 복구할 방법이 없으면 체크박스를 못 쓴다.
+  const handleToggleComplete = (item: PlannerItem) => {
+    if (item.status === 'completed') {
+      actions.updatePlannerItem(today, item.id, { status: 'planned' });
+    } else {
+      handleComplete(item.id);
+    }
+  };
 
-  // 선생님별 정렬을 고르면 항목을 선생님 단위로 묶는다(같은 선생님 항목은 원래 시간순 그대로 유지).
-  // 시간순일 때는 지금처럼 그룹 헤더 없이 하나의 목록으로 보여준다.
-  const itemGroups: NextItemGroup[] =
-    sortMode === 'time'
-      ? [{ header: null, items: homeModel.nextItems }]
-      : groupNextItemsByManager(
-          homeModel.nextItems,
-          managerIdFor,
-          state.linkedManagers.map((manager) => manager.id),
-          proposalManagerLabel,
-        );
+  const handleAddSelfPlan = (draft: { subjectId: SubjectId; material: string; startTime: string; endTime: string }) => {
+    actions.addPlannerItem(today, {
+      date: today,
+      subjectId: draft.subjectId,
+      startTime: draft.startTime,
+      studyType: null,
+      material: draft.material,
+      unit: '',
+      pageRange: '',
+      endTime: draft.endTime || null,
+      difficulty: null,
+      restPattern: null,
+      mustDo: false,
+      status: 'planned',
+      actualMinutes: null,
+      understanding: null,
+      partialReason: null,
+      incompleteReason: null,
+      source: 'self',
+      homeworkAssignmentId: null,
+      examSubjectRangeId: null,
+    });
+  };
+
   const currentItem = homeModel.currentItem;
   const currentIsRunning = currentItem ? Boolean(runningSessionId[currentItem.id]) : false;
   const itemOriginLabel = (item: PlannerItem) =>
@@ -210,10 +204,11 @@ export default function StudentHomeScreen({
       : '내 계획';
   const itemDetails = (item: PlannerItem) => [item.material, item.unit, item.pageRange].filter(Boolean).join(' · ');
   const completionPercent = homeModel.totalCount > 0 ? (homeModel.completedCount / homeModel.totalCount) * 100 : 0;
+  const completedItems = allTodayItems.filter((item) => item.status === 'completed');
 
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
-      <TopAppBar className="-mx-5" />
+      <TopAppBar className="-mx-5" compact />
 
       <section className="mt-2" aria-labelledby="today-progress-title">
         <div className="flex items-end justify-between gap-4">
@@ -232,57 +227,57 @@ export default function StudentHomeScreen({
         )}
       </section>
 
-      <section className="mt-6" aria-labelledby="current-study-title">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 id="current-study-title" className="text-sm font-bold text-on-surface">지금 할 공부</h2>
-          {currentIsRunning && <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary"><span className="h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse" />집중 중</span>}
-        </div>
-        {currentItem ? (
-          <article className="overflow-hidden rounded-[1.75rem] bg-primary text-on-primary shadow-card">
+      {/*
+        아래 카드는 라이트에선 파란 면 위 흰 글씨다. 다크에서 같은 밝기의 파란 면을 쓰면
+        화면에서 가장 눈부신 덩어리가 되어버려(승인된 B안이 피하려던 지점) 떠 있는 어두운
+        면으로 바꾸고, 강조는 CTA 버튼 하나에만 남긴다.
+      */}
+      {currentItem && (
+        <section className="mt-6" aria-labelledby="current-study-title">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 id="current-study-title" className="text-sm font-bold text-on-surface">지금 할 공부</h2>
+            {currentIsRunning && <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary"><span className="h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse" />집중 중</span>}
+          </div>
+          <article className="overflow-hidden rounded-[1.75rem] bg-primary text-on-primary shadow-card dark:bg-surface-container-lowest dark:text-on-surface">
             <div className="p-5 pb-4">
-              <p className="text-xs font-semibold text-on-primary/70">{itemOriginLabel(currentItem)}</p>
+              <p className="text-xs font-semibold text-on-primary/70 dark:text-on-surface-variant">{itemOriginLabel(currentItem)}</p>
               <h3 className="mt-2 break-words text-2xl font-extrabold tracking-tight">{getSubject(currentItem.subjectId).label}</h3>
-              <p className="mt-1 min-h-5 break-words text-sm leading-relaxed text-on-primary/80">{itemDetails(currentItem) || '학습 내용을 확인하고 바로 시작해 보세요.'}</p>
+              <p className="mt-1 min-h-5 break-words text-sm leading-relaxed text-on-primary/80 dark:text-on-surface-variant">{itemDetails(currentItem) || '학습 내용을 확인하고 바로 시작해 보세요.'}</p>
               <div className="mt-5 flex items-end justify-between gap-3">
-                <div><p className="text-[10px] font-semibold tracking-[0.1em] text-on-primary/60">오늘 쌓은 시간</p><p className="mt-1 font-mono text-4xl font-bold leading-none tabular-nums">{formatElapsed(homeModel.currentElapsedSeconds)}</p></div>
-                <button onClick={() => currentIsRunning ? handleStop(currentItem.id, false) : handleStart(currentItem.id)} disabled={Boolean(startPending[currentItem.id])} className="inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-2xl bg-surface-container-lowest px-4 py-3 text-sm font-bold text-primary transition active:scale-[0.98] disabled:opacity-50">
+                <div><p className="text-[10px] font-semibold tracking-[0.1em] text-on-primary/60 dark:text-on-surface-variant">오늘 쌓은 시간</p><p className="mt-1 font-mono text-4xl font-bold leading-none tabular-nums">{formatElapsed(homeModel.currentElapsedSeconds)}</p></div>
+                <button onClick={() => currentIsRunning ? handleStop(currentItem.id, false) : handleStart(currentItem.id)} disabled={Boolean(startPending[currentItem.id])} className="inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-2xl bg-surface-container-lowest px-4 py-3 text-sm font-bold text-primary transition active:scale-[0.98] disabled:opacity-50 dark:bg-primary dark:text-on-primary">
                   <Icon name={currentIsRunning ? 'pause' : 'play_arrow'} className="!text-[18px]" />
                   {currentIsRunning ? '잠깐 멈춤' : homeModel.currentElapsedSeconds > 0 ? '이어서 하기' : '시작하기'}
                 </button>
               </div>
             </div>
-            {homeModel.currentElapsedSeconds > 0 && <button onClick={() => handleComplete(currentItem.id)} className="w-full border-t border-on-primary/15 px-5 py-3.5 text-sm font-bold transition hover:bg-on-primary/10 active:bg-on-primary/15">오늘 학습 완료</button>}
+            {homeModel.currentElapsedSeconds > 0 && <button onClick={() => handleComplete(currentItem.id)} className="w-full border-t border-on-primary/15 px-5 py-3.5 text-sm font-bold transition hover:bg-on-primary/10 active:bg-on-primary/15 dark:border-outline-variant dark:hover:bg-surface-container dark:active:bg-surface-container-high">오늘 학습 완료</button>}
           </article>
-        ) : (
-          <div className="rounded-[1.75rem] bg-surface-container px-5 py-8 text-center">
-            <Icon name="task_alt" className="!text-[32px] text-primary" filled />
-            <p className="mt-2 text-sm font-bold text-on-surface">{homeModel.totalCount > 0 ? '오늘 공부를 모두 마쳤어요' : '아직 등록된 공부가 없어요'}</p>
-            <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{homeModel.totalCount > 0 ? '수고했어요. 오늘 쌓은 흐름을 이어가요.' : '캘린더에서 오늘 계획을 추가할 수 있어요.'}</p>
-            {homeModel.totalCount === 0 && onNavigateToCalendar && <button onClick={onNavigateToCalendar} className="mt-4 inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold text-primary">오늘 계획 만들기</button>}
-          </div>
-        )}
-      </section>
-      {homeModel.nextItems.length > 0 && (
-        <section className="mt-6" aria-labelledby="next-study-title">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div><h2 id="next-study-title" className="text-sm font-bold text-on-surface">다음에 할 공부</h2><p className="mt-0.5 text-[11px] text-on-surface-variant">{homeModel.nextItems.length}개가 기다리고 있어요</p></div>
-            {state.linkedManagers.length > 1 && <div className="flex rounded-full bg-surface-container p-0.5">{(['time', 'manager'] as const).map((mode) => <button key={mode} onClick={() => setSortMode(mode)} aria-pressed={sortMode === mode} className={`min-h-11 rounded-full px-3 py-2 text-[10px] font-semibold transition ${sortMode === mode ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}>{mode === 'time' ? '시간순' : '선생님별'}</button>)}</div>}
-          </div>
-          <div className="divide-y divide-outline-variant/40 border-y border-outline-variant/40">
-            {itemGroups.map((group) => <div key={group.header ?? 'all'}>
-              {group.header && <p className="pb-1 pt-3 text-[10px] font-semibold text-tertiary">{group.header}</p>}
-              {group.items.map((item) => {
-                const isRunning = Boolean(runningSessionId[item.id]);
-                const elapsed = homeModel.elapsedSecondsByItemId[item.id] ?? 0;
-                return <article key={item.id} className="flex min-w-0 items-center gap-3 py-3.5">
-                  <div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><h3 className="truncate text-sm font-bold text-on-surface">{getSubject(item.subjectId).label}</h3><span className="shrink-0 text-[10px] font-medium text-tertiary">{itemOriginLabel(item)}</span></div><p className="mt-0.5 break-words text-xs leading-relaxed text-on-surface-variant">{itemDetails(item) || '학습 내용 미입력'}</p>{elapsed > 0 && <p className="mt-1 font-mono text-[11px] font-bold tabular-nums text-primary">{formatElapsed(elapsed)} 학습</p>}</div>
-                  <button onClick={() => isRunning ? handleStop(item.id, false) : handleStart(item.id)} disabled={Boolean(startPending[item.id]) || !canStartStudyItem(runningSessionId, item.id)} aria-label={`${getSubject(item.subjectId).label} ${isRunning ? '일시정지' : '시작'}`} className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-[0.96] disabled:opacity-50 ${isRunning ? 'bg-surface-container text-on-surface' : 'bg-primary/10 text-primary'}`}><Icon name={isRunning ? 'pause' : 'play_arrow'} className="!text-[17px]" />{isRunning ? '멈춤' : '시작'}</button>
-                </article>;
-              })}
-            </div>)}
-          </div>
         </section>
       )}
+
+      <TodayList
+        pending={homeModel.nextItems}
+        completed={completedItems}
+        managerIdOf={managerIdFor}
+        linkedManagerIds={state.linkedManagers.map((manager) => manager.id)}
+        managerLabelOf={proposalManagerLabel}
+        elapsedSecondsByItemId={homeModel.elapsedSecondsByItemId}
+        isRunning={(itemId) => Boolean(runningSessionId[itemId])}
+        canStart={(itemId) => canStartStudyItem(runningSessionId, itemId)}
+        startPending={startPending}
+        onStart={handleStart}
+        onPause={(itemId) => handleStop(itemId, false)}
+        onToggleComplete={handleToggleComplete}
+        onDelete={async (item) => {
+          const label = `${getSubject(item.subjectId).label}${itemDetails(item) ? ` · ${itemDetails(item)}` : ''}`;
+          if (await confirm(`"${label}" 계획을 삭제할까요?`)) actions.deletePlannerItem(today, item.id);
+        }}
+        onAdd={handleAddSelfPlan}
+        originLabel={itemOriginLabel}
+        details={itemDetails}
+        isSelfPlan={(item) => item.source !== 'homework'}
+      />
 
       {state.homeworkProposals.length > 0 && (
         <section className="mt-6" aria-labelledby="homework-proposals-title">
@@ -319,115 +314,41 @@ export default function StudentHomeScreen({
           </div>
         </section>
       )}
+
       {missedYesterday.length > 0 && (
-        <div className="mt-5 rounded-2xl bg-surface-container-low px-4 py-3.5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-on-surface">어제 남은 공부</p>
-            <button onClick={onNavigateToCalendar} className="min-h-11 rounded-xl px-2 text-[11px] font-semibold text-on-surface-variant">
-              남은 계획 보기
+        <section className="mt-6" aria-labelledby="missed-yesterday-title">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <h2 id="missed-yesterday-title" className="text-sm font-bold text-on-surface">어제 남은 공부</h2>
+              <p className="mt-0.5 text-[11px] text-on-surface-variant">오늘로 넘겨서 마무리할 수 있어요</p>
+            </div>
+            <button onClick={onNavigateToCalendar} className="min-h-11 shrink-0 rounded-xl px-2 text-[11px] font-semibold text-on-surface-variant">
+              캘린더에서 보기
             </button>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {missedYesterday.map((it) => (
-              <div key={it.id} className="flex min-w-0 items-center justify-between gap-2">
-                <p className="min-w-0 break-words text-xs leading-relaxed">
-                  {getSubject(it.subjectId).label} · {itemDetails(it) || '할 일'}
-                  {managerLabelFor(it) && <span className="text-[10px] text-tertiary ml-1">· {managerLabelFor(it)}</span>}
-                </p>
+              <article key={it.id} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-container-low px-4 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <h3 className="text-sm font-bold text-on-surface">{getSubject(it.subjectId).label}</h3>
+                    <span className="text-[10px] font-medium text-tertiary">{itemOriginLabel(it)}</span>
+                  </div>
+                  <p className="mt-0.5 break-words text-xs leading-relaxed text-on-surface-variant">{itemDetails(it) || '할 일'}</p>
+                </div>
                 {(!isPageRangeItem(it) || !hasFutureIncompleteInSameRange(it)) && (
-                  <button onClick={() => handleAddToToday(it)} className="min-h-11 shrink-0 rounded-xl px-2 text-[11px] font-semibold text-primary">
-                    오늘 일정에 추가
+                  <button onClick={() => handleAddToToday(it)} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-3 text-xs font-bold text-on-primary transition active:scale-[0.96]">
+                    오늘로
                   </button>
                 )}
-              </div>
+              </article>
             ))}
           </div>
-        </div>
+        </section>
       )}
-      <HomeBanner />
-      <section className="mt-6" aria-labelledby="study-tools-title">
-        <div className="mb-2 flex items-center justify-between">
-          <div>
-            <h2 id="study-tools-title" className="text-sm font-bold text-on-surface">학습 도구</h2>
-            <p className="mt-0.5 text-[11px] text-on-surface-variant">필요할 때만 가볍게 꺼내 써요</p>
-          </div>
-          {state.linkedManagers.length > 0 && <span className="text-[11px] font-semibold text-tertiary">{state.linkedManagers.length}명 연결됨</span>}
-        </div>
-        <div className="rounded-2xl bg-surface-container-low px-4 py-3.5">
-          {state.profile?.inviteCode && (
-            <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-              <Icon name="link" className="!text-[17px] text-primary" />
-              <span>초대코드</span>
-              <span className="font-mono font-bold tracking-wider text-on-surface">{state.profile.inviteCode}</span>
-            </div>
-          )}
-          <LinkedManagerChips />
-          <div className={`mt-3 grid gap-2 ${onOpenMockExam ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {onOpenMockExam && (
-              <button onClick={onOpenMockExam} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-surface-container-lowest px-3 text-xs font-bold text-primary transition active:scale-[0.98]">
-                <Icon name="timer" className="!text-[18px]" /> 모의고사
-              </button>
-            )}
-            <button
-              ref={todoTriggerRef}
-              onClick={() => setShowTodo(true)}
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-surface-container-lowest px-3 text-xs font-bold text-on-surface-variant transition active:scale-[0.98]"
-            >
-              <Icon name="checklist" className="!text-[18px] text-primary" />
-              오늘의 할 일
-            </button>
-          </div>
-        </div>
-      </section>
-      {showTodo && (
-        <div className="fixed inset-0 z-40 flex items-end bg-on-surface/45 backdrop-blur-[2px]" onClick={closeTodo} onKeyDown={(e) => { if (e.key === 'Escape') closeTodo(); if (e.key === 'Tab') { e.preventDefault(); (e.currentTarget.querySelector('button') as HTMLButtonElement | null)?.focus(); } }}>
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="today-todo-title"
-            className="mx-auto max-h-[78dvh] w-full max-w-[480px] overflow-y-auto rounded-t-[1.75rem] bg-surface-container-lowest px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 shadow-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-outline-variant" aria-hidden="true" />
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 id="today-todo-title" className="text-lg font-extrabold tracking-tight text-on-surface">오늘의 할 일</h2>
-                <p className="mt-0.5 text-xs text-on-surface-variant">{homeModel.completedCount}개 완료 · {homeModel.totalCount - homeModel.completedCount}개 남음</p>
-              </div>
-              <button autoFocus onClick={closeTodo} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]" aria-label="오늘의 할 일 닫기">
-                <Icon name="close" className="!text-[20px]" />
-              </button>
-            </div>
 
-            {allTodayItems.length > 0 ? (
-              <div className="mt-4 divide-y divide-outline-variant/40 border-y border-outline-variant/40">
-                {allTodayItems.map((it) => {
-                  const completed = it.status === 'completed';
-                  return (
-                    <article key={it.id} className={`flex items-start gap-3 py-3.5 ${completed ? 'text-on-surface-variant' : 'text-on-surface'}`}>
-                      <Icon name={completed ? 'task_alt' : 'radio_button_unchecked'} className={`mt-0.5 !text-[20px] ${completed ? 'text-primary' : 'text-outline'}`} filled={completed} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <h3 className={`text-sm font-bold ${completed ? 'line-through decoration-outline' : ''}`}>{getSubject(it.subjectId).label}</h3>
-                          <span className="text-[10px] font-medium text-tertiary">{itemOriginLabel(it)}</span>
-                        </div>
-                        <p className="mt-0.5 break-words text-xs leading-relaxed text-on-surface-variant">{itemDetails(it) || '학습 내용 미입력'}</p>
-                      </div>
-                      <span className="shrink-0 pt-0.5 text-[11px] font-semibold text-on-surface-variant">{completed ? '완료' : '남음'}</span>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-10 text-center">
-                <Icon name="event_available" className="!text-[30px] text-primary" filled />
-                <p className="mt-2 text-sm font-bold text-on-surface">오늘 등록된 공부가 없어요</p>
-                <p className="mt-1 text-xs text-on-surface-variant">캘린더에서 오늘 계획을 만들 수 있어요.</p>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
+      <HomeBanner />
+      {confirmDialog}
     </div>
   );
 }

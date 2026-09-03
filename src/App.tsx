@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
+import { ThemeProvider } from './state/ThemeContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { BottomNav, Card, Button, TopAppBar } from './primitives';
 import { STUDENT_NAV_TABS } from './constants';
@@ -9,7 +10,7 @@ import OnboardingScreen from './screens/Onboarding';
 import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import MockExamTimerScreen from './screens/student/MockExamTimer';
-import StudentPlannerScreen from './screens/student/StudentPlanner';
+import MyPageScreen from './screens/student/MyPage';
 import StudentCalendarScreen from './screens/student/StudentCalendar';
 import DistractionFab from './screens/shared/DistractionFab';
 import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
@@ -69,7 +70,9 @@ function StudentAppShell() {
 
   // 알림으로 여는 경로와 화면 버튼으로 여는 경로를 분석에서 구분한다 — 설정을 끝낸 학생이
   // 실제로 어느 쪽으로 들어오는지가 이 기능의 재방문을 좌우한다.
-  const openDistractionStop = React.useCallback((entryPoint: 'fab' | 'notification') => {
+  // 'my_page'는 "나" 탭의 학습 도구 목록에서 들어온 경우 — FAB을 없앨지 판단하려면 두 경로를
+  // 따로 세어야 한다.
+  const openDistractionStop = React.useCallback((entryPoint: 'fab' | 'notification' | 'my_page') => {
     setShowDistractionStop(true);
     track('Opened Distraction Stop', { entry_point: entryPoint });
   }, []);
@@ -116,11 +119,11 @@ function StudentAppShell() {
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {activeTab === 'home' && (
-        <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} onOpenMockExam={() => setShowMockExam(true)} />
-      )}
+      {activeTab === 'home' && <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} />}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
-      {activeTab === 'planner' && <StudentPlannerScreen />}
+      {activeTab === 'me' && (
+        <MyPageScreen onOpenMockExam={() => setShowMockExam(true)} onOpenDistractionStop={() => openDistractionStop('my_page')} />
+      )}
       {isNativePlatform() && <DistractionFab onOpen={() => openDistractionStop('fab')} />}
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
@@ -219,8 +222,10 @@ function Gate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Gate />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Gate />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

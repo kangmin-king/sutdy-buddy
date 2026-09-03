@@ -2,22 +2,143 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { background: #f7f9fb; overscroll-behavior-y: none; }
-body { font-family: 'Plus Jakarta Sans', sans-serif; color: #191c1e; }
+/*
+  색은 전부 여기서 CSS 변수로 정의하고, tailwind.config.ts는 이 변수를 참조하기만 한다.
+  덕분에 화면 코드는 `bg-surface`/`text-on-surface`처럼 그대로 두고 테마만 갈아끼울 수 있다.
+  값은 `R G B` 채널만 적는다 — Tailwind가 `rgb(var(--x) / <alpha-value>)`로 감싸서
+  `bg-primary/10` 같은 투명도 표기를 그대로 쓸 수 있게 하기 위함.
+*/
+@layer base {
+  :root {
+    /* ── 라이트 (기본) — 기존 tailwind.config.ts 값 그대로 ── */
+    --surface: 247 249 251;
+    --surface-dim: 216 218 220;
+    --surface-bright: 247 249 251;
+    --surface-container-lowest: 255 255 255;
+    --surface-container-low: 242 244 246;
+    --surface-container: 236 238 240;
+    --surface-container-high: 230 232 234;
+    --surface-container-highest: 224 227 229;
+    --on-surface: 25 28 30;
+    --on-surface-variant: 66 71 79;
+    --outline: 115 119 128;
+    --outline-variant: 195 198 209;
+
+    --primary: 54 96 149;
+    --on-primary: 255 255 255;
+    --primary-container: 110 150 207;
+    --on-primary-container: 0 45 88;
+
+    --secondary: 25 107 80;
+    --on-secondary: 255 255 255;
+    --secondary-container: 162 239 205;
+    --on-secondary-container: 31 111 84;
+
+    --tertiary: 99 86 142;
+    --on-tertiary: 255 255 255;
+    --tertiary-container: 154 140 200;
+    --on-tertiary-container: 48 36 89;
+
+    --error: 186 26 26;
+    --on-error: 255 255 255;
+    --error-container: 255 218 214;
+    --on-error-container: 147 0 10;
+
+    /* DayProgressRing의 "보통" 구간 — 예전엔 #dc9c00로 하드코딩돼 있었다. */
+    --warning: 220 156 0;
+
+    /* 모달 뒤를 덮는 막. 라이트에선 어두운 막, 다크에선 더 짙은 막이 필요하다. */
+    --scrim: 25 28 30;
+  }
+
+  /*
+    다크 — 승인된 "블루 글래스 B안"(저채도 인디고 네이비).
+    surface-container-* 사다리는 라이트에서 "낮을수록 떠 있는 면(흰 카드)"으로 쓰이고 있어서,
+    다크에서도 같은 역할을 유지하도록 lowest를 가장 밝게 두고 내려간다. 이렇게 해야 기존
+    className을 한 줄도 안 고치고 카드/시트/내비게이션이 전부 제대로 떠 보인다.
+  */
+  .dark {
+    --surface: 27 24 50;
+    --surface-dim: 20 18 39;
+    --surface-bright: 50 46 89;
+    --surface-container-lowest: 50 46 89;
+    --surface-container-low: 44 41 80;
+    --surface-container: 40 36 71;
+    --surface-container-high: 36 32 64;
+    --surface-container-highest: 32 29 57;
+    --on-surface: 233 232 245;
+    --on-surface-variant: 169 166 196;
+    --outline: 124 120 155;
+    --outline-variant: 58 54 96;
+
+    /*
+      primary는 이 앱에서 큰 면(홈 히어로 카드)과 작은 강조 글씨를 겸한다. 다크에서 한 색으로
+      둘 다 만족시켜야 해서, 어두운 배경 위 글씨로 읽히면서(약 5.3:1) 위에 어두운 글씨를
+      얹어도 읽히는 중간 밝기 인디고를 골랐다.
+    */
+    --primary: 139 133 232;
+    --on-primary: 22 20 43;
+    --primary-container: 74 67 128;
+    --on-primary-container: 217 214 247;
+
+    /* 진행/성공 계열 — 시안의 민트 */
+    --secondary: 111 217 174;
+    --on-secondary: 8 40 28;
+    --secondary-container: 35 85 68;
+    --on-secondary-container: 162 239 205;
+
+    --tertiary: 176 163 224;
+    --on-tertiary: 36 28 66;
+    --tertiary-container: 69 58 107;
+    --on-tertiary-container: 220 212 245;
+
+    /* 진한 빨강은 어두운 배경에서 탁하게 죽는다 — 밝은 코랄로 올린다. */
+    --error: 255 155 155;
+    --on-error: 68 0 0;
+    --error-container: 110 32 32;
+    --on-error-container: 255 218 214;
+
+    --warning: 255 211 122;
+
+    --scrim: 0 0 0;
+  }
+}
+
+html,
+body {
+  background: rgb(var(--surface));
+  overscroll-behavior-y: none;
+}
+
+body {
+  color: rgb(var(--on-surface));
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+}
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   font-size: 22px;
   line-height: 1;
   user-select: none;
 }
-.material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
-#app-shell { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fb; position: relative; }
+.material-symbols-outlined.filled {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+#app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: rgb(var(--surface));
+  position: relative;
+}
+
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
   height: 8px;
   border-radius: 9999px;
-  background: #e0e3e5;
+  background: rgb(var(--surface-container-highest));
 }
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -25,10 +146,17 @@ input[type='range']::-webkit-slider-thumb {
   width: 22px;
   height: 22px;
   border-radius: 9999px;
-  background: #366095;
-  border: 3px solid #ffffff;
+  background: rgb(var(--primary));
+  border: 3px solid rgb(var(--surface-container-lowest));
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   cursor: pointer;
 }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: #c3c6d1; border-radius: 9999px; }
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--outline-variant));
+  border-radius: 9999px;
+}

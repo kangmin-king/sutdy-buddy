@@ -1,14 +1,23 @@
 import React from 'react';
 import { useAuth } from './state/AuthContext';
+import { useTheme, type Theme } from './state/ThemeContext';
 import mascotFaceUrl from './assets/mascot-face.png';
 
 export function Icon({ name, className = '', filled = false }: { name: string; className?: string; filled?: boolean }) {
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
 }
 
-export function TopAppBar({ title = '스터디 벅스', onBell, className = '' }: { title?: string; onBell?: () => void; className?: string }) {
+// compact은 학생 셸용 — 설정과 로그아웃이 "나" 탭으로 옮겨가서 상단바에 중복으로 둘 이유가
+// 없다. 선생님 셸에는 아직 "나" 탭이 없으므로 기본값(전체)을 그대로 쓴다.
+export function TopAppBar({
+  title = '스터디 벅스',
+  onBell,
+  className = '',
+  compact = false,
+}: { title?: string; onBell?: () => void; className?: string; compact?: boolean }) {
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   return (
     <header className={`sticky top-0 z-20 flex items-center justify-between bg-surface/90 px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur ${className}`.trim()}>
       <div className="flex items-center gap-2.5">
@@ -18,12 +27,20 @@ export function TopAppBar({ title = '스터디 벅스', onBell, className = '' }
         <span className="text-lg font-bold text-primary">{title}</span>
       </div>
       <div className="relative flex items-center gap-1">
-        <button onClick={onBell} className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+        <button onClick={onBell} aria-label="알림" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
           <Icon name="notifications" />
         </button>
-        <button onClick={() => setConfirmOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
-          <Icon name="logout" />
-        </button>
+        {!compact && (
+          <>
+            <button onClick={() => setSettingsOpen(true)} aria-label="설정" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+              <Icon name="settings" />
+            </button>
+            <button onClick={() => setConfirmOpen(true)} aria-label="로그아웃" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+              <Icon name="logout" />
+            </button>
+          </>
+        )}
+        <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         {confirmOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setConfirmOpen(false)} />
@@ -51,6 +68,46 @@ export function TopAppBar({ title = '스터디 벅스', onBell, className = '' }
         )}
       </div>
     </header>
+  );
+}
+
+// 설정은 아직 화면 하나를 차지할 만큼 항목이 많지 않아 바텀시트로 둔다. 학생 셸과 선생님
+// 셸이 라우팅 구조가 서로 달라서, 시트로 두면 TopAppBar 한 곳만 고쳐도 양쪽에 다 붙는다.
+// 항목이 늘어나면 그때 화면으로 승격시키면 된다.
+export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { theme, setTheme } = useTheme();
+  const options: { id: Theme; label: string; icon: string; hint: string }[] = [
+    { id: 'light', label: '라이트', icon: 'light_mode', hint: '밝은 배경' },
+    { id: 'dark', label: '다크', icon: 'dark_mode', hint: '밤에 눈이 편해요' },
+  ];
+  return (
+    <BottomSheet open={open} onClose={onClose} title="설정">
+      <div>
+        <p className="mb-2 text-sm font-semibold text-on-surface-variant">화면 테마</p>
+        <div role="radiogroup" aria-label="화면 테마" className="grid grid-cols-2 gap-2">
+          {options.map((opt) => {
+            const selected = theme === opt.id;
+            return (
+              <button
+                key={opt.id}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setTheme(opt.id)}
+                className={`flex min-h-11 flex-col items-start gap-1 rounded-xl border-[1.5px] px-4 py-3 text-left transition active:scale-[0.98] ${
+                  selected ? 'border-primary bg-primary/10' : 'border-outline-variant bg-surface-container-lowest'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Icon name={opt.icon} className={`!text-[18px] ${selected ? 'text-primary' : 'text-on-surface-variant'}`} filled={selected} />
+                  <span className={`text-sm font-bold ${selected ? 'text-primary' : 'text-on-surface'}`}>{opt.label}</span>
+                </span>
+                <span className="text-[11px] text-on-surface-variant">{opt.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </BottomSheet>
   );
 }
 
@@ -235,13 +292,13 @@ export function ProgressRing({ percent, size = 88, stroke = 10 }: { percent: num
   const offset = circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
   return (
     <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e0e3e5" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" className="stroke-surface-container-highest" strokeWidth={stroke} />
       <circle
         cx={size / 2}
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="#366095"
+        className="stroke-primary"
         strokeWidth={stroke}
         strokeDasharray={circumference}
         strokeDashoffset={offset}

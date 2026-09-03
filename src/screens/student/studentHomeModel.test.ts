@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlannerItem, StudySession } from '../../types';
-import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupNextItemsByManager } from './studentHomeModel';
+import { buildStudentHomeModel, canStartStudyItem, deriveRunningSessionIds, findStaleRunningSessions, groupItemsByManager } from './studentHomeModel';
 
 function item(id: string, order: number, status: PlannerItem['status'] = 'planned'): PlannerItem {
   return {
@@ -226,7 +226,7 @@ describe('buildStudentHomeModel', () => {
   });
 });
 
-describe('groupNextItemsByManager', () => {
+describe('groupItemsByManager', () => {
   const labelFor = (managerId: string) => `${managerId} 선생님`;
 
   it('groups items under their linked manager and keeps self-added items last', () => {
@@ -235,7 +235,7 @@ describe('groupNextItemsByManager', () => {
     const mine = item('mine', 3);
     const managerIdOf = (it: PlannerItem) => ({ a: 'm1', b: 'm2' } as Record<string, string>)[it.id] ?? null;
 
-    expect(groupNextItemsByManager([a, b, mine], managerIdOf, ['m1', 'm2'], labelFor)).toEqual([
+    expect(groupItemsByManager([a, b, mine], managerIdOf, ['m1', 'm2'], labelFor)).toEqual([
       { header: 'm1 선생님', items: [a] },
       { header: 'm2 선생님', items: [b] },
       { header: '직접 추가', items: [mine] },
@@ -248,7 +248,7 @@ describe('groupNextItemsByManager', () => {
     const managerIdOf = (it: PlannerItem) =>
       ({ linked: 'm1', unlinked: 'gone' } as Record<string, string>)[it.id] ?? null;
 
-    const groups = groupNextItemsByManager([linked, unlinked], managerIdOf, ['m1'], labelFor);
+    const groups = groupItemsByManager([linked, unlinked], managerIdOf, ['m1'], labelFor);
 
     expect(groups.flatMap((group) => group.items)).toEqual([linked, unlinked]);
     expect(groups).toContainEqual({ header: 'gone 선생님', items: [unlinked] });
@@ -256,7 +256,7 @@ describe('groupNextItemsByManager', () => {
 
   it('omits empty groups', () => {
     const only = item('only', 1);
-    expect(groupNextItemsByManager([only], () => 'm2', ['m1', 'm2'], labelFor)).toEqual([
+    expect(groupItemsByManager([only], () => 'm2', ['m1', 'm2'], labelFor)).toEqual([
       { header: 'm2 선생님', items: [only] },
     ]);
   });
