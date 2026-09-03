@@ -2,17 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  /* Plus Jakarta Sans는 라틴 전용이라 한글 글리프가 없다. 라틴 글자는 앞쪽 얼굴이 맡고
-     한글은 Pretendard가 받도록 순서를 이대로 유지해야 한다. */
-  font-family: 'Plus Jakarta Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
-  scroll-behavior: smooth;
-  /* 한글은 음절(글자) 단위로 줄바꿈이 가능해서, 이게 없으면 "안녕하세/요"처럼 한 단어가
-     중간에서 잘려 보일 수 있다. 띄어쓰기 단위로만 줄바꿈되게 사이트 전체에 적용한다. */
-  word-break: keep-all;
+/* shadcn/ui 토큰. baseColor는 slate — 본앱(src/index.css)의 중립색이 청회색 계열
+   (on-surface #191C1E, on-surface-variant #42474F, outline-variant #C3C6D1, 색조 약 213°)
+   이라서, 색조가 240°인 zinc를 쓰면 랜딩과 앱의 회색이 미묘하게 어긋난다. slate가 215° 근처로
+   앱 중립과 맞는다. primary만 브랜드 캐럿(#FF6B35)으로 바꿔 끼웠고 나머지는 shadcn slate 기본값. */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* 앱 라이트 --primary: 54 96 149 (#366095) */
+    --primary: 213 47% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 213 47% 40%;
+
+    --radius: 0.625rem;
+  }
+
+  /* 전역 다크 모드 토글은 아직 없다. 이 토큰 세트는 "어두운 밴드" 섹션(작동 방식·마지막 CTA)에
+     class="dark"를 걸어서 쓴다 — 색을 하드코딩하지 않고 같은 토큰 이름으로 반전시키는 게
+     shadcn 방식이고, 나중에 전역 토글을 붙이면 그대로 재사용된다.
+     값은 본앱 다크 테마("블루 글래스 B안", src/index.css의 .dark)에서 그대로 가져왔다 —
+     랜딩의 어두운 섹션이 앱 다크모드와 같은 면으로 읽혀야 하기 때문이다. 예전 브랜드 네이비
+     #151C48(색조 232°)로 두면 앱 다크(247°)와 15°만 어긋나서, 의도한 대비가 아니라
+     색을 맞추려다 실패한 것처럼 보였다. */
+  .dark {
+    /* 앱 --surface: 27 24 50 */
+    --background: 247 35% 15%;
+    /* 앱 --on-surface: 233 232 245 */
+    --foreground: 245 40% 94%;
+
+    /* 앱 --surface-container-lowest: 50 46 89 (라이트에서 흰 카드가 맡던 역할) */
+    --card: 246 32% 26%;
+    --card-foreground: 245 40% 94%;
+
+    --popover: 246 32% 26%;
+    --popover-foreground: 245 40% 94%;
+
+    /* 앱 다크 --primary: 139 133 232 (#8B85E8), --on-primary: 22 20 43 */
+    --primary: 244 68% 72%;
+    --primary-foreground: 245 37% 12%;
+
+    /* 앱 --surface-container: 40 36 71 */
+    --secondary: 247 33% 21%;
+    --secondary-foreground: 245 40% 94%;
+
+    --muted: 247 33% 21%;
+    /* 앱 --on-surface-variant: 169 166 196 */
+    --muted-foreground: 246 20% 71%;
+
+    --accent: 247 33% 21%;
+    --accent-foreground: 245 40% 94%;
+
+    --destructive: 0 100% 80%;
+    --destructive-foreground: 0 100% 13%;
+
+    /* 앱 --outline-variant: 58 54 96 */
+    --border: 246 28% 29%;
+    --input: 246 28% 29%;
+    --ring: 244 68% 72%;
+  }
 }
 
-/* 그레인 텍스처: 히어로 배경에 아주 옅게 깔아서 완전 평면 느낌을 깬다. */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Inter는 라틴 전용이라 한글 글리프가 없다. 라틴 글자는 앞쪽 얼굴이 맡고 한글은
+       Pretendard가 받도록 순서를 이대로 유지해야 한다. */
+    font-family: Inter, 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+    scroll-behavior: smooth;
+    /* 한글은 음절(글자) 단위로 줄바꿈이 가능해서, 이게 없으면 "안녕하세/요"처럼 한 단어가
+       중간에서 잘려 보일 수 있다. 띄어쓰기 단위로만 줄바꿈되게 사이트 전체에 적용한다. */
+    word-break: keep-all;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+}
+
+/* 그레인 텍스처: 어두운 밴드 배경에 아주 옅게 깔아서 완전 평면 느낌을 깬다. */
 .grain::before {
   content: '';
   position: absolute;
@@ -21,4 +115,14 @@ html {
   opacity: 0.05;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* shadcn 데모 사이트의 옅은 격자. 히어로 배경에만 깔고 위아래로 마스크해서 잘라낸다. */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, hsl(var(--border) / 0.55) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border) / 0.55) 1px, transparent 1px);
+  background-size: 3.5rem 3.5rem;
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 30%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 30%, #000 30%, transparent 100%);
 }
