@@ -3,7 +3,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { useAuth } from '../../state/AuthContext';
 import { useTheme, type Theme } from '../../state/ThemeContext';
 import { todayKey, addDaysToKey, getPlannerProgress } from '../../lib';
-import { Icon, ProgressRing, BottomSheet, TextField, Button, useConfirm, useDeleteAccount } from '../../primitives';
+import { Icon, ProgressRing, BottomSheet, TextField, Button, useConfirm } from '../../primitives';
 import { isNativePlatform } from '../../native/distractionStop';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import LinkedManagerChips from './LinkedManagerChips';
@@ -61,7 +61,6 @@ export default function MyPageScreen({
   const { signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { confirm, confirmDialog } = useConfirm();
-  const { requestDeleteAccount, deleteAccountDialog } = useDeleteAccount();
   const [timetableOpen, setTimetableOpen] = React.useState(false);
   const [editingCell, setEditingCell] = React.useState<{ weekday: number; period: number; subject: string } | null>(null);
   const [copied, setCopied] = React.useState(false);
@@ -191,17 +190,10 @@ export default function MyPageScreen({
               if (await confirm('로그아웃 하시겠습니까?')) void signOut();
             }}
           />
-          {/* 탈퇴는 로그아웃과 생김새가 같으면 안 된다 — 한 칸 아래 같은 빨간 줄로 두면 잘못
-              누른다. 힌트로 결과를 미리 알리고, 시트에서 "탈퇴"를 입력해야 실행된다. */}
-          <Row
-            icon="person_remove"
-            title="회원 탈퇴"
-            hint="계정과 학습 기록이 모두 삭제되고 되돌릴 수 없어요"
-            danger
-            onClick={requestDeleteAccount}
-          />
         </div>
       </section>
+
+      {/* 탈퇴는 여기 없다 — 홈·캘린더 탭 상단바의 로고를 눌러 열리는 내 계정 맨 아래 하나뿐이다. */}
 
       <BottomSheet open={timetableOpen} onClose={() => setTimetableOpen(false)} title="학교 시간표">
         <p className="mb-3 text-xs text-on-surface-variant">칸을 눌러 과목을 입력하세요. 선생님도 이 시간표를 볼 수 있어요.</p>
@@ -239,7 +231,6 @@ export default function MyPageScreen({
       </BottomSheet>
 
       {confirmDialog}
-      {deleteAccountDialog}
     </div>
   );
 }

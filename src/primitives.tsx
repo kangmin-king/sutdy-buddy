@@ -19,17 +19,28 @@ export function TopAppBar({
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [accountOpen, setAccountOpen] = React.useState(false);
   // 탈퇴 시트는 설정 시트 안이 아니라 이 레벨에 둔다. 설정 시트도 BottomSheet라서 안에 넣으면
   // 시트가 겹치고, 설정 시트를 닫는 순간 그 자식인 탈퇴 시트까지 언마운트된다.
   const { requestDeleteAccount, deleteAccountDialog } = useDeleteAccount();
   return (
+    // 시트류(fixed)는 반드시 이 header 밖에 둔다. header에 backdrop-blur가 걸려 있어서
+    // backdrop-filter가 자손 fixed 요소의 컨테이닝 블록이 되어버린다 — 안에 두면 시트가
+    // 화면 전체가 아니라 높이 60px짜리 상단바 안에 갇히고, items-end 때문에 패널이 위로
+    // 잘려 맨 아래 항목만 보인다.
+    <>
     <header className={`sticky top-0 z-20 flex items-center justify-between bg-surface/90 px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur ${className}`.trim()}>
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
+      {/* 로고를 누르면 내 계정이 열린다 — 이메일·로그인 방식·가입일과, 맨 아래 회원 탈퇴. */}
+      <button
+        onClick={() => setAccountOpen(true)}
+        aria-label="내 계정"
+        className="-ml-1 flex min-h-11 items-center gap-2.5 rounded-full pl-1 pr-2.5 transition active:scale-[0.98]"
+      >
+        <span className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
           <img src={mascotFaceUrl} alt="" className="w-full h-full object-cover" />
-        </div>
+        </span>
         <span className="text-lg font-bold text-primary">{title}</span>
-      </div>
+      </button>
       <div className="relative flex items-center gap-1">
         <button onClick={onBell} aria-label="알림" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
           <Icon name="notifications" />
@@ -44,15 +55,6 @@ export function TopAppBar({
             </button>
           </>
         )}
-        <SettingsSheet
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          onRequestDeleteAccount={() => {
-            setSettingsOpen(false);
-            requestDeleteAccount();
-          }}
-        />
-        {deleteAccountDialog}
         {confirmOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setConfirmOpen(false)} />
@@ -80,21 +82,74 @@ export function TopAppBar({
         )}
       </div>
     </header>
+
+    <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
+    </>
+  );
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  kakao: '카카오',
+  google: 'Google',
+  email: '이메일',
+};
+
+function formatJoinedAt(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+// 상단바의 로고를 누르면 열리는 내 계정 정보. 탈퇴는 계정 정보 맨 아래에 두는 게 맞아서
+// 여기 하나만 둔다(설정 시트에도, "나" 탭에도 두지 않는다 — 여러 곳에 있으면 잘못 누른다).
+export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { session } = useAuth();
+  const { requestDeleteAccount, deleteAccountDialog } = useDeleteAccount();
+  const user = session?.user;
+  const provider = typeof user?.app_metadata?.provider === 'string' ? user.app_metadata.provider : undefined;
+  const joinedAt = formatJoinedAt(user?.created_at);
+
+  const rows: { label: string; value: string }[] = [
+    { label: '이메일', value: user?.email || '—' },
+    { label: '로그인 방식', value: provider ? (PROVIDER_LABELS[provider] ?? provider) : '—' },
+    ...(joinedAt ? [{ label: '가입일', value: joinedAt }] : []),
+  ];
+
+  return (
+    <>
+      <BottomSheet open={open} onClose={onClose} title="내 계정">
+        <dl className="divide-y divide-outline-variant/40 overflow-hidden rounded-xl bg-surface-container-low">
+          {rows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-3">
+              <dt className="shrink-0 text-xs font-semibold text-on-surface-variant">{row.label}</dt>
+              <dd className="min-w-0 break-all text-right text-sm font-semibold text-on-surface">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* 맨 아래, 아이콘도 카드도 없이 작은 글씨로만. 실행은 시트에서 "탈퇴"를 직접 입력해야 된다. */}
+        <div className="mt-6 border-t border-outline-variant/40 pt-4 text-center">
+          <button
+            onClick={() => {
+              onClose();
+              requestDeleteAccount();
+            }}
+            className="min-h-11 px-3 text-xs text-on-surface-variant underline decoration-outline-variant underline-offset-2 transition active:scale-[0.98]"
+          >
+            회원 탈퇴
+          </button>
+        </div>
+      </BottomSheet>
+      {deleteAccountDialog}
+    </>
   );
 }
 
 // 설정은 아직 화면 하나를 차지할 만큼 항목이 많지 않아 바텀시트로 둔다. 학생 셸과 선생님
 // 셸이 라우팅 구조가 서로 달라서, 시트로 두면 TopAppBar 한 곳만 고쳐도 양쪽에 다 붙는다.
 // 항목이 늘어나면 그때 화면으로 승격시키면 된다.
-export function SettingsSheet({
-  open,
-  onClose,
-  onRequestDeleteAccount,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onRequestDeleteAccount?: () => void;
-}) {
+export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { theme, setTheme } = useTheme();
   const options: { id: Theme; label: string; icon: string; hint: string }[] = [
     { id: 'light', label: '라이트', icon: 'light_mode', hint: '밝은 배경' },
@@ -128,22 +183,7 @@ export function SettingsSheet({
         </div>
       </div>
 
-      {onRequestDeleteAccount && (
-        <div className="mt-5 border-t border-outline-variant/40 pt-4">
-          <button
-            onClick={onRequestDeleteAccount}
-            className="flex min-h-11 w-full items-center gap-2 rounded-xl px-1 text-left transition hover:bg-surface-container active:scale-[0.99]"
-          >
-            <Icon name="person_remove" className="!text-[18px] shrink-0 text-error" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-error">회원 탈퇴</span>
-              <span className="mt-0.5 block text-[11px] leading-relaxed text-on-surface-variant">
-                계정과 학습 기록이 모두 삭제되고 되돌릴 수 없어요
-              </span>
-            </span>
-          </button>
-        </div>
-      )}
+      {/* 탈퇴는 여기 없다 — 상단바 로고를 눌러 열리는 내 계정(AccountSheet) 맨 아래 하나뿐이다. */}
     </BottomSheet>
   );
 }
