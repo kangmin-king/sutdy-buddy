@@ -70,13 +70,17 @@ export default function PlannerItemRow({
         )}
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        <div
-          className={`w-7 h-7 rounded-md border-2 flex items-center justify-center ${
-            item.status === 'completed' ? 'bg-primary border-primary' : 'border-outline-variant'
+        {/*
+          예전엔 체크박스 모양(빈 사각형/체크된 사각형)이었는데 관리자는 이걸 누를 수 없다
+          (완료 여부는 학생만 바꾼다). 누를 수 있는 것처럼 보이는 게 문제라 상태를 글자로 적는다.
+        */}
+        <span
+          className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-bold ${
+            item.status === 'completed' ? 'bg-secondary/10 text-secondary' : 'bg-surface-container text-on-surface-variant'
           }`}
         >
-          {item.status === 'completed' && <Icon name="check" className="!text-[18px] text-on-primary" />}
-        </div>
+          {item.status === 'completed' ? '완료' : '미완료'}
+        </span>
         {onDelete && item.source === 'homework' && (
           <button
             onClick={onDelete}
