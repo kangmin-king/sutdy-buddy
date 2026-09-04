@@ -95,10 +95,10 @@ export default function StudentHomeScreen({
     const index = state.linkedManagers.findIndex((m) => m.id === managerId);
     return managerDisplayLabel(managerId, state.managerLabels, index);
   };
-  const proposalManagerLabel = (managerId: string) => {
-    const index = state.linkedManagers.findIndex((m) => m.id === managerId);
-    return index >= 0 ? managerDisplayLabel(managerId, state.managerLabels, index) : (state.managerLabels[managerId] || '선생님');
-  };
+  // index가 -1일 때의 처리는 managerDisplayLabel이 맡는다 — 여기서 한 번 더 가드하면 같은
+  // 규칙이 두 곳에 생겨서, 나중에 한쪽만 고치게 된다.
+  const proposalManagerLabel = (managerId: string) =>
+    managerDisplayLabel(managerId, state.managerLabels, state.linkedManagers.findIndex((m) => m.id === managerId));
 
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);

@@ -121,6 +121,14 @@ describe('managerDisplayLabel', () => {
   it('falls back to 선생님 N when unlabeled', () => {
     expect(managerDisplayLabel('m1', {}, 2)).toBe('선생님 3');
   });
+  // 연결이 끊긴 선생님이 만든 숙제를 학생이 보는 경우. findIndex가 -1을 주는데, 예전에는
+  // 그게 "선생님 0"으로 화면에 나왔다.
+  it('drops the number when the manager is no longer in the list', () => {
+    expect(managerDisplayLabel('m1', {}, -1)).toBe('선생님');
+  });
+  it('still prefers the student-chosen label for an unlinked manager', () => {
+    expect(managerDisplayLabel('m1', { m1: '수학쌤' }, -1)).toBe('수학쌤');
+  });
 });
 
 describe('addDaysToKey', () => {

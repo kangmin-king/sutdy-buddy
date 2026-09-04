@@ -179,9 +179,16 @@ export function resolvePlannerItemManagerId(
 
 // managerId가 labels(학생이 직접 붙인 별칭)에 있으면 그대로, 없으면 "선생님 N"으로 폴백한다
 // (StudentSelector의 "학생 N" 폴백 패턴과 동일).
+//
+// index는 호출부에서 대개 linkedManagers.findIndex(...)로 넘어오는데, 그 관리자가 목록에
+// 없으면 findIndex는 -1을 준다. 예전에는 그 -1이 그대로 `선생님 ${-1 + 1}` = "선생님 0"으로
+// 화면에 나왔다 — 연결이 끊긴 선생님이 만든 숙제를 학생이 볼 때 실제로 그랬다.
+// 번호를 붙일 근거가 없으면 번호 없이 "선생님"으로 부른다.
 export function managerDisplayLabel(managerId: string | null, labels: Record<string, string>, index: number): string {
   if (!managerId) return '';
-  return labels[managerId] ?? `선생님 ${index + 1}`;
+  const label = labels[managerId];
+  if (label !== undefined) return label;
+  return index >= 0 ? `선생님 ${index + 1}` : '선생님';
 }
 
 // DB 기본 키 컬럼이 모두 `uuid` 타입이므로 반드시 유효한 UUID를 반환해야 한다
