@@ -21,9 +21,10 @@ android {
         // 인정한다. 1은 드라이브로 직접 배포한 APK가 이미 쓰고 있어서 2부터 시작한다 —
         // 그래야 그 APK를 쓰는 학생이 스토어 버전으로 넘어올 수 있다.
         // **스토어에 올릴 때마다 반드시 올릴 것.**
-        versionCode 2
-        // 사용자에게 보이는 버전. 1.0 이후로 회원 탈퇴·다크 모드·학생 탭 개편이 들어갔다.
-        versionName "1.1"
+        versionCode 3
+        // 사용자에게 보이는 버전. 1.1(학생 폰에 이미 깔려 있는 APK) 이후로 다크 모드,
+        // 학생 탭 개편(플래너 → "나"), 매니저 화면 결함 수정, 회원 탈퇴 위치 변경이 들어갔다.
+        versionName "1.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
