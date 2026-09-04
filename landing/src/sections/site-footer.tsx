@@ -64,11 +64,20 @@ export function SiteFooter() {
           </div>
         </div>
 
-        {/* 스토어 배포 시점에는 개인정보처리방침·이용약관 링크가 여기 들어가야 한다.
-            아직 문서 자체가 없어서 404를 만들지 않도록 링크를 걸지 않았다. */}
-        <p className="mt-12 border-t pt-6 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} 스터디 벅스 · Study Buks
-        </p>
+        <div className="mt-12 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} 스터디 벅스 · Study Buks</p>
+          <nav className="flex items-center gap-4">
+            <a href="/privacy" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+              개인정보처리방침
+            </a>
+            <a
+              href="/privacy#delete-account"
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              계정 삭제
+            </a>
+          </nav>
+        </div>
       </div>
     </footer>
   );

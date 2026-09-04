@@ -24,12 +24,28 @@ export const APK_URL = 'https://drive.google.com/file/d/1SxxChy7Qudom_dSSgFPicGa
 // 죽은 링크는 없는 것보다 나쁘다.
 export const CONTACT_OPENCHAT_URL: string | null = 'https://open.kakao.com/o/sq4hxSLi';
 
+// 앵커를 "/#who"처럼 절대경로로 둔다. /privacy 같은 다른 페이지에서도 같은 헤더가 동작해야
+// 하기 때문이다. 랜딩(/)에서 누르면 경로가 같으므로 새로고침 없이 스크롤만 된다.
 export const NAV_LINKS: { href: string; label: string }[] = [
-  { href: '#who', label: '누가 쓰나요' },
-  { href: '#how', label: '작동 방식' },
-  { href: '#features', label: '기능' },
-  { href: '#faq', label: '자주 묻는 질문' },
+  { href: '/#who', label: '누가 쓰나요' },
+  { href: '/#how', label: '작동 방식' },
+  { href: '/#features', label: '기능' },
+  { href: '/#faq', label: '자주 묻는 질문' },
 ];
+
+/**
+ * 개인정보처리방침에 들어가야 하는, 코드에서 알아낼 수 없는 값들.
+ * 빈 문자열인 항목이 하나라도 있으면 /privacy 상단에 미완성 안내가 뜬다 —
+ * 채우면 그 안내는 저절로 사라진다. **전부 채우기 전에는 플레이 콘솔에 제출하지 말 것.**
+ */
+export const POLICY = {
+  operator: '', // 운영 주체 표기 (개인 개발자면 이름, 사업자라면 상호·대표자·사업자등록번호)
+  officer: '', // 개인정보 보호책임자 이름
+  officerContact: '', // 연락 가능한 수단 (이메일 권장)
+  effectiveDate: '', // 시행일 (예: 2026-09-10)
+} as const;
+
+export const POLICY_INCOMPLETE = Object.values(POLICY).some((v) => v.trim() === '');
 
 type Feature = { icon: LucideIcon; title: string; body: string };
 

@@ -16,4 +16,15 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // 이 사이트는 라우터를 쓰지 않는다. /privacy는 두 번째 진입점으로 빌드해서 dist에 실제
+  // privacy.html이 나오게 한다 — 개인정보처리방침과 계정 삭제 안내는 플레이 콘솔에 URL로
+  // 제출해야 하므로, SPA 리라이트에 기대지 않고 파일로 존재하는 편이 확실하다.
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        privacy: fileURLToPath(new URL('./privacy.html', import.meta.url)),
+      },
+    },
+  },
 });
