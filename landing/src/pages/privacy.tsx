@@ -337,7 +337,25 @@ export function PrivacyPage() {
               head={['구분', '내용']}
               rows={[
                 ['개인정보 보호책임자', <Fill key="o" value={POLICY.officer} hint="책임자 이름" />],
-                ['연락처', <Fill key="c" value={POLICY.officerContact} hint="연락처" />],
+                [
+                  '연락처',
+                  // 연락처가 오픈채팅이므로 글자만 두면 연락할 방법이 없다 — 눌러서 바로
+                  // 들어갈 수 있게 링크로 만든다.
+                  CONTACT_OPENCHAT_URL ? (
+                    <a
+                      key="c"
+                      href={CONTACT_OPENCHAT_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => track('Clicked Contact Openchat', { placement: 'privacy_officer' })}
+                      className="font-semibold text-foreground underline underline-offset-4"
+                    >
+                      {POLICY.officerContact}
+                    </a>
+                  ) : (
+                    <Fill key="c" value={POLICY.officerContact} hint="연락처" />
+                  ),
+                ],
               ]}
             />
             <p className="text-sm">

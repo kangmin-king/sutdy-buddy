@@ -39,10 +39,12 @@ export const NAV_LINKS: { href: string; label: string }[] = [
  * 채우면 그 안내는 저절로 사라진다. **전부 채우기 전에는 플레이 콘솔에 제출하지 말 것.**
  */
 export const POLICY = {
-  operator: '', // 운영 주체 표기 (개인 개발자면 이름, 사업자라면 상호·대표자·사업자등록번호)
-  officer: '', // 개인정보 보호책임자 이름
-  officerContact: '', // 연락 가능한 수단 (이메일 권장)
-  effectiveDate: '', // 시행일 (예: 2026-09-10)
+  operator: '이강민',
+  // 1인 운영이라 운영자와 보호책임자가 같은 사람이다.
+  officer: '이강민',
+  // 문의 창구는 카카오톡 1:1 오픈채팅 하나다. 아래 CONTACT_OPENCHAT_URL로 링크된다.
+  officerContact: '카카오톡 1:1 오픈채팅',
+  effectiveDate: '2026-09-04',
 } as const;
 
 export const POLICY_INCOMPLETE = Object.values(POLICY).some((v) => v.trim() === '');
