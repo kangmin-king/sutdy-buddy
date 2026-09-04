@@ -17,7 +17,11 @@ android {
         applicationId "com.studybuddy.app"  
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // 플레이는 같은 versionCode를 두 번 받지 않고, 안드로이드는 이 값이 커야 업데이트로
+        // 인정한다. 1은 드라이브로 직접 배포한 APK가 이미 쓰고 있어서 2부터 시작한다 —
+        // 그래야 그 APK를 쓰는 학생이 스토어 버전으로 넘어올 수 있다.
+        // **스토어에 올릴 때마다 반드시 올릴 것.**
+        versionCode 2
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
