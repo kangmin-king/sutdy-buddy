@@ -12,7 +12,6 @@ import StudentHomeScreen from './screens/student/StudentHome';
 import MockExamTimerScreen from './screens/student/MockExamTimer';
 import MyPageScreen from './screens/student/MyPage';
 import StudentCalendarScreen from './screens/student/StudentCalendar';
-import DistractionFab from './screens/shared/DistractionFab';
 import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
 import StudentSelector from './screens/manager/StudentSelector';
 import ManagerHomeScreen from './screens/manager/ManagerHome';
@@ -70,9 +69,11 @@ function StudentAppShell() {
 
   // 알림으로 여는 경로와 화면 버튼으로 여는 경로를 분석에서 구분한다 — 설정을 끝낸 학생이
   // 실제로 어느 쪽으로 들어오는지가 이 기능의 재방문을 좌우한다.
-  // 'my_page'는 "나" 탭의 학습 도구 목록에서 들어온 경우 — FAB을 없앨지 판단하려면 두 경로를
-  // 따로 세어야 한다.
-  const openDistractionStop = React.useCallback((entryPoint: 'fab' | 'notification' | 'my_page') => {
+  //
+  // 예전에는 'fab'(오른쪽 가장자리에 붙어 있던 자물쇠 버튼)도 있었다. 그걸 없앨지 판단하려고
+  // 경로를 나눠 세고 있었는데, "나" 탭 학습 도구에 같은 항목이 이미 있어 중복이라 2026-09-04에
+  // FAB을 제거했다. 남은 두 경로는 성격이 달라서 계속 구분한다.
+  const openDistractionStop = React.useCallback((entryPoint: 'notification' | 'my_page') => {
     setShowDistractionStop(true);
     track('Opened Distraction Stop', { entry_point: entryPoint });
   }, []);
@@ -124,7 +125,6 @@ function StudentAppShell() {
       {activeTab === 'me' && (
         <MyPageScreen onOpenMockExam={() => setShowMockExam(true)} onOpenDistractionStop={() => openDistractionStop('my_page')} />
       )}
-      {isNativePlatform() && <DistractionFab onOpen={() => openDistractionStop('fab')} />}
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
   );

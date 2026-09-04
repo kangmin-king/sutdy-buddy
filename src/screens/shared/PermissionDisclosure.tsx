@@ -38,7 +38,9 @@ const COPY: Record<
       '비밀번호나 입력한 내용을 보지 않아요',
       '공부 중이 아닐 때는 아무것도 확인하지 않아요',
     ],
-    settingsLabel: '이해했어요, 접근성 설정 열기',
+    // 버튼은 "이해했어요" 아래에 이 문구가 두 번째 줄로 붙는다 — 여기에 "이해했어요"를
+    // 또 넣지 말 것.
+    settingsLabel: '접근성 설정 열기',
   },
   overlay: {
     icon: 'layers',
@@ -46,7 +48,7 @@ const COPY: Record<
     lead: '허용하지 않은 앱이 열렸을 때, 그 앱 위에 차단 화면을 띄우기 위해 필요합니다.',
     accesses: ['공부 중 차단이 필요한 순간에만 화면을 덮어요'],
     nots: ['다른 앱의 내용을 읽거나 가져오지 않아요', '광고를 띄우지 않아요'],
-    settingsLabel: '이해했어요, 설정 열기',
+    settingsLabel: '설정 열기',
   },
 };
 
@@ -108,12 +110,16 @@ export function usePermissionDisclosure() {
             이 권한은 언제든 설정에서 다시 끌 수 있어요. 끄면 "딴짓 멈춰"만 동작하지 않고 나머지 기능은 그대로예요.
           </p>
 
+          {/* 확인 버튼 글자가 한 줄에 안 들어가서 "이해했어요, 접근성 설정" / "열기" 처럼
+              말 중간에서 끊겨 읽기 불편했다. 끊길 자리를 직접 정해 두 줄로 쌓는다.
+              Button의 기본 클래스가 `flex ... gap-1.5`라 세로 정렬과 간격은 !로 덮어쓴다. */}
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={close}>
               나중에
             </Button>
-            <Button className="flex-1" onClick={proceed}>
-              {copy.settingsLabel}
+            <Button className="flex-1 !flex-col !gap-0 leading-tight" onClick={proceed}>
+              <span>이해했어요</span>
+              <span>{copy.settingsLabel}</span>
             </Button>
           </div>
         </div>
