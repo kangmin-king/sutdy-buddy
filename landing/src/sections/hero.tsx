@@ -25,12 +25,16 @@ export function Hero() {
             과외쌤이라면 아는 그 장면
           </Badge>
 
-          {/* 시각적 제목 역할은 h1이 하고, 이 말풍선은 그 앞에 놓인 장면이다. */}
+          {/* 시각적 제목 역할은 h1이 하고, 이 말풍선은 그 앞에 놓인 장면이다.
+              이 페이지를 읽는 사람이 과외쌤이므로, 과외쌤의 말을 자기 말처럼 오른쪽에 두고
+              학생의 대답을 왼쪽에 둔다. 모서리 꼬리도 각자 앉은 쪽으로 맞춘다.
+              색은 바꾸지 않았다 — 바로 아래 h1이 "그 대답"이라고 받는 대상이 학생의 대답이라,
+              강조(진한 말풍선)는 그쪽에 남아 있어야 문장이 이어진다. */}
           <div className="mb-8 flex max-w-[19rem] flex-col gap-2.5">
-            <p className="w-fit rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-base font-semibold text-foreground md:text-lg">
+            <p className="w-fit self-end rounded-2xl rounded-br-sm bg-muted px-4 py-2.5 text-base font-semibold text-foreground md:text-lg">
               숙제 다 했어?
             </p>
-            <p className="w-fit self-end rounded-2xl rounded-br-sm bg-foreground px-4 py-2.5 text-base font-semibold text-background md:text-lg">
+            <p className="w-fit self-start rounded-2xl rounded-bl-sm bg-foreground px-4 py-2.5 text-base font-semibold text-background md:text-lg">
               네, 다 했어요.
             </p>
           </div>
