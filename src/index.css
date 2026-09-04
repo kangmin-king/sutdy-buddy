@@ -108,11 +108,32 @@ html,
 body {
   background: rgb(var(--surface));
   overscroll-behavior-y: none;
+
+  /* 한글은 음절 단위로도 줄바꿈이 되기 때문에, 이 설정이 없으면 한 낱말이 줄 끝에서 그냥
+     갈린다("...여기에 쌓여 / 요." 처럼). 띄어쓰기 단위로만 넘어가게 앱 전체에 적용한다.
+     랜딩(landing/src/index.css)도 같은 설정이다.
+
+     keep-all만 켜면 띄어쓰기가 없는 긴 문자열(URL, 영문 패키지명, 첨부 파일명)이 줄바꿈
+     지점을 못 찾아 컨테이너를 넘친다. overflow-wrap을 같이 두어 그런 경우에만 강제로 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 body {
   color: rgb(var(--on-surface));
   font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+
+  /* 마지막 줄에 한 낱말만 떨어지는 것(고아 낱말)을 줄인다. 지원하지 않는 브라우저는 이 줄을
+     무시하므로 안전하다. */
+  text-wrap: pretty;
+}
+
+/* 제목은 줄 길이를 고르게 나눈다 — 두 줄짜리 제목에서 둘째 줄에 한 낱말만 남는 걸 막는다.
+   balance는 짧은 텍스트(대략 6줄 이하)에만 적용되도록 브라우저가 알아서 제한한다. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
 }
 
 .material-symbols-outlined {
