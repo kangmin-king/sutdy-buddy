@@ -5,6 +5,7 @@ import { setUserProperties } from '../lib/analytics';
 import type { DistractionState, ExitModeId } from '../types/distraction';
 import { distractionStatus, extendedEndTime, formatRemaining, isBreakActive, statusMessage } from './distractionStopModel';
 import AllowedAppsScreen from './AllowedAppsScreen';
+import { usePermissionDisclosure } from './shared/PermissionDisclosure';
 
 const EXIT_MODE_OPTIONS: { id: ExitModeId; label: string }[] = [
   { id: 'IMMEDIATE', label: '즉시 차단' },
@@ -29,6 +30,7 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
   const state = local;
 
   const [showAllowedApps, setShowAllowedApps] = React.useState(false);
+  const { requestAccessibility, requestOverlay, disclosureDialog } = usePermissionDisclosure();
 
   React.useEffect(() => {
     setNow(Date.now());
@@ -124,14 +126,19 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
         {(!permissions.accessibilityEnabled || !permissions.overlayGranted) && (
           <Card tint="error" className="space-y-2">
             <p className="text-sm font-bold text-error">권한 설정이 필요해요</p>
+            <p className="text-xs leading-relaxed text-on-surface-variant">
+              무엇에 쓰는 권한인지 먼저 설명해 드려요. 읽어보고 결정하시면 됩니다.
+            </p>
+            {/* 설정 화면으로 곧바로 보내지 않는다 — 민감 권한은 요청 전에 목적을 알리고
+                명시적 동의를 받아야 한다(플레이 정책). usePermissionDisclosure가 그 화면을 낀다. */}
             {!permissions.accessibilityEnabled && (
-              <Button variant="outline" className="w-full" onClick={() => DistractionStop.openAccessibilitySettings()}>
-                접근성 권한 설정 열기
+              <Button variant="outline" className="w-full" onClick={requestAccessibility}>
+                접근성 권한이 왜 필요한지 보기
               </Button>
             )}
             {!permissions.overlayGranted && (
-              <Button variant="outline" className="w-full" onClick={() => DistractionStop.openOverlaySettings()}>
-                오버레이 권한 설정 열기
+              <Button variant="outline" className="w-full" onClick={requestOverlay}>
+                다른 앱 위에 표시 권한이 왜 필요한지 보기
               </Button>
             )}
           </Card>
@@ -208,6 +215,8 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
           </Card>
         </div>
       </div>
+
+      {disclosureDialog}
     </div>
   );
 }
