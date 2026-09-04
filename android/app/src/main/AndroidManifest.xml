@@ -104,8 +104,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- 딴짓 멈춰: 전체화면 차단, 알림, 포그라운드 서비스 -->
+    <!-- 딴짓 멈춰: 전체화면 차단, 알림 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- FOREGROUND_SERVICE는 선언해 두고 쓰지 않아서 지웠다. startForeground를 부르는 코드가
+         한 곳도 없다(차단 판단은 AccessibilityService가, 알림은 NotificationManager가 한다).
+         안 쓰는 권한은 스토어 심사에서 질문거리가 되고 설치 화면의 권한 목록만 늘린다.
+         나중에 정말 포그라운드 서비스를 붙이면 targetSdk 34+에서는 이 권한만으로는 부족하고
+         foregroundServiceType과 그에 맞는 세부 권한을 함께 선언해야 한다. -->
 </manifest>
