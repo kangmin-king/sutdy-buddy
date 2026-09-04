@@ -24,10 +24,12 @@ import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
 import { useAllowedAppUsageFlush } from './screens/student/useAllowedAppUsageFlush';
 import { track } from './lib/analytics';
 
+// "진도관리"는 진도를 보는 화면이 아니라 시험·과목 목표·교재 범위를 만드는 화면이다
+// (ManagerProgress). 이름을 실제 내용에 맞춘다.
 const MANAGER_TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
   { id: 'home', label: '홈', icon: 'home' },
-  { id: 'progress', label: '진도관리', icon: 'trending_up' },
+  { id: 'progress', label: '학습설계', icon: 'school' },
 ] as const;
 
 // 쓰기 실패/초대코드 오류 같은 전역 오류는 어느 셸(학생/관리자/레거시)에 있든 보여야 한다.
@@ -157,7 +159,11 @@ function ManagerAppShell() {
     <div id="app-shell">
       <ErrorBanner />
       <TopAppBar />
-      <StudentSelector selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />
+      <StudentSelector
+        selectedStudentId={selectedStudentId}
+        onSelectStudent={setSelectedStudentId}
+        onBackToList={() => setSelectedStudentId(null)}
+      />
       {tab === 'calendar' && (
         <ManagerCalendarScreen
           studentId={selectedStudentId}

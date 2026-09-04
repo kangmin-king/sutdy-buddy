@@ -86,13 +86,21 @@ export default function ManagerCalendarScreen({
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-between mt-2 mb-3">
-        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, -1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button
+          onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, -1))}
+          aria-label="이전 달"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container active:scale-[0.94]"
+        >
           <Icon name="chevron_left" />
         </button>
         <p className="text-base font-bold">
           {viewY}년 {Number(viewM)}월
         </p>
-        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button
+          onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))}
+          aria-label="다음 달"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container active:scale-[0.94]"
+        >
           <Icon name="chevron_right" />
         </button>
       </div>
@@ -140,6 +148,29 @@ export default function ManagerCalendarScreen({
           />
           <span className="text-[11px] text-on-surface-variant">{reminderEnabled ? `미시작 ${remindAt}` : '미시작 알림'}</span>
         </button>
+      </div>
+
+      {/*
+        날짜 한 칸이 선택·오늘·과외날·공휴일·시험·숙제있음·이행률 일곱 가지를 색과 테두리로
+        동시에 표현한다. 설명이 없으면 읽을 수 없어서 범례를 붙인다(학생 캘린더와 같은 형식).
+      */}
+      <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5 rounded-xl bg-surface-container-low px-3 py-2.5">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-3 w-3 rounded-full bg-tertiary-container/40" />과외 날
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-3 w-3 rounded-full ring-2 ring-error ring-inset" />시험
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-1.5 w-1.5 rounded-full bg-secondary" />숙제 있음
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span
+            className="h-3 w-3 rounded-full"
+            style={{ background: 'conic-gradient(rgb(var(--warning)) 0% 65%, rgb(var(--surface-container-highest)) 65% 100%)' }}
+          />
+          지난 날 이행률
+        </span>
       </div>
 
       <div className="grid grid-cols-7 mb-1">
@@ -209,7 +240,7 @@ export default function ManagerCalendarScreen({
                 setExceptionNewDate(selectedDate);
                 setExceptionSheetOpen(true);
               }}
-              className="text-[11px] text-error font-semibold"
+              className="min-h-11 shrink-0 rounded-xl px-2 text-[11px] font-bold text-error transition active:scale-[0.96]"
             >
               이 날 일정 변경
             </button>

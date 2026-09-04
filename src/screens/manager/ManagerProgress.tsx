@@ -42,20 +42,28 @@ function CompactMonthPicker({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <button onClick={() => onViewMonthChange(addMonthsToKey(viewMonthKey, -1))} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button
+          onClick={() => onViewMonthChange(addMonthsToKey(viewMonthKey, -1))}
+          aria-label="이전 달"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container active:scale-[0.94]"
+        >
           <Icon name="chevron_left" className="!text-[18px]" />
         </button>
         <p className="text-xs font-bold">
           {viewY}년 {Number(viewM)}월
         </p>
-        <button onClick={() => onViewMonthChange(addMonthsToKey(viewMonthKey, 1))} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button
+          onClick={() => onViewMonthChange(addMonthsToKey(viewMonthKey, 1))}
+          aria-label="다음 달"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container active:scale-[0.94]"
+        >
           <Icon name="chevron_right" className="!text-[18px]" />
         </button>
       </div>
 
       <div className="grid grid-cols-7 mb-0.5">
         {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="text-center text-[10px] text-on-surface-variant py-0.5">
+          <div key={label} className="text-center text-[11px] text-on-surface-variant py-0.5">
             {label}
           </div>
         ))}
@@ -103,7 +111,7 @@ function CompactMonthPicker({
           );
         })}
       </div>
-      <p className="text-[10px] text-on-surface-variant mt-1">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-on-surface-variant">
         진한 표시 칸 = 과외 날짜 · 빨간 숫자 = 공휴일/일요일{lockedDates.size > 0 ? ' · 회색 = 이미 지났거나 완료돼 수정할 수 없는 날' : ''}
       </p>
     </div>
@@ -134,9 +142,14 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
   const [customLabel, setCustomLabel] = React.useState('');
   const [selectedDates, setSelectedDates] = React.useState<string[]>([]);
   const [viewMonthKey, setViewMonthKey] = React.useState(today);
+  // 예전에는 입력이 부족하면 아무 표시 없이 return만 해서, 저장 버튼을 눌러도 왜 안 되는지
+  // 알 수 없었다. 막힌 이유를 폼 안에 그대로 보여준다.
+  const [rangeError, setRangeError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
+    // 다른 학생의 시험이 선택된 채로 남지 않게 비운다 — 아래 효과가 새 학생의 시험을 다시 고른다.
+    setSelectedExamId(null);
     // 탭을 열 때마다·학생을 바꿀 때마다 한 번. 담당 학생 수를 같이 실어야 "학생이 여러 명인
     // 선생님이 실제로 여러 명을 챙기는가"를 볼 수 있다.
     track('Viewed Student Progress', { managed_student_count: state.managedStudents.length });
@@ -144,7 +157,18 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 
-  const studentExams = state.examRecords.filter((e) => e.studentId === studentId);
+  const studentExams = React.useMemo(
+    () => state.examRecords.filter((e) => e.studentId === studentId).sort((a, b) => (a.examDate < b.examDate ? -1 : 1)),
+    [state.examRecords, studentId],
+  );
+
+  // 예전에는 초기값이 null이라, 시험이 이미 있어도 하나를 눌러야 과목별 목표가 나타났다.
+  // 화면을 열면 다가오는 시험(없으면 가장 최근 시험)을 바로 펼쳐 준다.
+  React.useEffect(() => {
+    if (selectedExamId != null || studentExams.length === 0) return;
+    const upcoming = studentExams.find((e) => e.examDate >= today);
+    setSelectedExamId((upcoming ?? studentExams[studentExams.length - 1]).id);
+  }, [selectedExamId, studentExams, today]);
   const selectedExam = studentExams.find((e) => e.id === selectedExamId) ?? null;
   const subjectsForExam = state.examSubjects.filter((s) => s.examId === selectedExamId);
 
@@ -167,6 +191,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
   }, [editingRangeId, allStudentItems, today]);
 
   const closeRangeForm = () => {
+    setRangeError(null);
     setRangeSubjectId(null);
     setEditingRangeId(null);
     setMaterial('');
@@ -217,26 +242,49 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
   };
 
   const submitRange = () => {
-    if (!rangeSubjectId || !material.trim()) return;
-    const scope: { mode: 'pages'; startPage: number; endPage: number } | { mode: 'custom'; customLabel: string } | null =
-      rangeMode === 'pages'
-        ? startPage.trim() && endPage.trim() && Number(startPage) <= Number(endPage)
-          ? { mode: 'pages', startPage: Number(startPage), endPage: Number(endPage) }
-          : null
-        : customLabel.trim()
-          ? { mode: 'custom', customLabel: customLabel.trim() }
-          : null;
-    if (!scope) return;
+    if (!rangeSubjectId) return;
+    if (!material.trim()) {
+      setRangeError('교재명을 입력해주세요.');
+      return;
+    }
+    let scope: { mode: 'pages'; startPage: number; endPage: number } | { mode: 'custom'; customLabel: string };
+    if (rangeMode === 'pages') {
+      if (!startPage.trim() || !endPage.trim()) {
+        setRangeError('시작 페이지와 끝 페이지를 모두 입력해주세요.');
+        return;
+      }
+      if (Number(startPage) > Number(endPage)) {
+        setRangeError('끝 페이지가 시작 페이지보다 커야 해요.');
+        return;
+      }
+      scope = { mode: 'pages', startPage: Number(startPage), endPage: Number(endPage) };
+    } else {
+      if (!customLabel.trim()) {
+        setRangeError('학습 내용을 입력해주세요.');
+        return;
+      }
+      scope = { mode: 'custom', customLabel: customLabel.trim() };
+    }
 
     if (editingRangeId) {
-      if (selectedDates.length === 0 && lockedDates.size === 0) return;
+      if (selectedDates.length === 0 && lockedDates.size === 0) {
+        setRangeError('공부할 날짜를 하나 이상 골라주세요.');
+        return;
+      }
       actions.updateHomeworkRange(studentId, editingRangeId, { material, selectedDates, ...scope });
     } else {
-      if (selectedDates.length === 0) return;
+      if (selectedDates.length === 0) {
+        setRangeError('공부할 날짜를 하나 이상 골라주세요.');
+        return;
+      }
       const subject = subjectsForExam.find((s) => s.id === rangeSubjectId);
-      if (!subject) return;
+      if (!subject) {
+        setRangeError('과목을 찾을 수 없어요. 화면을 다시 열어주세요.');
+        return;
+      }
       actions.registerHomeworkRange(studentId, rangeSubjectId, { subjectId: subject.subjectId, material, selectedDates, ...scope });
     }
+    setRangeError(null);
     closeRangeForm();
   };
 
@@ -302,9 +350,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                   actions.deleteExamRecord(studentId, exam.id);
                 }
               }}
-              className="absolute top-1 right-1 opacity-60"
+              aria-label={`${exam.title} 시험 삭제`}
+              className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center rounded-xl opacity-60 transition active:scale-[0.94]"
             >
-              <Icon name="close" className="!text-[16px]" />
+              <Icon name="close" className="!text-[17px]" />
             </button>
           </div>
         ))}
@@ -348,9 +397,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                             actions.deleteExamSubject(studentId, selectedExam.id, subject.id);
                           }
                         }}
-                        className="text-on-surface-variant"
+                        aria-label={`${getSubject(subject.subjectId).label} 과목 목표 삭제`}
+                        className="-my-2 flex min-h-11 min-w-11 items-center justify-center rounded-xl text-on-surface-variant transition active:scale-[0.94]"
                       >
-                        <Icon name="close" className="!text-[16px]" />
+                        <Icon name="close" className="!text-[18px]" />
                       </button>
                     </div>
                   </div>
@@ -372,16 +422,18 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                         ) : (
                           <TextField label="학습 내용" value={customLabel} onChange={setCustomLabel} placeholder="예: 1회 모의고사 풀이 및 채점" />
                         )}
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <span className="text-xs text-on-surface-variant">{rangeMode === 'pages' ? '상세 범위' : '학습 내용'}</span>
-                          <button
-                            onClick={() => setRangeMode((m) => (m === 'pages' ? 'custom' : 'pages'))}
-                            title="모의고사 등 페이지가 아닌 학습은 직접 입력으로 전환"
-                            className="text-on-surface-variant"
-                          >
-                            <Icon name="arrow_drop_down" className="!text-[16px]" />
-                          </button>
-                        </div>
+                        {/* 예전엔 전환할 수 있다는 사실이 title 속성(hover 툴팁)에만 있어서
+                            터치 기기에서는 발견할 방법이 없었다. 보이는 버튼 문구로 꺼낸다. */}
+                        <button
+                          onClick={() => {
+                            setRangeMode((m) => (m === 'pages' ? 'custom' : 'pages'));
+                            setRangeError(null);
+                          }}
+                          className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-xs font-semibold text-primary transition active:scale-[0.96]"
+                        >
+                          <Icon name="swap_horiz" className="!text-[17px]" />
+                          {rangeMode === 'pages' ? '페이지가 아닌 학습으로 입력' : '페이지 범위로 입력'}
+                        </button>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">공부할 날짜 선택</label>
@@ -395,6 +447,11 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                           minDate={editingRangeId ? undefined : today}
                         />
                       </div>
+                      {rangeError && (
+                        <p role="alert" className="rounded-xl bg-error-container/50 px-3 py-2 text-xs font-semibold leading-relaxed text-error">
+                          {rangeError}
+                        </p>
+                      )}
                       <Button className="w-full" onClick={submitRange}>
                         {editingRangeId ? '수정 내용 저장' : `${selectedDates.length}일에 나눠서 등록`}
                       </Button>
@@ -408,8 +465,11 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                           <p className="text-xs text-on-surface-variant">
                             {r.material} · {r.rangeLabel} · {r.assignedDates.join(', ')}
                           </p>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button onClick={() => startEditRange(r.id, subject.id)} className="text-[11px] font-semibold text-primary">
+                          <div className="flex shrink-0 items-center">
+                            <button
+                              onClick={() => startEditRange(r.id, subject.id)}
+                              className="-my-2 min-h-11 rounded-xl px-2 text-xs font-bold text-primary transition active:scale-[0.96]"
+                            >
                               {editingRangeId === r.id && rangeSubjectId === subject.id ? '취소' : '수정'}
                             </button>
                             <button
@@ -419,9 +479,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                                   actions.deleteExamRange(studentId, r.id);
                                 }
                               }}
-                              className="text-on-surface-variant"
+                              aria-label={`${r.material} 교재 등록 삭제`}
+                              className="-my-2 flex min-h-11 min-w-11 items-center justify-center rounded-xl text-on-surface-variant transition active:scale-[0.94]"
                             >
-                              <Icon name="close" className="!text-[14px]" />
+                              <Icon name="close" className="!text-[17px]" />
                             </button>
                           </div>
                         </div>
