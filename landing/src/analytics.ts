@@ -1,4 +1,7 @@
-import * as amplitude from '@amplitude/unified';
+// unified가 아니라 analytics-browser를 직접 쓴다 — 이유는 본앱 src/lib/analytics.ts의
+// 같은 자리 주석과 같다(쓰지 않는 Engagement·Experiment SDK를 켜지 않기 위해).
+import * as amplitude from '@amplitude/analytics-browser';
+import { sessionReplayPlugin } from '@amplitude/plugin-session-replay-browser';
 
 /**
  * 랜딩 페이지의 Amplitude 연동. 본앱(src/lib/analytics.ts)과 같은 프로젝트 키를 쓴다 —
@@ -24,25 +27,27 @@ export function initAnalytics(): void {
     return;
   }
 
-  void amplitude.initAll(AMPLITUDE_API_KEY, {
-    analytics: {
-      // 오토캡처는 5가지만 — Page viewed / Start session / End session / Marketing attribution
-      // (+ attribution이 세팅하는 user properties). formInteractions·fileDownloads는 기본값이
-      // true라서 명시적으로 끄지 않으면 딸려 들어온다.
-      autocapture: {
-        pageViews: true,
-        sessions: true,
-        attribution: true,
-        formInteractions: false,
-        fileDownloads: false,
-        elementInteractions: false,
-        frustrationInteractions: false,
-        networkTracking: false,
-        webVitals: false,
-      },
+  void amplitude.init(AMPLITUDE_API_KEY, {
+    // 오토캡처는 5가지만 — Page viewed / Start session / End session / Marketing attribution
+    // (+ attribution이 세팅하는 user properties). formInteractions·fileDownloads는 기본값이
+    // true라서 명시적으로 끄지 않으면 딸려 들어온다.
+    autocapture: {
+      pageViews: true,
+      sessions: true,
+      attribution: true,
+      formInteractions: false,
+      fileDownloads: false,
+      elementInteractions: false,
+      frustrationInteractions: false,
+      networkTracking: false,
+      webVitals: false,
     },
-    sessionReplay: { sampleRate: 1 },
   });
+
+  // 세션 리플레이는 initAll이 켜주던 것이라 직접 붙인다. 랜딩은 로그인이 없고 개인정보를
+  // 다루지 않는 공개 페이지라 전량 기록해도 문제가 없다 — 본앱과 달리 학생 화면이 아니다.
+  // (본앱은 관리자 세션에만 켠다. src/lib/analytics.ts의 applySessionReplayPolicy 참고)
+  void amplitude.add(sessionReplayPlugin({ sampleRate: 1 }));
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {

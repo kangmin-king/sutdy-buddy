@@ -1,4 +1,11 @@
-import * as amplitude from '@amplitude/unified';
+// @amplitude/unified이 아니라 analytics-browser를 직접 쓴다. unified의 존재 이유는
+// analytics·Engagement·Experiment를 initAll로 한 번에 켜주는 것인데, 이 앱은 Engagement와
+// Experiment를 쓰지 않는다. 그런데도 unified를 쓰던 동안 매 세션 Engagement SDK 로딩을
+// 10초 기다렸다 실패했고("Engagement SDK failed to load within 10000ms"), 쓰지 않는 두
+// SDK가 번들에도 들어갔다. unified는 모듈 레벨에 initAll만 내놓아서 analytics만 켤 방법이
+// 없다 — 그래서 한 겹 아래로 내려왔다.
+import * as amplitude from '@amplitude/analytics-browser';
+import { sessionReplayPlugin, type SessionReplayPlugin } from '@amplitude/plugin-session-replay-browser';
 import { Capacitor } from '@capacitor/core';
 
 /**
@@ -25,6 +32,10 @@ interface CommonProperties {
 let commonProperties: CommonProperties = {};
 let initialized = false;
 
+// 세션 리플레이 플러그인. 관리자 세션에서만 붙이므로 처음에는 null이다 — 아래
+// applySessionReplayPolicy 주석 참고.
+let sessionReplay: SessionReplayPlugin | null = null;
+
 export function initAnalytics(): void {
   // 앱 수명 동안 딱 한 번만. StrictMode의 이중 마운트나 HMR로 두 번 불려도 안전해야 한다.
   if (initialized) return;
@@ -35,26 +46,55 @@ export function initAnalytics(): void {
     return;
   }
 
-  void amplitude.initAll(AMPLITUDE_API_KEY, {
-    analytics: {
-      // 오토캡처는 5가지만 켠다 — Page viewed / Start session / End session /
-      // Marketing attribution(+그게 세팅하는 User properties).
-      // formInteractions·fileDownloads는 기본값이 true라서 명시적으로 끄지 않으면 딸려 들어온다.
-      // 나머지 행동 데이터는 아래 track()으로 의도한 것만 보낸다.
-      autocapture: {
-        pageViews: true,
-        sessions: true,
-        attribution: true,
-        formInteractions: false,
-        fileDownloads: false,
-        elementInteractions: false,
-        frustrationInteractions: false,
-        networkTracking: false,
-        webVitals: false,
-      },
+  // 세션 리플레이는 예전에 initAll이 켜주던 것이라, 이제 applySessionReplayPolicy에서 직접
+  // 붙인다. 그게 오히려 필요한 구조다 — 로그인해서 역할을 알기 전에는 켜면 안 된다.
+  void amplitude.init(AMPLITUDE_API_KEY, {
+    // 오토캡처는 5가지만 켠다 — Page viewed / Start session / End session /
+    // Marketing attribution(+그게 세팅하는 User properties).
+    // formInteractions·fileDownloads는 기본값이 true라서 명시적으로 끄지 않으면 딸려 들어온다.
+    // 나머지 행동 데이터는 아래 track()으로 의도한 것만 보낸다.
+    autocapture: {
+      pageViews: true,
+      sessions: true,
+      attribution: true,
+      formInteractions: false,
+      fileDownloads: false,
+      elementInteractions: false,
+      frustrationInteractions: false,
+      networkTracking: false,
+      webVitals: false,
     },
-    sessionReplay: { sampleRate: 1 },
   });
+}
+
+/**
+ * 세션 리플레이는 **관리자(과외쌤·학부모) 세션에만** 켠다.
+ *
+ * 이 앱의 학생은 중1부터라 만 14세 미만이 포함되고, 학생 화면에는 숙제·목표·이행률이 그대로
+ * 떠 있다. 그 화면 조작을 재생 가능한 형태로 남기는 것은 플레이 가족 정책과 부딪치고,
+ * 마스킹을 걸어도 "아동 화면을 녹화한다"는 사실 자체는 남는다. 그래서 학생 세션은 아예
+ * 기록하지 않고, 성인인 관리자 세션에서만 진단용으로 켠다.
+ *
+ * 프로필을 읽어 역할이 확정될 때마다 불린다(syncUserProperties). 한 기기에서 관리자가
+ * 로그아웃하고 학생이 로그인하는 경우가 실제 위험이라, 관리자가 아니면 매번 stop()을 부른다.
+ */
+export function applySessionReplayPolicy(role: 'student' | 'manager'): void {
+  if (!AMPLITUDE_API_KEY) return;
+
+  if (role !== 'manager') {
+    sessionReplay?.stop();
+    return;
+  }
+
+  if (!sessionReplay) {
+    // add()가 플러그인 setup()을 돌리면서 녹화를 시작한다. 그래서 관리자로 확인된 뒤에만
+    // 붙인다 — 미리 붙여두고 끄는 방식은 붙는 순간과 끄는 순간 사이가 비게 된다.
+    sessionReplay = sessionReplayPlugin({ sampleRate: 1 });
+    void amplitude.add(sessionReplay);
+    return;
+  }
+
+  void sessionReplay.start();
 }
 
 export function setCommonProperties(next: CommonProperties): void {
@@ -81,6 +121,9 @@ export function identifyUser(userId: string): void {
 /** 로그아웃 시점. userId와 deviceId를 함께 끊어서 다음 사용자와 섞이지 않게 한다. */
 export function resetIdentity(): void {
   if (!AMPLITUDE_API_KEY) return;
+  // 녹화를 먼저 멈춘다. 같은 기기에서 관리자가 나가고 학생이 들어오는 경우, 학생의 프로필을
+  // 읽기 전까지의 화면(로그인·온보딩)이 관리자 세션의 연장으로 녹화될 수 있다.
+  sessionReplay?.stop();
   amplitude.reset();
   commonProperties = {};
 }

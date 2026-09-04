@@ -44,7 +44,14 @@ import type {
   AllowedAppInterval,
 } from '../types';
 import type { SbPlannerItemRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
-import { track, setCommonProperties, setUserProperties, incrementUserProperty, APP_PLATFORM } from '../lib/analytics';
+import {
+  track,
+  setCommonProperties,
+  setUserProperties,
+  incrementUserProperty,
+  applySessionReplayPolicy,
+  APP_PLATFORM,
+} from '../lib/analytics';
 
 interface AppState {
   profile: Profile | null;
@@ -211,6 +218,8 @@ function syncUserProperties(state: AppState): void {
   const profile = state.profile;
   if (!profile) return;
   setCommonProperties({ role: profile.role, is_onboarded: Boolean(profile.onboardedAt) });
+  // 역할이 확정되는 지점이 여기뿐이라, 세션 리플레이 허용 여부도 같이 정한다.
+  applySessionReplayPolicy(profile.role);
   setUserProperties({
     role: profile.role,
     is_onboarded: Boolean(profile.onboardedAt),
