@@ -43,8 +43,7 @@ export function SiteFooter() {
               <a
                 href={APK_URL}
                 onClick={() => track('Clicked Download Apk', { placement: 'footer' })}
-                target="_blank"
-                rel="noreferrer"
+                download
                 className="text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 안드로이드 APK

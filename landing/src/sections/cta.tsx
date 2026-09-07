@@ -33,8 +33,7 @@ export function Cta() {
             <a
               href={APK_URL}
               onClick={() => track('Clicked Download Apk', { placement: 'final_cta' })}
-              target="_blank"
-              rel="noreferrer"
+              download
             >
               <DownloadIcon />
               안드로이드 APK

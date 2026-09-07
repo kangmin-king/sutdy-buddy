@@ -35,11 +35,12 @@ export function Download() {
               </CardHeader>
               <CardContent className="mt-auto">
                 <Button asChild>
+                  {/* 같은 도메인 파일이라 `download`가 먹는다 — 새 탭을 열지 않고 바로 받는다.
+                      드라이브 시절엔 새 탭이 필요했지만(경고 페이지를 거쳐야 했다) 이제 아니다. */}
                   <a
                     href={APK_URL}
                     onClick={() => track('Clicked Download Apk', { placement: 'android_guide' })}
-                    target="_blank"
-                    rel="noreferrer"
+                    download
                   >
                     <DownloadIcon />
                     APK 다운로드

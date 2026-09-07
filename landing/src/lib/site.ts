@@ -12,7 +12,19 @@ import {
 } from 'lucide-react';
 
 export const APP_URL = 'https://app.studybuks.store';
-export const APK_URL = 'https://drive.google.com/file/d/1SxxChy7Qudom_dSSgFPicGawKxOH29hd/view?usp=sharing';
+// APK는 이 사이트가 직접 준다(`landing/public/studybuks.apk`).
+//
+// 예전엔 구글 드라이브 공유 링크였는데, 드라이브는 실행 파일에 "Virus scan warning" 페이지를
+// 먼저 물린다. 폰 브라우저(특히 카카오톡 인앱 브라우저)가 그 페이지를 그대로 받아버리면
+// **2.4KB짜리 HTML이 `app-release.apk`라는 이름으로 저장되고**, 설치하려 하면
+// "패키지를 파싱하는 중 문제가 발생했습니다"가 뜬다. 2026-09-07에 실제로 학생이 겪었다.
+// 확인 토큰(`&confirm=t`)을 붙인 직접 링크로도 우회되지만, 문서화되지 않은 엔드포인트라
+// 언제 바뀔지 모른다. 내 도메인에서 바이트를 그대로 주는 쪽이 확실하고, 학생 입장에서도
+// 낯선 드라이브 경고 화면 대신 방금 보던 사이트에서 받게 된다.
+//
+// **새 버전을 낼 때 `landing/public/studybuks.apk`를 교체하고 랜딩을 재배포해야 한다.**
+// 앱만 빌드하고 여기를 안 바꾸면 학생은 옛 버전을 계속 받는다.
+export const APK_URL = '/studybuks.apk';
 
 // 문의 창구는 카카오톡 **1:1** 오픈채팅. 그룹방으로 만들면 안 된다 — 문의 내용이 학생 이름·
 // 성적·숙제 이행 여부라서, 한 방에 모으면 학부모끼리 서로의 사정을 그대로 보게 된다.
