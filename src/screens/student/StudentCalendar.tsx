@@ -13,6 +13,8 @@ import {
 import { getSubject, SUBJECTS } from '../../constants';
 import { Icon, Card, TopAppBar, BottomSheet, TextField, Button, ChipGroup, SectionTitle, useConfirm } from '../../primitives';
 import { DayProgressRing } from '../shared/DayProgressRing';
+import { TutoringMark } from '../shared/TutoringMark';
+import { calendarDayLabel } from '../shared/calendarDayLabel';
 import ChecklistTimeline from '../shared/ChecklistTimeline';
 import ExamSchedule from './ExamSchedule';
 import type { PlannerItem, SubjectId } from '../../types';
@@ -124,7 +126,7 @@ export default function StudentCalendarScreen() {
           두 사람이 서로 다른 범례를 보면 안 된다. 근거는 그쪽 주석에 적어 뒀다. */}
       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5 rounded-xl bg-surface-container-low px-3 py-2.5">
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-3 w-3 rounded-full bg-tertiary-container/40 ring-1 ring-inset ring-outline/60" />과외 날
+          <TutoringMark active />과외 날
         </span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
           <span className="h-2.5 w-2.5 bg-error" />시험
@@ -161,23 +163,40 @@ export default function StudentCalendarScreen() {
           const hasExam = examsByDate.has(d.key);
           const percent = d.key < today && dayItems.length > 0 ? getPlannerProgress(dayItems).percent : null;
           return (
-            <button key={d.key} onClick={() => setSelectedDate(d.key)} className="flex flex-col items-center py-1.5">
+            <button
+              key={d.key}
+              onClick={() => setSelectedDate(d.key)}
+              aria-label={calendarDayLabel(d.key, {
+                isToday,
+                isTutoringDay,
+                isRedDay,
+                hasExam,
+                hasPlan: hasItems && d.key >= today,
+                percent,
+                planWord: '계획',
+                progressWord: '완료율',
+              })}
+              aria-current={isToday ? 'date' : undefined}
+              className="flex flex-col items-center pt-0.5 pb-1.5"
+            >
+              <TutoringMark active={isTutoringDay} className="mb-[3px]" />
               <DayProgressRing percent={percent}>
+                {/* 과외 날이 사슬에서 빠져서 "오늘이면서 과외 날"에 오늘 테두리가 살아났다.
+                    선생님 캘린더와 같은 규칙 — 근거는 그쪽과 TutoringMark 주석에 있다. */}
                 <span
                   className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm ${
                     isSelected
                       ? 'bg-primary text-on-primary font-bold'
-                      : isTutoringDay
-                        ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
-                        : isToday
-                          ? 'border border-primary text-primary font-semibold'
-                          : d.inCurrentMonth
-                            ? isRedDay
-                              ? 'text-error'
-                              : 'text-on-surface'
-                            : isRedDay
-                              ? 'text-error/40'
-                              : 'text-outline-variant'
+                      : isToday
+                        ? 'border border-primary text-primary font-semibold'
+                        : d.inCurrentMonth
+                          ? isRedDay
+                            ? 'text-error'
+                            : 'text-on-surface'
+                          : isRedDay
+                            ? 'text-error/40'
+                            : // 다크에서 다른 달 날짜가 안 보이던 문제 — 선생님 캘린더와 같은 처리.
+                              'text-outline-variant dark:text-outline/60'
                   }`}
                 >
                   {d.date}

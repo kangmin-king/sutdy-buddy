@@ -4,6 +4,8 @@ import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHoliday
 import { Icon, BottomSheet, Button, TextField, ChipGroup, ToggleSwitch, useConfirm } from '../../primitives';
 import { SUBJECTS, getSubject, DEFAULT_HOMEWORK_REMIND_AT } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
+import { TutoringMark } from '../shared/TutoringMark';
+import { calendarDayLabel } from '../shared/calendarDayLabel';
 import { track } from '../../lib/analytics';
 import { DayProgressRing } from '../shared/DayProgressRing';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
@@ -158,10 +160,10 @@ export default function ManagerCalendarScreen({
         동시에 표현한다. 설명이 없으면 읽을 수 없어서 범례를 붙인다(학생 캘린더와 같은 형식).
       */}
       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5 rounded-xl bg-surface-container-low px-3 py-2.5">
-        {/* 과외 날 견본은 실제 칸과 같은 tertiary-container/40인데, 12px로 줄이면 다크에서
-            배경에 묻혀 안 보인다(32px 칸은 잘 보인다). 테두리로 윤곽을 잡아준다. */}
+        {/* 견본은 실제 칸과 똑같은 막대를 쓴다 — 견본과 실물이 다르면 범례가 제 일을 못 한다.
+            예전엔 채운 원 견본이었는데, 실제 칸의 채움이 다크에서 1.20:1로 안 보였다(TutoringMark 참고). */}
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-3 w-3 rounded-full bg-tertiary-container/40 ring-1 ring-inset ring-outline/60" />과외 날
+          <TutoringMark active />과외 날
         </span>
         {/* 시험은 네모, 숙제는 동그라미 — 색이 아니라 모양으로 구분한다. 예전엔 시험이 날짜를
             감싸는 링이었는데, 이행률도 링이라 다크에서 둘이 구분되지 않았다. */}
@@ -201,23 +203,45 @@ export default function ManagerCalendarScreen({
           const hasExam = examsByDate.has(d.key);
           const percent = d.key < today && dayItems.length > 0 ? getPlannerProgress(dayItems).percent : null;
           return (
-            <button key={d.key} onClick={() => setSelectedDate(d.key)} className="flex flex-col items-center py-1.5">
+            <button
+              key={d.key}
+              onClick={() => setSelectedDate(d.key)}
+              // 칸 안의 표시(막대·테두리·마커)는 전부 aria-hidden이라 스크린리더에는 숫자만 읽혔다.
+              // 눈으로 읽는 정보와 같은 것을 읽어 준다.
+              aria-label={calendarDayLabel(d.key, {
+                isToday,
+                isTutoringDay,
+                isRedDay,
+                hasExam,
+                hasPlan: hasItems && d.key >= today,
+                percent,
+                planWord: '숙제',
+                progressWord: '이행률',
+              })}
+              aria-current={isToday ? 'date' : undefined}
+              className="flex flex-col items-center pt-0.5 pb-1.5"
+            >
+              <TutoringMark active={isTutoringDay} className="mb-[3px]" />
               <DayProgressRing percent={percent}>
+                {/* 과외 날이 이 사슬에서 빠지면서 "오늘이면서 과외 날"에 오늘 테두리가 살아났다.
+                    예전엔 과외 날이 오늘보다 앞이라 그런 날엔 오늘 표시가 사라졌다. 지난달·다음달
+                    날짜가 과외 날이면 흐려지지 않던 것도 같이 고쳐진다. */}
                 <span
                   className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm ${
                     isSelected
                       ? 'bg-primary text-on-primary font-bold'
-                      : isTutoringDay
-                        ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
-                        : isToday
-                          ? 'border border-primary text-primary font-semibold'
-                          : d.inCurrentMonth
-                            ? isRedDay
-                              ? 'text-error'
-                              : 'text-on-surface'
-                            : isRedDay
-                              ? 'text-error/40'
-                              : 'text-outline-variant'
+                      : isToday
+                        ? 'border border-primary text-primary font-semibold'
+                        : d.inCurrentMonth
+                          ? isRedDay
+                            ? 'text-error'
+                            : 'text-on-surface'
+                          : isRedDay
+                            ? 'text-error/40'
+                            : // 다른 달 날짜는 흐려야 하지만 다크에서는 1.22:1로 아예 안 보였다 —
+                              // 첫 줄이 통째로 비어 보여서 달력이 깨진 것처럼 읽힌다. 다크에서만
+                              // 2.05:1로 올린다(라이트는 그대로). 여전히 이번 달보다 한참 약하다.
+                              'text-outline-variant dark:text-outline/60'
                   }`}
                 >
                   {d.date}

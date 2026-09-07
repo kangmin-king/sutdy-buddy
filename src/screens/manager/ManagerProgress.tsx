@@ -4,6 +4,7 @@ import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHoliday
 import { SUBJECTS, getSubject } from '../../constants';
 import { Card, Button, TextField, ToggleSwitch, ChipGroup, SectionTitle, Icon, useConfirm } from '../../primitives';
 import { track } from '../../lib/analytics';
+import { TutoringMark } from '../shared/TutoringMark';
 import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -82,27 +83,31 @@ function CompactMonthPicker({
               key={d.key}
               disabled={isDisabled}
               onClick={() => !isLocked && !isDisabled && onToggleDate(d.key)}
-              className="flex items-center justify-center py-0.5"
+              className="flex flex-col items-center justify-center py-0.5"
             >
+              {/* 여기서 과외 날은 "어느 날에 분량을 넣을지" 고르는 힌트다. 예전엔 칸을
+                  옅게 채웠는데 다크에서 1.20:1로 안 보였다 — 캘린더 탭과 같은 막대로 맞춘다. */}
+              <TutoringMark active={isTutoringDay} className="mb-0.5" />
               <span
                 className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] ${
                   isSelected
                     ? isLocked
                       ? 'bg-outline-variant text-on-surface font-semibold'
                       : 'bg-primary text-on-primary font-bold'
-                    : isTutoringDay
-                      ? `bg-tertiary-container/40 ${isRedDay ? 'text-error' : 'text-on-surface'}`
-                      : isToday
-                        ? 'border border-primary text-primary font-semibold'
-                        : isDisabled
-                          ? 'text-outline-variant/50'
-                          : isRedDay
-                            ? d.inCurrentMonth
-                              ? 'text-error'
-                              : 'text-error/40'
-                            : d.inCurrentMonth
-                              ? 'text-on-surface'
-                              : 'text-outline-variant'
+                    : isToday
+                      ? 'border border-primary text-primary font-semibold'
+                      : // 고를 수 없는 날(이미 지났거나 다른 달)은 흐려야 하지만, 다크에서
+                        // 1.10~1.22:1이라 첫 줄이 통째로 비어 보였다. 다크에서만 2.05:1로 올린다.
+                        // 둘 다 "고를 수 없다"는 같은 뜻이라 다크에서 같은 농도로 둔다.
+                        isDisabled
+                        ? 'text-outline-variant/50 dark:text-outline/60'
+                        : isRedDay
+                          ? d.inCurrentMonth
+                            ? 'text-error'
+                            : 'text-error/40'
+                          : d.inCurrentMonth
+                            ? 'text-on-surface'
+                            : 'text-outline-variant dark:text-outline/60'
                 }`}
               >
                 {d.date}
@@ -112,7 +117,7 @@ function CompactMonthPicker({
         })}
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-on-surface-variant">
-        진한 표시 칸 = 과외 날짜 · 빨간 숫자 = 공휴일/일요일{lockedDates.size > 0 ? ' · 회색 = 이미 지났거나 완료돼 수정할 수 없는 날' : ''}
+        위에 막대 = 과외 날짜 · 빨간 숫자 = 공휴일/일요일{lockedDates.size > 0 ? ' · 회색 = 이미 지났거나 완료돼 수정할 수 없는 날' : ''}
       </p>
     </div>
   );
