@@ -120,22 +120,25 @@ export default function StudentCalendarScreen() {
         날짜 한 칸이 선택·오늘·과외날·공휴일·시험·계획있음·완료율 일곱 가지를 색과 테두리로
         동시에 표현한다. 설명이 없으면 읽을 수 없어서 범례를 붙인다.
       */}
+      {/* 견본 규칙은 선생님 캘린더(ManagerCalendar)와 같이 맞춰 둔다 — 같은 달력을 보는
+          두 사람이 서로 다른 범례를 보면 안 된다. 근거는 그쪽 주석에 적어 뒀다. */}
       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5 rounded-xl bg-surface-container-low px-3 py-2.5">
-        <span className="flex items-center gap-1.5 text-[10px] font-medium text-on-surface-variant">
-          <span className="h-3 w-3 rounded-full bg-tertiary-container/40" />과외 날
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-3 w-3 rounded-full bg-tertiary-container/40 ring-1 ring-inset ring-outline/60" />과외 날
         </span>
-        <span className="flex items-center gap-1.5 text-[10px] font-medium text-on-surface-variant">
-          <span className="h-3 w-3 rounded-full ring-2 ring-error ring-inset" />시험
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-2 w-2 rounded-sm bg-error" />시험
         </span>
-        <span className="flex items-center gap-1.5 text-[10px] font-medium text-on-surface-variant">
-          <span className="h-1.5 w-1.5 rounded-full bg-secondary" />계획 있음
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-2 w-2 rounded-full bg-secondary" />계획 있음
         </span>
-        <span className="flex items-center gap-1.5 text-[10px] font-medium text-on-surface-variant">
-          <span
-            className="h-3 w-3 rounded-full"
-            style={{ background: 'conic-gradient(rgb(var(--warning)) 0% 65%, rgb(var(--surface-container-highest)) 65% 100%)' }}
-          />
-          지난 날 완료율
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="flex gap-0.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-error" />
+            <span className="h-2.5 w-2.5 rounded-full bg-warning" />
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          </span>
+          지난 날 완료율(낮음·보통·완료)
         </span>
       </div>
 
@@ -175,14 +178,15 @@ export default function StudentCalendarScreen() {
                             : isRedDay
                               ? 'text-error/40'
                               : 'text-outline-variant'
-                  } ${hasExam ? 'ring-2 ring-error' : ''}`}
+                  }`}
                 >
                   {d.date}
                 </span>
               </DayProgressRing>
-              <span className="flex items-center gap-0.5 mt-0.5 h-1">
-                {hasItems && d.key >= today && <span className="w-1 h-1 rounded-full bg-secondary" />}
-                {hasExam && <span className="w-1 h-1 rounded-full bg-error" />}
+              {/* 시험은 네모, 계획은 동그라미 — 선생님 캘린더와 같은 규칙. */}
+              <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
+                {hasItems && d.key >= today && <span className="h-1.5 w-1.5 rounded-full bg-secondary" />}
+                {hasExam && <span className="h-1.5 w-1.5 rounded-sm bg-error" />}
               </span>
             </button>
           );

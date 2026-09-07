@@ -155,21 +155,27 @@ export default function ManagerCalendarScreen({
         동시에 표현한다. 설명이 없으면 읽을 수 없어서 범례를 붙인다(학생 캘린더와 같은 형식).
       */}
       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5 rounded-xl bg-surface-container-low px-3 py-2.5">
+        {/* 과외 날 견본은 실제 칸과 같은 tertiary-container/40인데, 12px로 줄이면 다크에서
+            배경에 묻혀 안 보인다(32px 칸은 잘 보인다). 테두리로 윤곽을 잡아준다. */}
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-3 w-3 rounded-full bg-tertiary-container/40" />과외 날
+          <span className="h-3 w-3 rounded-full bg-tertiary-container/40 ring-1 ring-inset ring-outline/60" />과외 날
+        </span>
+        {/* 시험은 네모, 숙제는 동그라미 — 색이 아니라 모양으로 구분한다. 예전엔 시험이 날짜를
+            감싸는 링이었는데, 이행률도 링이라 다크에서 둘이 구분되지 않았다. */}
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-2 w-2 rounded-sm bg-error" />시험
         </span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-3 w-3 rounded-full ring-2 ring-error ring-inset" />시험
+          <span className="h-2 w-2 rounded-full bg-secondary" />숙제 있음
         </span>
+        {/* 이행률 링은 구간별로 색이 셋인데 견본을 하나만 두면 오해를 준다. 셋 다 보여준다. */}
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-1.5 w-1.5 rounded-full bg-secondary" />숙제 있음
-        </span>
-        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span
-            className="h-3 w-3 rounded-full"
-            style={{ background: 'conic-gradient(rgb(var(--warning)) 0% 65%, rgb(var(--surface-container-highest)) 65% 100%)' }}
-          />
-          지난 날 이행률
+          <span className="flex gap-0.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-error" />
+            <span className="h-2.5 w-2.5 rounded-full bg-warning" />
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          </span>
+          지난 날 이행률(낮음·보통·완료)
         </span>
       </div>
 
@@ -209,14 +215,18 @@ export default function ManagerCalendarScreen({
                             : isRedDay
                               ? 'text-error/40'
                               : 'text-outline-variant'
-                  } ${hasExam ? 'ring-2 ring-error' : ''}`}
+                  }`}
                 >
                   {d.date}
                 </span>
               </DayProgressRing>
-              <span className="flex items-center gap-0.5 mt-0.5 h-1">
-                {hasItems && d.key >= today && <span className="w-1 h-1 rounded-full bg-secondary" />}
-                {hasExam && <span className="w-1 h-1 rounded-full bg-error" />}
+              {/* 시험은 네모, 숙제는 동그라미로 구분한다. 예전엔 시험이 날짜를 감싸는
+                  ring-2 ring-error였는데, 이행률도 날짜를 감싸는 링이라 다크에서 error가
+                  밝은 코랄로 바뀌면서 둘이 같은 것처럼 보였다. 색을 더 쥐어짜는 대신
+                  채널을 바꿨다 — 색약 사용자에게도 이 편이 낫다. */}
+              <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
+                {hasItems && d.key >= today && <span className="h-1.5 w-1.5 rounded-full bg-secondary" />}
+                {hasExam && <span className="h-1.5 w-1.5 rounded-sm bg-error" />}
               </span>
             </button>
           );
