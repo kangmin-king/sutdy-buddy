@@ -307,9 +307,12 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
 
   return (
     <div className="px-5 pt-2 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      {/* 강조 링크는 색만으로는 어두운 배경에서 잘 안 읽힌다 — 굵기·크기를 올리는 쪽이 체감이
+          크다. 이 화면의 "+ 시험 추가"·"교재 등록"·"수정"에 같은 처리를 했고, 터치 타깃도
+          같이 확보했다. */}
       <SectionTitle
         action={
-          <button onClick={() => setShowExamForm((s) => !s)} className="text-primary text-xs font-semibold">
+          <button onClick={() => setShowExamForm((s) => !s)} className="min-h-11 rounded-xl px-2 text-[13px] font-bold text-primary">
             + 시험 추가
           </button>
         }
@@ -387,7 +390,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => startRegisterRange(subject.id)} className="text-xs font-semibold text-primary">
+                      <button onClick={() => startRegisterRange(subject.id)} className="-my-2 min-h-11 rounded-xl px-2 text-[13px] font-bold text-primary">
                         교재 등록
                       </button>
                       <button
@@ -398,7 +401,9 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                           }
                         }}
                         aria-label={`${getSubject(subject.subjectId).label} 과목 목표 삭제`}
-                        className="-my-2 flex min-h-11 min-w-11 items-center justify-center rounded-xl text-on-surface-variant transition active:scale-[0.94]"
+                        // 삭제는 되돌릴 수 없는데 지금까지 "수정"보다 밝아서(5.35 대 3.96) 먼저 눈에 띄었다.
+                        // outline으로 낮춰 안전한 동작이 앞서게 한다.
+                        className="-my-2 flex min-h-11 min-w-11 items-center justify-center rounded-xl text-outline transition active:scale-[0.94]"
                       >
                         <Icon name="close" className="!text-[18px]" />
                       </button>
@@ -468,7 +473,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                           <div className="flex shrink-0 items-center">
                             <button
                               onClick={() => startEditRange(r.id, subject.id)}
-                              className="-my-2 min-h-11 rounded-xl px-2 text-xs font-bold text-primary transition active:scale-[0.96]"
+                              className="-my-2 min-h-11 rounded-xl px-2 text-[13px] font-bold text-primary transition active:scale-[0.96]"
                             >
                               {editingRangeId === r.id && rangeSubjectId === subject.id ? '취소' : '수정'}
                             </button>
@@ -480,7 +485,9 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
                                 }
                               }}
                               aria-label={`${r.material} 교재 등록 삭제`}
-                              className="-my-2 flex min-h-11 min-w-11 items-center justify-center rounded-xl text-on-surface-variant transition active:scale-[0.94]"
+                              // 삭제는 되돌릴 수 없는데 지금까지 "수정"보다 밝아서(5.35 대 3.96) 먼저 눈에 띄었다.
+                        // outline으로 낮춰 안전한 동작이 앞서게 한다.
+                        className="-my-2 flex min-h-11 min-w-11 items-center justify-center rounded-xl text-outline transition active:scale-[0.94]"
                             >
                               <Icon name="close" className="!text-[17px]" />
                             </button>

@@ -271,7 +271,13 @@ export function Chip({ label, active, onClick, icon = null }: { label: string; a
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-medium flex items-center gap-1 transition ${active ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}
+      // 다크에서는 선택 안 된 칩(surface-container)과 카드(surface-container-lowest)의 대비가
+      // 1.17이라 칩이 카드에 녹아버린다. 배경색을 어떻게 바꿔도 1.23이 한계여서 테두리로 세운다.
+      className={`rounded-full px-4 py-2 text-sm font-medium flex items-center gap-1 transition ${
+        active
+          ? 'bg-primary text-on-primary'
+          : 'bg-surface-container text-on-surface-variant dark:border dark:border-outline'
+      }`}
     >
       {icon && <Icon name={icon} className="!text-[18px]" />}
       {label}
@@ -596,7 +602,9 @@ export function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+        // placeholder 색을 못박아 둔다. 브라우저 기본값은 다크에서 충분히 흐리지 않아
+        // (대비 6.24, 실제 입력값은 10.37) 안 채운 칸이 이미 채워진 것처럼 보였다.
+        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none placeholder:text-outline focus:ring-2 focus:ring-primary"
       />
     </div>
   );
@@ -623,7 +631,7 @@ export function TextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary resize-none"
+        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none placeholder:text-outline focus:ring-2 focus:ring-primary resize-none"
       />
     </div>
   );
