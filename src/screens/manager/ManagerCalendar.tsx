@@ -163,10 +163,10 @@ export default function ManagerCalendarScreen({
         {/* 시험은 네모, 숙제는 동그라미 — 색이 아니라 모양으로 구분한다. 예전엔 시험이 날짜를
             감싸는 링이었는데, 이행률도 링이라 다크에서 둘이 구분되지 않았다. */}
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-2 w-2 rounded-sm bg-error" />시험
+          <span className="h-2.5 w-2.5 bg-error" />시험
         </span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-2 w-2 rounded-full bg-secondary" />숙제 있음
+          <span className="h-1.5 w-1.5 rounded-full bg-secondary" />숙제 있음
         </span>
         {/* 이행률 링은 구간별로 색이 셋인데 견본을 하나만 두면 오해를 준다. 셋 다 보여준다. */}
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
@@ -224,9 +224,12 @@ export default function ManagerCalendarScreen({
                   ring-2 ring-error였는데, 이행률도 날짜를 감싸는 링이라 다크에서 error가
                   밝은 코랄로 바뀌면서 둘이 같은 것처럼 보였다. 색을 더 쥐어짜는 대신
                   채널을 바꿨다 — 색약 사용자에게도 이 편이 낫다. */}
-              <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
+              {/* 모서리 곡률만 다르게 하면 6px에서는 구분이 안 된다. 크기·모양·색 셋을 다
+                  달리한다 — 시험은 크고 각진 네모, 숙제는 작고 둥근 점. 시험이 한 달에
+                  한두 번뿐이고 더 중요하니 무게를 주는 쪽이 위계에도 맞다. */}
+              <span className="mt-0.5 flex h-2 items-center gap-0.5">
                 {hasItems && d.key >= today && <span className="h-1.5 w-1.5 rounded-full bg-secondary" />}
-                {hasExam && <span className="h-1.5 w-1.5 rounded-sm bg-error" />}
+                {hasExam && <span className="h-2 w-2 bg-error" />}
               </span>
             </button>
           );

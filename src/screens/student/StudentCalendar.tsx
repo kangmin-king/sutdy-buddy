@@ -127,10 +127,10 @@ export default function StudentCalendarScreen() {
           <span className="h-3 w-3 rounded-full bg-tertiary-container/40 ring-1 ring-inset ring-outline/60" />과외 날
         </span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-2 w-2 rounded-sm bg-error" />시험
+          <span className="h-2.5 w-2.5 bg-error" />시험
         </span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
-          <span className="h-2 w-2 rounded-full bg-secondary" />계획 있음
+          <span className="h-1.5 w-1.5 rounded-full bg-secondary" />계획 있음
         </span>
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
           <span className="flex gap-0.5">
@@ -183,10 +183,10 @@ export default function StudentCalendarScreen() {
                   {d.date}
                 </span>
               </DayProgressRing>
-              {/* 시험은 네모, 계획은 동그라미 — 선생님 캘린더와 같은 규칙. */}
-              <span className="mt-0.5 flex h-1.5 items-center gap-0.5">
+              {/* 시험은 크고 각진 네모, 계획은 작고 둥근 점 — 선생님 캘린더와 같은 규칙. */}
+              <span className="mt-0.5 flex h-2 items-center gap-0.5">
                 {hasItems && d.key >= today && <span className="h-1.5 w-1.5 rounded-full bg-secondary" />}
-                {hasExam && <span className="h-1.5 w-1.5 rounded-sm bg-error" />}
+                {hasExam && <span className="h-2 w-2 bg-error" />}
               </span>
             </button>
           );

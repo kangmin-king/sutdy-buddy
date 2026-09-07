@@ -21,12 +21,12 @@ android {
         // 인정한다. 1은 드라이브로 직접 배포한 APK가 이미 쓰고 있어서 2부터 시작한다 —
         // 그래야 그 APK를 쓰는 학생이 스토어 버전으로 넘어올 수 있다.
         // **스토어에 올릴 때마다 반드시 올릴 것.**
-        versionCode 4
+        versionCode 5
         // 사용자에게 보이는 버전. 1.1(학생 폰에 이미 깔려 있던 APK) 이후로 다크 모드,
         // 학생 탭 개편(플래너 → "나"), 매니저 화면 결함 수정, 회원 탈퇴 위치 변경이 들어갔다.
-        // 1.2(versionCode 3)는 다크 대비 수정 전에 빌드해서 내 기기에만 설치됐다 —
-        // 그 수정까지 담은 것이 1.2.1이다.
-        versionName "1.2.1"
+        // 1.2(versionCode 3)는 다크 대비 수정 전에 빌드해서 내 기기에만 설치됐다.
+        // 1.2.1(versionCode 4)이 그 수정을 담았고, 1.2.2는 캘린더 범례·시험 표식까지 고쳤다.
+        versionName "1.2.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
