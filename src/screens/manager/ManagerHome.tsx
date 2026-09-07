@@ -6,6 +6,7 @@ import { getSubject } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
 import ChecklistTimeline from '../shared/ChecklistTimeline';
 import { totalUsageSeconds } from '../shared/allowedAppUsageModel';
+import { track } from '../../lib/analytics';
 
 export default function ManagerHomeScreen({ studentId }: { studentId: string }) {
   const { state, actions } = useAppState();
@@ -15,6 +16,10 @@ export default function ManagerHomeScreen({ studentId }: { studentId: string }) 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
     actions.loadSentHomeworkProposals(studentId);
+    // 탭을 열 때마다 한 번 찍힌다(탭을 바꾸면 이 화면이 언마운트되므로 마운트 = 탭 조회).
+    // 세 탭(홈/캘린더/학습설계)에 같은 형태로 넣어 두면, 관리자가 "확인하러" 오는지
+    // "설계하러" 오는지 비율로 알 수 있다 — 정보구조를 바꿀지 판단하는 근거가 된다.
+    track('Viewed Student Home', { managed_student_count: state.managedStudents.length });
     // studentId 바뀔 때만 다시 불러온다 — actions는 매 렌더 재생성되므로 deps에서 제외.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);

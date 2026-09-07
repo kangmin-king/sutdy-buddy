@@ -4,6 +4,7 @@ import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHoliday
 import { Icon, BottomSheet, Button, TextField, ChipGroup, ToggleSwitch, useConfirm } from '../../primitives';
 import { SUBJECTS, getSubject, DEFAULT_HOMEWORK_REMIND_AT } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
+import { track } from '../../lib/analytics';
 import { DayProgressRing } from '../shared/DayProgressRing';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import type { SubjectId } from '../../types';
@@ -42,6 +43,8 @@ export default function ManagerCalendarScreen({
     actions.loadStudentPlannerItems(studentId);
     actions.loadSentHomeworkProposals(studentId);
     actions.loadStudentSchoolTimetable(studentId);
+    // 탭 조회 수. 홈·학습설계와 같은 형태로 찍어 세 탭의 비율을 본다(ManagerHome 주석 참고).
+    track('Viewed Student Calendar', { managed_student_count: state.managedStudents.length });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 

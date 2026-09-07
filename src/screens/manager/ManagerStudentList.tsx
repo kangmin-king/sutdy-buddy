@@ -4,6 +4,7 @@ import { TopAppBar, Card, Button, TextField, Icon } from '../../primitives';
 import { todayKey, getPlannerProgress } from '../../lib';
 import { DEFAULT_HOMEWORK_REMIND_AT } from '../../constants';
 import { allowedAppSummary } from '../shared/allowedAppUsageModel';
+import { track } from '../../lib/analytics';
 
 export default function ManagerStudentListScreen({
   onSelectStudent,
@@ -22,6 +23,19 @@ export default function ManagerStudentListScreen({
     state.managedStudents.forEach((s) => actions.loadStudentPlannerItems(s.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.managedStudents.map((s) => s.id).join(',')]);
+
+  // 명단 조회 수. 앱을 켜면 한 번 찍히고, 그 뒤로 찍히는 건 학생 칩의 "전체 학생"으로
+  // 돌아온 경우다 — 그 복귀 경로가 실제로 쓰이는지, 전체 현황을 훑는 게 관리자의 일과인지
+  // 알 수 있다. 정보구조를 바꿀지 판단하는 근거가 된다(ManagerHome 주석 참고).
+  //
+  // 마운트 즉시 찍으면 안 된다 — 앱을 켠 직후엔 managedStudents가 아직 비어 있어서
+  // managed_student_count가 0으로 박힌다. 로딩이 끝난 뒤 한 번만 찍는다.
+  const didTrackListView = React.useRef(false);
+  React.useEffect(() => {
+    if (state.loading || didTrackListView.current) return;
+    didTrackListView.current = true;
+    track('Viewed Student List', { managed_student_count: state.managedStudents.length });
+  }, [state.loading, state.managedStudents.length]);
 
   return (
     <div className="px-5 pt-4 pb-10">
