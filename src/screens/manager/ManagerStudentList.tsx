@@ -38,7 +38,9 @@ export default function ManagerStudentListScreen({
   }, [state.loading, state.managedStudents.length]);
 
   return (
-    <div className="px-5 pt-4 pb-10">
+    // 하단 탭이 이 화면 위에도 떠 있으므로(명단이 "오늘" 탭의 기본 상태가 됐다) 탭 높이만큼
+    // 아래를 비운다 — 예전엔 이 화면에 탭이 없어서 pb-10으로 충분했다.
+    <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <TopAppBar />
       <h1 className="text-xl font-bold mt-2 mb-4">내 학생</h1>
 

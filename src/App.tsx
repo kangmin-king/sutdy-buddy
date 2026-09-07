@@ -26,9 +26,11 @@ import { track } from './lib/analytics';
 
 // "진도관리"는 진도를 보는 화면이 아니라 시험·과목 목표·교재 범위를 만드는 화면이다
 // (ManagerProgress). 이름을 실제 내용에 맞춘다.
+// "홈"은 실제로 이 학생의 오늘을 보는 화면이고, 학생을 안 고른 상태에서는 명단이 그 자리에
+// 온다 — 둘 다 "오늘"에 관한 것이라 이름을 그렇게 맞췄다.
 const MANAGER_TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
-  { id: 'home', label: '홈', icon: 'home' },
+  { id: 'home', label: '오늘', icon: 'today' },
   { id: 'progress', label: '학습설계', icon: 'school' },
 ] as const;
 
@@ -133,47 +135,74 @@ function StudentAppShell() {
 }
 
 function ManagerAppShell() {
+  const { state } = useAppState();
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<(typeof MANAGER_TABS)[number]['id']>('home');
   // 학생 목록의 알림 칩으로 들어온 경우엔 캘린더 탭을 열면서 그 학생의 설정 시트까지 펼친다.
   // 학생 id로 들고 있는 이유: 시트를 펼치기 전에 다른 학생으로 바꾸면 펼치지 않아야 한다.
   const [reminderSheetFor, setReminderSheetFor] = React.useState<string | null>(null);
 
-  if (!selectedStudentId) {
-    return (
-      <div id="app-shell">
-        <ErrorBanner />
+  // 학생 명단은 별도 셸이 아니라 "오늘" 탭의 기본 상태다. 예전에는 학생을 고르기 전엔 하단
+  // 탭이 아예 없다가 고른 뒤에 생겨서, 사용자는 명단이 홈보다 윗 단계인지 별도 페이지인지
+  // 알 수 없었다. 게다가 selectedStudentId를 다시 null로 만드는 경로가 없어 명단으로 돌아갈
+  // 수 없었고, 명단에만 있는 초대코드 폼 때문에 새 학생을 추가하려면 앱을 껐다 켜야 했다.
+  // 이제 탭이 항상 보이고, 학생 선택은 "오늘" 탭 안에서 오간다.
+  const showRoster = selectedStudentId == null;
+
+  return (
+    <div id="app-shell">
+      <ErrorBanner />
+      {!showRoster && (
+        <>
+          <TopAppBar />
+          <StudentSelector
+            selectedStudentId={selectedStudentId}
+            onSelectStudent={setSelectedStudentId}
+            onBackToList={() => setSelectedStudentId(null)}
+          />
+        </>
+      )}
+
+      {showRoster ? (
         <ManagerStudentListScreen
-          onSelectStudent={setSelectedStudentId}
+          onSelectStudent={(studentId) => {
+            setSelectedStudentId(studentId);
+            setTab('home');
+          }}
           onOpenReminderSetting={(studentId) => {
             setSelectedStudentId(studentId);
             setTab('calendar');
             setReminderSheetFor(studentId);
           }}
         />
-      </div>
-    );
-  }
-
-  return (
-    <div id="app-shell">
-      <ErrorBanner />
-      <TopAppBar />
-      <StudentSelector
-        selectedStudentId={selectedStudentId}
-        onSelectStudent={setSelectedStudentId}
-        onBackToList={() => setSelectedStudentId(null)}
-      />
-      {tab === 'calendar' && (
-        <ManagerCalendarScreen
-          studentId={selectedStudentId}
-          openReminderSheet={reminderSheetFor === selectedStudentId}
-          onReminderSheetOpened={() => setReminderSheetFor(null)}
-        />
+      ) : (
+        <>
+          {tab === 'calendar' && (
+            <ManagerCalendarScreen
+              studentId={selectedStudentId}
+              openReminderSheet={reminderSheetFor === selectedStudentId}
+              onReminderSheetOpened={() => setReminderSheetFor(null)}
+            />
+          )}
+          {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
+          {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
+        </>
       )}
-      {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
-      {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
-      <BottomNav tabs={MANAGER_TABS} active={tab} onChange={setTab} />
+
+      <BottomNav
+        tabs={MANAGER_TABS}
+        active={showRoster ? 'home' : tab}
+        onChange={(next) => {
+          // 명단을 보는 중에 캘린더·학습설계를 누르면 대상 학생이 없다. 첫 학생을 자동으로
+          // 골라 준다 — 학생이 한 명뿐인 학부모는 이 경로가 사실상 기본 동선이다.
+          if (showRoster && next !== 'home') {
+            const first = state.managedStudents[0];
+            if (!first) return;
+            setSelectedStudentId(first.id);
+          }
+          setTab(next);
+        }}
+      />
     </div>
   );
 }
