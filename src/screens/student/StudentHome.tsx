@@ -79,8 +79,16 @@ export default function StudentHomeScreen({
       allTodayItems.filter((item) => item.status !== 'completed').map((item) => item.id),
     );
     const recovered = deriveRunningSessionIds(state.studySessions, visibleItemIds);
+    // 방치된 세션을 endStudySession으로 닫으면 auto_closed가 false로 남아, 셸의 만료 훅
+    // (useExpiredSessionClose → autoCloseStudySession, auto_closed=true)과 같은 세션을
+    // 서로 다르게 기록하는 경쟁이 생긴다(둘 다 앱 시작 시 돈다). 이 durationSeconds는 다음
+    // 세션 시작까지의 간격을 상한 씌운 추정치일 뿐 학생이 확인한 값이 아니므로,
+    // autoCloseStudySession으로 통일해 auto_closed=true로 남기고 그 가드(.is('ended_at',
+    // null))도 함께 얻는다. 반환값은 무시한다: 이 효과는 마운트당 한 번만 돌고(위 ref 가드)
+    // 실패 시 재시도 경로가 없는 건 이 훅으로 옮기기 전 endStudySession 호출도 마찬가지였다
+    // — 서버 에러는 액션 내부에서 이미 배너로 알리므로 여기서 더 할 일이 없다.
     for (const stale of findStaleRunningSessions(state.studySessions, visibleItemIds)) {
-      void actions.endStudySession(stale.itemId, stale.sessionId, stale.durationSeconds);
+      void actions.autoCloseStudySession(stale.itemId, stale.sessionId, stale.endedAt, stale.durationSeconds);
     }
     setRunningSessionId(recovered);
   }, [actions, allTodayItems, state.loading, state.studySessions]);

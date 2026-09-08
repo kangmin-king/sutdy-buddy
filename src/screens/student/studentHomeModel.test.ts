@@ -186,7 +186,12 @@ describe('buildStudentHomeModel', () => {
     const visibleItemIds = new Set(['current', 'next']);
     expect(deriveRunningSessionIds(sessions, visibleItemIds)).toEqual({ next: 'newer-active' });
     expect(findStaleRunningSessions(sessions, visibleItemIds)).toEqual([
-      { itemId: 'current', sessionId: 'older-active', durationSeconds: 120 },
+      {
+        itemId: 'current',
+        sessionId: 'older-active',
+        endedAt: '2026-08-21T09:05:00.000Z',
+        durationSeconds: 120,
+      },
     ]);
   });
 
@@ -200,7 +205,7 @@ describe('buildStudentHomeModel', () => {
 
     expect(deriveRunningSessionIds(sessions, visibleItemIds)).toEqual({ next: 'session-b' });
     expect(findStaleRunningSessions(sessions, visibleItemIds)).toEqual([
-      { itemId: 'current', sessionId: 'session-a', durationSeconds: 0 },
+      { itemId: 'current', sessionId: 'session-a', endedAt: startedAt, durationSeconds: 0 },
     ]);
   });
 
@@ -226,7 +231,14 @@ describe('buildStudentHomeModel', () => {
     const visibleItemIds = new Set(['current', 'next']);
 
     expect(findStaleRunningSessions(sessions, visibleItemIds)).toEqual([
-      { itemId: 'current', sessionId: 'older-active', durationSeconds: MAX_SESSION_SECONDS },
+      {
+        itemId: 'current',
+        sessionId: 'older-active',
+        // 상한이 걸렸으므로 ended_at은 다음 세션의 실제 시작 시각(08-19)이 아니라
+        // started_at + 3시간(08-17)이다 — duration_seconds와 항상 같은 순간을 가리켜야 한다.
+        endedAt: '2026-08-17T12:00:00.000Z',
+        durationSeconds: MAX_SESSION_SECONDS,
+      },
     ]);
   });
 
@@ -250,7 +262,47 @@ describe('buildStudentHomeModel', () => {
     const visibleItemIds = new Set(['current', 'next']);
 
     expect(findStaleRunningSessions(sessions, visibleItemIds)).toEqual([
-      { itemId: 'current', sessionId: 'older-active', durationSeconds: 3600 },
+      {
+        itemId: 'current',
+        sessionId: 'older-active',
+        endedAt: '2026-08-21T10:00:00.000Z',
+        durationSeconds: 3600,
+      },
+    ]);
+  });
+
+  // I4: 방치된 세션을 autoCloseStudySession(항상 auto_closed=true)으로 닫으려면, 이 함수가
+  // 내려주는 endedAt이 durationSeconds와 항상 같은 순간을 가리켜야 한다 — 둘 중 하나만 상한이
+  // 걸리면 ChecklistTimeline의 합계(durationSeconds)와 막대(startedAt~endedAt)가 다시 갈라진다.
+  // 세 개가 연달아 방치된 경우까지 이 불변식이 항목마다 유지되는지 확인한다.
+  it('derives endedAt so it always agrees with durationSeconds, across a chain of stale sessions', () => {
+    const sessions = {
+      first: [
+        session('s1', 'first', { startedAt: '2026-08-17T09:00:00.000Z', endedAt: null, durationSeconds: null }),
+      ],
+      second: [
+        session('s2', 'second', { startedAt: '2026-08-19T09:00:00.000Z', endedAt: null, durationSeconds: null }),
+      ],
+      third: [
+        session('s3', 'third', { startedAt: '2026-08-19T09:30:00.000Z', endedAt: null, durationSeconds: null }),
+      ],
+      newest: [
+        session('s4', 'newest', { startedAt: '2026-08-21T09:00:00.000Z', endedAt: null, durationSeconds: null }),
+      ],
+    };
+    const visibleItemIds = new Set(['first', 'second', 'third', 'newest']);
+
+    const stale = findStaleRunningSessions(sessions, visibleItemIds);
+    expect(stale).toHaveLength(3);
+    expect(stale).toEqual([
+      // 08-17 → 08-19 간격은 3시간을 훌쩍 넘으므로 상한이 걸려 endedAt이 다음 세션의 실제
+      // 시작 시각이 아니라 startedAt + 3시간이다.
+      { itemId: 'first', sessionId: 's1', endedAt: '2026-08-17T12:00:00.000Z', durationSeconds: MAX_SESSION_SECONDS },
+      // 08-19 09:00 → 08-19 09:30 간격(30분)은 상한 밑이라 endedAt이 다음 세션의 시작 시각과
+      // 정확히 같다.
+      { itemId: 'second', sessionId: 's2', endedAt: '2026-08-19T09:30:00.000Z', durationSeconds: 1800 },
+      // 08-19 09:30 → 08-21 09:00 간격도 3시간을 훌쩍 넘어 다시 상한이 걸린다.
+      { itemId: 'third', sessionId: 's3', endedAt: '2026-08-19T12:30:00.000Z', durationSeconds: MAX_SESSION_SECONDS },
     ]);
   });
 
