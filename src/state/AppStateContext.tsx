@@ -830,7 +830,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async endStudySession(plannerItemId, sessionId, displayedSeconds) {
-        const endedAt = new Date().toISOString();
+        const nowIso = new Date().toISOString();
         // startedAt is immutable once a session is created, so reading it from the outer `state`
         // closure (rather than deriving inside the setState updater) is safe here — unlike
         // updatePlannerItem's list derivation, there's no risk of acting on a stale sibling write.
@@ -844,8 +844,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 이 함수가 막으려는 것과 같은 결함(부풀려진 시간)이 그대로 재현된다 — 앞으로 이 인자를
         // 생략하는 호출자가 생겨도 안전하도록 여기도 같은 cappedSessionSeconds를 쓴다.
         const durationSeconds = existing
-          ? (displayedSeconds ?? cappedSessionSeconds(existing.startedAt, Date.parse(endedAt)))
+          ? (displayedSeconds ?? cappedSessionSeconds(existing.startedAt, Date.parse(nowIso)))
           : null;
+        // ended_at을 항상 "지금"으로 적으면, 위에서 상한이 걸릴 수 있는 durationSeconds와
+        // 어긋난다 — ChecklistTimeline은 합계를 durationSeconds로, 타임라인 막대는
+        // started_at~ended_at 두 시각으로 그려서, 12시간 잊고 멈춘 세션이 합계는 "180분"인데
+        // 막대는 12시간짜리로 그대로 남는다(이 브랜치가 지우려던 바로 그 결함). duration을
+        // 아는 경우엔 시작 시각 + duration으로 ended_at을 역산해 두 값이 항상 같은 순간을
+        // 가리키게 한다.
+        const endedAt =
+          existing && durationSeconds != null
+            ? new Date(Date.parse(existing.startedAt) + durationSeconds * 1000).toISOString()
+            : nowIso;
 
         setState((s) => {
           const list = s.studySessions[plannerItemId] ?? [];
