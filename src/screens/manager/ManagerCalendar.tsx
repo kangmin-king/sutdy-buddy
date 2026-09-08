@@ -1,16 +1,26 @@
 import React from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { todayKey, monthGrid, addMonthsToKey, getTutoringDaysInRange, getHolidayName, getPlannerProgress } from '../../lib';
-import { Icon, BottomSheet, Button, TextField, ChipGroup, useConfirm } from '../../primitives';
-import { SUBJECTS, getSubject } from '../../constants';
+import { Icon, BottomSheet, Button, TextField, ChipGroup, ToggleSwitch, useConfirm } from '../../primitives';
+import { SUBJECTS, getSubject, DEFAULT_HOMEWORK_REMIND_AT } from '../../constants';
 import PlannerItemRow from './PlannerItemRow';
+import { track } from '../../lib/analytics';
 import { DayProgressRing } from '../shared/DayProgressRing';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import type { SubjectId } from '../../types';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
-export default function ManagerCalendarScreen({ studentId }: { studentId: string }) {
+export default function ManagerCalendarScreen({
+  studentId,
+  openReminderSheet = false,
+  onReminderSheetOpened,
+}: {
+  studentId: string;
+  /** 학생 목록의 알림 칩에서 들어왔을 때 true — 마운트 직후 미시작 알림 시트를 펼친다. */
+  openReminderSheet?: boolean;
+  onReminderSheetOpened?: () => void;
+}) {
   const { state, actions } = useAppState();
   const { confirm, confirmDialog } = useConfirm();
   const today = todayKey();
@@ -25,11 +35,16 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   const [proposalMaterial, setProposalMaterial] = React.useState('');
   const [proposalPageRange, setProposalPageRange] = React.useState('');
   const [timetableSheetOpen, setTimetableSheetOpen] = React.useState(false);
+  const [reminderSheetOpen, setReminderSheetOpen] = React.useState(false);
+  const [draftRemindAt, setDraftRemindAt] = React.useState(DEFAULT_HOMEWORK_REMIND_AT);
+  const [draftReminderEnabled, setDraftReminderEnabled] = React.useState(true);
 
   React.useEffect(() => {
     actions.loadStudentPlannerItems(studentId);
     actions.loadSentHomeworkProposals(studentId);
     actions.loadStudentSchoolTimetable(studentId);
+    // 탭 조회 수. 홈·학습설계와 같은 형태로 찍어 세 탭의 비율을 본다(ManagerHome 주석 참고).
+    track('Viewed Student Calendar', { managed_student_count: state.managedStudents.length });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 
@@ -46,6 +61,21 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
     getTutoringDaysInRange(schedule?.weekdays ?? [], scheduleExceptions, grid[0].key, grid[grid.length - 1].key)
   );
   const [draftWeekdays, setDraftWeekdays] = React.useState<number[]>(schedule?.weekdays ?? []);
+  // 설정 행이 없는 학생은 기본값으로 동작한다(0023 마이그레이션) — 화면에도 같은 값을 보여준다.
+  const reminderSetting = state.homeworkReminderSettings[studentId];
+  const remindAt = reminderSetting?.remindAt ?? DEFAULT_HOMEWORK_REMIND_AT;
+  const reminderEnabled = reminderSetting?.enabled ?? true;
+
+  // 학생 목록의 알림 칩으로 들어온 경우. 한 번 펼치면 부모의 신호를 지워서, 시트를 닫고
+  // 다른 걸 만지다가 이 화면이 다시 그려질 때 또 열리지 않게 한다.
+  React.useEffect(() => {
+    if (!openReminderSheet) return;
+    setDraftRemindAt(remindAt);
+    setDraftReminderEnabled(reminderEnabled);
+    setReminderSheetOpen(true);
+    onReminderSheetOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openReminderSheet, studentId]);
 
   const itemsByDate = state.studentPlannerItems[studentId] ?? {};
   const selectedItems = (itemsByDate[selectedDate] ?? []).slice().sort((a, b) => a.order - b.order);
@@ -59,20 +89,28 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
   return (
     <div className="px-5 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-between mt-2 mb-3">
-        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, -1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button
+          onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, -1))}
+          aria-label="이전 달"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container active:scale-[0.94]"
+        >
           <Icon name="chevron_left" />
         </button>
         <p className="text-base font-bold">
           {viewY}년 {Number(viewM)}월
         </p>
-        <button onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container">
+        <button
+          onClick={() => setViewMonthKey(addMonthsToKey(viewMonthKey, 1))}
+          aria-label="다음 달"
+          className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-container active:scale-[0.94]"
+        >
           <Icon name="chevron_right" />
         </button>
       </div>
 
       {/* 예전엔 화면마다 작은 밑줄 텍스트 링크로 흩어져 있던 기능들이라 있는지도 잘 몰랐다는
           피드백을 받았다. 항상 같은 자리, 같은 아이콘으로 보이게 한 줄로 모았다. */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="grid grid-cols-4 gap-2 mb-4">
         <button
           onClick={() => {
             setProposalSubjectId('math');
@@ -99,6 +137,49 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
           <Icon name="event_repeat" className="!text-[20px] text-primary" />
           <span className="text-[11px] text-on-surface-variant">요일 설정</span>
         </button>
+        <button
+          onClick={() => {
+            setDraftRemindAt(remindAt);
+            setDraftReminderEnabled(reminderEnabled);
+            setReminderSheetOpen(true);
+          }}
+          className="flex flex-col items-center gap-1 py-2 rounded-2xl bg-surface-container"
+        >
+          <Icon
+            name={reminderEnabled ? 'notifications_active' : 'notifications_off'}
+            className={`!text-[20px] ${reminderEnabled ? 'text-primary' : 'text-on-surface-variant'}`}
+          />
+          <span className="text-[11px] text-on-surface-variant">{reminderEnabled ? `미시작 ${remindAt}` : '미시작 알림'}</span>
+        </button>
+      </div>
+
+      {/*
+        날짜 한 칸이 선택·오늘·과외날·공휴일·시험·숙제있음·이행률 일곱 가지를 색과 테두리로
+        동시에 표현한다. 설명이 없으면 읽을 수 없어서 범례를 붙인다(학생 캘린더와 같은 형식).
+      */}
+      <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5 rounded-xl bg-surface-container-low px-3 py-2.5">
+        {/* 과외 날 견본은 실제 칸과 같은 tertiary-container/40인데, 12px로 줄이면 다크에서
+            배경에 묻혀 안 보인다(32px 칸은 잘 보인다). 테두리로 윤곽을 잡아준다. */}
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-3 w-3 rounded-full bg-tertiary-container/40 ring-1 ring-inset ring-outline/60" />과외 날
+        </span>
+        {/* 시험은 네모, 숙제는 동그라미 — 색이 아니라 모양으로 구분한다. 예전엔 시험이 날짜를
+            감싸는 링이었는데, 이행률도 링이라 다크에서 둘이 구분되지 않았다. */}
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-2.5 w-2.5 bg-error" />시험
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="h-1.5 w-1.5 rounded-full bg-secondary" />숙제 있음
+        </span>
+        {/* 이행률 링은 구간별로 색이 셋인데 견본을 하나만 두면 오해를 준다. 셋 다 보여준다. */}
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-on-surface-variant">
+          <span className="flex gap-0.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-error" />
+            <span className="h-2.5 w-2.5 rounded-full bg-warning" />
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+          </span>
+          지난 날 이행률(낮음·보통·완료)
+        </span>
       </div>
 
       <div className="grid grid-cols-7 mb-1">
@@ -137,14 +218,21 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
                             : isRedDay
                               ? 'text-error/40'
                               : 'text-outline-variant'
-                  } ${hasExam ? 'ring-2 ring-error' : ''}`}
+                  }`}
                 >
                   {d.date}
                 </span>
               </DayProgressRing>
-              <span className="flex items-center gap-0.5 mt-0.5 h-1">
-                {hasItems && d.key >= today && <span className="w-1 h-1 rounded-full bg-secondary" />}
-                {hasExam && <span className="w-1 h-1 rounded-full bg-error" />}
+              {/* 시험은 네모, 숙제는 동그라미로 구분한다. 예전엔 시험이 날짜를 감싸는
+                  ring-2 ring-error였는데, 이행률도 날짜를 감싸는 링이라 다크에서 error가
+                  밝은 코랄로 바뀌면서 둘이 같은 것처럼 보였다. 색을 더 쥐어짜는 대신
+                  채널을 바꿨다 — 색약 사용자에게도 이 편이 낫다. */}
+              {/* 모서리 곡률만 다르게 하면 6px에서는 구분이 안 된다. 크기·모양·색 셋을 다
+                  달리한다 — 시험은 크고 각진 네모, 숙제는 작고 둥근 점. 시험이 한 달에
+                  한두 번뿐이고 더 중요하니 무게를 주는 쪽이 위계에도 맞다. */}
+              <span className="mt-0.5 flex h-2 items-center gap-0.5">
+                {hasItems && d.key >= today && <span className="h-1.5 w-1.5 rounded-full bg-secondary" />}
+                {hasExam && <span className="h-2 w-2 bg-error" />}
               </span>
             </button>
           );
@@ -168,7 +256,7 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
                 setExceptionNewDate(selectedDate);
                 setExceptionSheetOpen(true);
               }}
-              className="text-[11px] text-error font-semibold"
+              className="min-h-11 shrink-0 rounded-xl px-2 text-[11px] font-bold text-error transition active:scale-[0.96]"
             >
               이 날 일정 변경
             </button>
@@ -281,6 +369,25 @@ export default function ManagerCalendarScreen({ studentId }: { studentId: string
             }}
           >
             제안 보내기
+          </Button>
+        </div>
+      </BottomSheet>
+      <BottomSheet open={reminderSheetOpen} onClose={() => setReminderSheetOpen(false)} title="숙제 미시작 알림">
+        <div className="space-y-3">
+          <p className="text-xs text-on-surface-variant">
+            이 시각까지 오늘 숙제를 <b>하나도 시작하지 않으면</b> 알림을 보내요. 하루에 한 번만 오고, 학생이 시작만 해도
+            오지 않아요. 오늘 배정된 숙제가 없는 날은 보내지 않아요.
+          </p>
+          <ToggleSwitch label="알림 받기" checked={draftReminderEnabled} onChange={setDraftReminderEnabled} />
+          {draftReminderEnabled && <TextField label="알림 시각" type="time" value={draftRemindAt} onChange={setDraftRemindAt} />}
+          <Button
+            className="w-full"
+            onClick={() => {
+              actions.upsertHomeworkReminderSetting(studentId, { remindAt: draftRemindAt, enabled: draftReminderEnabled });
+              setReminderSheetOpen(false);
+            }}
+          >
+            저장
           </Button>
         </div>
       </BottomSheet>

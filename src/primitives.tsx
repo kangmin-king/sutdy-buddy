@@ -1,30 +1,60 @@
 import React from 'react';
-import { NAV_TABS, MOODS } from './constants';
 import { useAuth } from './state/AuthContext';
+import { useAppState } from './state/AppStateContext';
+import { useTheme, type Theme } from './state/ThemeContext';
 import mascotFaceUrl from './assets/mascot-face.png';
 
 export function Icon({ name, className = '', filled = false }: { name: string; className?: string; filled?: boolean }) {
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
 }
 
-export function TopAppBar({ title = '스터디 벅스', onBell, className = '' }: { title?: string; onBell?: () => void; className?: string }) {
+// compact은 학생 셸용 — 설정과 로그아웃이 "나" 탭으로 옮겨가서 상단바에 중복으로 둘 이유가
+// 없다. 선생님 셸에는 아직 "나" 탭이 없으므로 기본값(전체)을 그대로 쓴다.
+export function TopAppBar({
+  title = '스터디 벅스',
+  onBell,
+  className = '',
+  compact = false,
+}: { title?: string; onBell?: () => void; className?: string; compact?: boolean }) {
   const { signOut } = useAuth();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [accountOpen, setAccountOpen] = React.useState(false);
+  // 탈퇴 시트는 설정 시트 안이 아니라 이 레벨에 둔다. 설정 시트도 BottomSheet라서 안에 넣으면
+  // 시트가 겹치고, 설정 시트를 닫는 순간 그 자식인 탈퇴 시트까지 언마운트된다.
+  const { requestDeleteAccount, deleteAccountDialog } = useDeleteAccount();
   return (
+    // 시트류(fixed)는 반드시 이 header 밖에 둔다. header에 backdrop-blur가 걸려 있어서
+    // backdrop-filter가 자손 fixed 요소의 컨테이닝 블록이 되어버린다 — 안에 두면 시트가
+    // 화면 전체가 아니라 높이 60px짜리 상단바 안에 갇히고, items-end 때문에 패널이 위로
+    // 잘려 맨 아래 항목만 보인다.
+    <>
     <header className={`sticky top-0 z-20 flex items-center justify-between bg-surface/90 px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur ${className}`.trim()}>
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
+      {/* 로고를 누르면 내 계정이 열린다 — 이메일·로그인 방식·가입일과, 맨 아래 회원 탈퇴. */}
+      <button
+        onClick={() => setAccountOpen(true)}
+        aria-label="내 계정"
+        className="-ml-1 flex min-h-11 items-center gap-2.5 rounded-full pl-1 pr-2.5 transition active:scale-[0.98]"
+      >
+        <span className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
           <img src={mascotFaceUrl} alt="" className="w-full h-full object-cover" />
-        </div>
+        </span>
         <span className="text-lg font-bold text-primary">{title}</span>
-      </div>
+      </button>
       <div className="relative flex items-center gap-1">
-        <button onClick={onBell} className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+        <button onClick={onBell} aria-label="알림" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
           <Icon name="notifications" />
         </button>
-        <button onClick={() => setConfirmOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
-          <Icon name="logout" />
-        </button>
+        {!compact && (
+          <>
+            <button onClick={() => setSettingsOpen(true)} aria-label="설정" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+              <Icon name="settings" />
+            </button>
+            <button onClick={() => setConfirmOpen(true)} aria-label="로그아웃" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+              <Icon name="logout" />
+            </button>
+          </>
+        )}
         {confirmOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setConfirmOpen(false)} />
@@ -52,6 +82,109 @@ export function TopAppBar({ title = '스터디 벅스', onBell, className = '' }
         )}
       </div>
     </header>
+
+    <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
+    </>
+  );
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  kakao: '카카오',
+  google: 'Google',
+  email: '이메일',
+};
+
+function formatJoinedAt(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+// 상단바의 로고를 누르면 열리는 내 계정 정보. 탈퇴는 계정 정보 맨 아래에 두는 게 맞아서
+// 여기 하나만 둔다(설정 시트에도, "나" 탭에도 두지 않는다 — 여러 곳에 있으면 잘못 누른다).
+export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { session } = useAuth();
+  const { requestDeleteAccount, deleteAccountDialog } = useDeleteAccount();
+  const user = session?.user;
+  const provider = typeof user?.app_metadata?.provider === 'string' ? user.app_metadata.provider : undefined;
+  const joinedAt = formatJoinedAt(user?.created_at);
+
+  const rows: { label: string; value: string }[] = [
+    { label: '이메일', value: user?.email || '—' },
+    { label: '로그인 방식', value: provider ? (PROVIDER_LABELS[provider] ?? provider) : '—' },
+    ...(joinedAt ? [{ label: '가입일', value: joinedAt }] : []),
+  ];
+
+  return (
+    <>
+      <BottomSheet open={open} onClose={onClose} title="내 계정">
+        <dl className="divide-y divide-outline-variant/40 overflow-hidden rounded-xl bg-surface-container-low">
+          {rows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-3">
+              <dt className="shrink-0 text-xs font-semibold text-on-surface-variant">{row.label}</dt>
+              <dd className="min-w-0 break-all text-right text-sm font-semibold text-on-surface">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* 맨 아래, 아이콘도 카드도 없이 작은 글씨로만. 실행은 시트에서 "탈퇴"를 직접 입력해야 된다. */}
+        <div className="mt-6 border-t border-outline-variant/40 pt-4 text-center">
+          <button
+            onClick={() => {
+              onClose();
+              requestDeleteAccount();
+            }}
+            className="min-h-11 px-3 text-xs text-on-surface-variant underline decoration-outline-variant underline-offset-2 transition active:scale-[0.98]"
+          >
+            회원 탈퇴
+          </button>
+        </div>
+      </BottomSheet>
+      {deleteAccountDialog}
+    </>
+  );
+}
+
+// 설정은 아직 화면 하나를 차지할 만큼 항목이 많지 않아 바텀시트로 둔다. 학생 셸과 선생님
+// 셸이 라우팅 구조가 서로 달라서, 시트로 두면 TopAppBar 한 곳만 고쳐도 양쪽에 다 붙는다.
+// 항목이 늘어나면 그때 화면으로 승격시키면 된다.
+export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { theme, setTheme } = useTheme();
+  const options: { id: Theme; label: string; icon: string; hint: string }[] = [
+    { id: 'light', label: '라이트', icon: 'light_mode', hint: '밝은 배경' },
+    { id: 'dark', label: '다크', icon: 'dark_mode', hint: '밤에 눈이 편해요' },
+  ];
+  return (
+    <BottomSheet open={open} onClose={onClose} title="설정">
+      <div>
+        <p className="mb-2 text-sm font-semibold text-on-surface-variant">화면 테마</p>
+        <div role="radiogroup" aria-label="화면 테마" className="grid grid-cols-2 gap-2">
+          {options.map((opt) => {
+            const selected = theme === opt.id;
+            return (
+              <button
+                key={opt.id}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setTheme(opt.id)}
+                className={`flex min-h-11 flex-col items-start gap-1 rounded-xl border-[1.5px] px-4 py-3 text-left transition active:scale-[0.98] ${
+                  selected ? 'border-primary bg-primary/10' : 'border-outline-variant bg-surface-container-lowest'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Icon name={opt.icon} className={`!text-[18px] ${selected ? 'text-primary' : 'text-on-surface-variant'}`} filled={selected} />
+                  <span className={`text-sm font-bold ${selected ? 'text-primary' : 'text-on-surface'}`}>{opt.label}</span>
+                </span>
+                <span className="text-[11px] text-on-surface-variant">{opt.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 탈퇴는 여기 없다 — 상단바 로고를 눌러 열리는 내 계정(AccountSheet) 맨 아래 하나뿐이다. */}
+    </BottomSheet>
   );
 }
 
@@ -65,8 +198,6 @@ export function BackBar({ title, onBack }: { title: string; onBack: () => void }
     </header>
   );
 }
-
-export type TabId = (typeof NAV_TABS)[number]['id'];
 
 export function BottomNav<T extends { id: string; label: string; icon: string }>({
   tabs,
@@ -140,7 +271,13 @@ export function Chip({ label, active, onClick, icon = null }: { label: string; a
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-medium flex items-center gap-1 transition ${active ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}
+      // 다크에서는 선택 안 된 칩(surface-container)과 카드(surface-container-lowest)의 대비가
+      // 1.17이라 칩이 카드에 녹아버린다. 배경색을 어떻게 바꿔도 1.23이 한계여서 테두리로 세운다.
+      className={`rounded-full px-4 py-2 text-sm font-medium flex items-center gap-1 transition ${
+        active
+          ? 'bg-primary text-on-primary'
+          : 'bg-surface-container text-on-surface-variant dark:border dark:border-outline'
+      }`}
     >
       {icon && <Icon name={icon} className="!text-[18px]" />}
       {label}
@@ -220,23 +357,6 @@ export function SliderField({
   );
 }
 
-export function EmojiPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  return (
-    <div className="grid grid-cols-5 gap-2">
-      {MOODS.map((m) => (
-        <button
-          key={m.id}
-          onClick={() => onChange(m.id)}
-          className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition ${value === m.id ? 'border-primary bg-primary-container/20' : 'border-transparent bg-surface-container'}`}
-        >
-          <span className="text-2xl">{m.emoji}</span>
-          <span className="text-[11px] font-medium text-on-surface-variant">{m.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function StarRating({ value, onChange, size = 'text-2xl' }: { value: number; onChange: (n: number) => void; size?: string }) {
   return (
     <div className="flex gap-1">
@@ -255,13 +375,13 @@ export function ProgressRing({ percent, size = 88, stroke = 10 }: { percent: num
   const offset = circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
   return (
     <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e0e3e5" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" className="stroke-surface-container-highest" strokeWidth={stroke} />
       <circle
         cx={size / 2}
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="#366095"
+        className="stroke-primary"
         strokeWidth={stroke}
         strokeDasharray={circumference}
         strokeDashoffset={offset}
@@ -343,6 +463,101 @@ export function useConfirm() {
   return { confirm, confirmDialog };
 }
 
+// 회원 탈퇴. useConfirm과 같은 모양({ 여는 함수, 렌더할 다이얼로그 })으로 두어서 학생의 "나"
+// 탭과 선생님의 설정 시트 양쪽에 같은 방식으로 붙는다.
+//
+// 되돌릴 수 없는 동작이라 useConfirm의 "확인" 한 번으로는 부족하다 — 로그아웃과 같은 모양의
+// 버튼을 잘못 눌러 계정이 사라지면 복구가 불가능하다. 그래서 "탈퇴"를 직접 입력해야 버튼이
+// 열린다.
+const DELETE_ACCOUNT_PHRASE = '탈퇴';
+
+export function useDeleteAccount() {
+  const { deleteAccount } = useAuth();
+  const { state } = useAppState();
+  const [open, setOpen] = React.useState(false);
+  const [typed, setTyped] = React.useState('');
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const isManager = state.profile?.role === 'manager';
+
+  const requestDeleteAccount = React.useCallback(() => {
+    setTyped('');
+    setError(null);
+    setPending(false);
+    setOpen(true);
+  }, []);
+
+  const close = () => {
+    if (pending) return; // 삭제가 진행되는 동안 시트를 닫아 상태를 알 수 없게 만들지 않는다
+    setOpen(false);
+  };
+
+  const submit = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await deleteAccount();
+      // 성공하면 세션이 끊겨 AuthProvider가 로그인 화면으로 되돌린다 — 여기서 더 할 일이 없다.
+    } catch (err) {
+      setError((err as Error).message);
+      setPending(false);
+    }
+  };
+
+  const deleteAccountDialog = (
+    <BottomSheet open={open} onClose={close} title="회원 탈퇴">
+      <p className="text-sm leading-relaxed text-on-surface">
+        계정을 지우면 <b className="font-bold">되돌릴 수 없습니다.</b> 다음이 함께 삭제됩니다.
+      </p>
+      <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-on-surface-variant">
+        {isManager ? (
+          <>
+            <li>· 내 계정과 로그인 정보</li>
+            <li>· 연결된 학생과의 연결</li>
+            <li>· 내가 배정하거나 제안한 숙제, 등록한 과외 일정·시험 정보</li>
+            <li>· 학생이 직접 적은 계획과 공부 시간 기록은 그 학생 계정에 남습니다</li>
+          </>
+        ) : (
+          <>
+            <li>· 내 계정과 로그인 정보</li>
+            <li>· 숙제, 계획, 공부 시간 기록, 캘린더</li>
+            <li>· 학교 시간표, 모의고사 기록</li>
+            <li>· 선생님·학부모와의 연결 (상대 화면에서도 내 기록이 사라집니다)</li>
+          </>
+        )}
+      </ul>
+
+      <div className="mt-4">
+        <TextField
+          label={`계속하려면 "${DELETE_ACCOUNT_PHRASE}" 라고 입력하세요`}
+          value={typed}
+          onChange={setTyped}
+          placeholder={DELETE_ACCOUNT_PHRASE}
+        />
+      </div>
+
+      {error && <p className="mt-3 text-xs leading-relaxed text-error">{error}</p>}
+
+      <div className="mt-4 flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={close} disabled={pending}>
+          취소
+        </Button>
+        <Button
+          variant="error"
+          className="flex-1"
+          disabled={pending || typed.trim() !== DELETE_ACCOUNT_PHRASE}
+          onClick={() => void submit()}
+        >
+          {pending ? '삭제 중…' : '탈퇴하기'}
+        </Button>
+      </div>
+    </BottomSheet>
+  );
+
+  return { requestDeleteAccount, deleteAccountDialog };
+}
+
 export function AiTipCard({ text, icon = 'auto_awesome', tint = 'tertiary' }: { text: string; icon?: string; tint?: string }) {
   return (
     <Card tint={tint} className="flex gap-3">
@@ -387,7 +602,9 @@ export function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+        // placeholder 색을 못박아 둔다. 브라우저 기본값은 다크에서 충분히 흐리지 않아
+        // (대비 6.24, 실제 입력값은 10.37) 안 채운 칸이 이미 채워진 것처럼 보였다.
+        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none placeholder:text-outline focus:ring-2 focus:ring-primary"
       />
     </div>
   );
@@ -414,7 +631,7 @@ export function TextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary resize-none"
+        className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none placeholder:text-outline focus:ring-2 focus:ring-primary resize-none"
       />
     </div>
   );

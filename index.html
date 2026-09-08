@@ -3,13 +3,30 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
-<title>스터디 벅스 - AI 학습 코치</title>
+<!-- 태그라인을 붙이지 않는다. 여기는 로그인해서 쓰는 앱 화면이라 포지셔닝을 설명할 자리가
+     아니고(그건 랜딩 studybuks.store가 맡는다), 방향이 바뀔 때 같이 낡는다. 실제로 예전에
+     "AI 학습 코치"가 붙어 있었는데 그 방향은 폐기된 뒤에도 남아 있었다.
+     manifest.webmanifest의 name과 같은 값으로 맞춰 둔다. -->
+<title>스터디 벅스</title>
 <link rel="icon" href="/icons/icon-192.webp" type="image/webp" />
 <link rel="apple-touch-icon" href="/icons/icon-192.webp" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#f7f9fb" />
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css" />
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+<script>
+  // 첫 페인트 전에 저장된 테마를 적용한다 — React 마운트를 기다리면 라이트 화면이 한 번
+  // 번쩍인 뒤 다크로 바뀐다(FOUC). localStorage 접근이 막힌 환경에서도 죽지 않게 감싼다.
+  (function () {
+    try {
+      if (localStorage.getItem('sb-theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', '#1b1832');
+      }
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 <div id="root"></div>

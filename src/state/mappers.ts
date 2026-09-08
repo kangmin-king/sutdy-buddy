@@ -1,10 +1,6 @@
 import type {
   Profile,
-  DailyCondition,
-  ScheduleBlock,
   PlannerItem,
-  StudyLogEntry,
-  StudyMaterial,
   HomeworkAssignment,
   StudySession,
   ExamRecord,
@@ -14,15 +10,12 @@ import type {
   TutoringScheduleException,
   HomeworkProposal,
   SchoolTimetableSlot,
+  HomeworkReminderSetting,
   AllowedAppInterval,
 } from '../types';
 import type {
   SbProfileRow,
-  SbDailyConditionRow,
-  SbScheduleBlockRow,
   SbPlannerItemRow,
-  SbStudyLogRow,
-  SbStudyMaterialRow,
   SbHomeworkAssignmentRow,
   SbStudySessionRow,
   SbExamRecordRow,
@@ -32,6 +25,7 @@ import type {
   SbTutoringScheduleRow,
   SbTutoringScheduleExceptionRow,
   SbSchoolTimetableSlotRow,
+  SbHomeworkReminderSettingRow,
   AllowedAppIntervalRow,
 } from '../types/db';
 
@@ -48,14 +42,6 @@ export function profileFromRow(row: SbProfileRow): Profile {
     inviteCode: row.invite_code,
     subjectColors: row.subject_colors ?? {},
   };
-}
-
-export function conditionFromRow(row: SbDailyConditionRow): DailyCondition {
-  return { date: row.date, sleepHours: row.sleep_hours, fatigue: row.fatigue, focus: row.focus, mood: row.mood, notes: row.notes };
-}
-
-export function scheduleBlockFromRow(row: SbScheduleBlockRow): ScheduleBlock {
-  return { id: row.id, date: row.date, type: row.type, label: row.label, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5) };
 }
 
 export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
@@ -81,33 +67,6 @@ export function plannerItemFromRow(row: SbPlannerItemRow): PlannerItem {
     source: row.source,
     homeworkAssignmentId: row.homework_assignment_id,
     examSubjectRangeId: row.exam_subject_range_id,
-  };
-}
-
-export function studyLogFromRow(row: SbStudyLogRow): StudyLogEntry {
-  return {
-    id: row.id,
-    date: row.date,
-    plannerItemId: row.planner_item_id,
-    subjectId: row.subject_id,
-    rating: row.rating,
-    blockedTags: row.blocked_tags,
-    detailNote: row.detail_note,
-    selfMessage: row.self_message,
-  };
-}
-
-export function studyMaterialFromRow(row: SbStudyMaterialRow): StudyMaterial {
-  return {
-    id: row.id,
-    subjectId: row.subject_id,
-    materialName: row.material_name,
-    totalScope: row.total_scope,
-    currentProgress: row.current_progress,
-    targetPasses: row.target_passes,
-    targetDate: row.target_date,
-    sessionIntervalDays: row.session_interval_days,
-    createdAt: row.created_at,
   };
 }
 
@@ -176,6 +135,12 @@ export function homeworkProposalFromRow(row: SbHomeworkProposalRow): HomeworkPro
 
 export function schoolTimetableSlotFromRow(row: SbSchoolTimetableSlotRow): SchoolTimetableSlot {
   return { id: row.id, studentId: row.student_id, weekday: row.weekday, period: row.period, subject: row.subject, updatedAt: row.updated_at };
+}
+
+// Postgres time은 "21:00:00"으로 오는데 UI(TextField type="time")와 비교·표시는 "HH:MM"으로
+// 한다. scheduleBlockFromRow가 하던 slice(0, 5)와 같은 처리다.
+export function homeworkReminderSettingFromRow(row: SbHomeworkReminderSettingRow): HomeworkReminderSetting {
+  return { studentId: row.student_id, remindAt: row.remind_at.slice(0, 5), enabled: row.enabled };
 }
 
 export function allowedAppIntervalFromRow(row: AllowedAppIntervalRow): AllowedAppInterval {

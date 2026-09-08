@@ -12,11 +12,7 @@ import {
 } from '../lib';
 import {
   profileFromRow,
-  conditionFromRow,
-  scheduleBlockFromRow,
   plannerItemFromRow,
-  studyLogFromRow,
-  studyMaterialFromRow,
   homeworkAssignmentFromRow,
   studySessionFromRow,
   groupByDate,
@@ -27,19 +23,15 @@ import {
   tutoringScheduleExceptionFromRow,
   homeworkProposalFromRow,
   schoolTimetableSlotFromRow,
+  homeworkReminderSettingFromRow,
   allowedAppIntervalFromRow,
 } from './mappers';
 import type {
   Profile,
-  DailyCondition,
-  ScheduleBlock,
   PlannerItem,
-  StudyLogEntry,
-  StudyMaterial,
   HomeworkAssignment,
   StudySession,
   DateKey,
-  TomorrowRecommendationItem,
   ExamRecord,
   ExamSubject,
   ExamSubjectRange,
@@ -48,18 +40,23 @@ import type {
   SubjectId,
   HomeworkProposal,
   SchoolTimetableSlot,
+  HomeworkReminderSetting,
   AllowedAppInterval,
 } from '../types';
-import type { SbPlannerItemRow, SbStudyMaterialRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
+import type { SbPlannerItemRow, SbProfileRow, SbHomeworkAssignmentRow } from '../types/db';
+import {
+  track,
+  setCommonProperties,
+  setUserProperties,
+  incrementUserProperty,
+  applySessionReplayPolicy,
+  APP_PLATFORM,
+} from '../lib/analytics';
 import { cappedSessionSeconds } from '../screens/student/studySessionModel';
 
 interface AppState {
   profile: Profile | null;
-  conditions: Record<DateKey, DailyCondition>;
-  scheduleBlocks: Record<DateKey, ScheduleBlock[]>;
   plannerItems: Record<DateKey, PlannerItem[]>;
-  studyLogs: Record<DateKey, StudyLogEntry[]>;
-  studyMaterials: StudyMaterial[];
   homeworkAssignments: HomeworkAssignment[];
   studySessions: Record<string, StudySession[]>;
   allowedAppIntervals: Record<string, AllowedAppInterval[]>;
@@ -77,17 +74,16 @@ interface AppState {
   sentHomeworkProposals: Record<string, HomeworkProposal[]>;
   schoolTimetable: SchoolTimetableSlot[];
   studentSchoolTimetables: Record<string, SchoolTimetableSlot[]>;
+  // 숙제 미시작 알림 설정. 관리자 로그인에서만 채운다(설정 UI가 관리자 쪽에만 있다).
+  // 키가 없는 학생은 기본값(DEFAULT_HOMEWORK_REMIND_AT · 켜짐)이다 — DB에 행이 없는 것과 같다.
+  homeworkReminderSettings: Record<string, HomeworkReminderSetting>;
   loading: boolean;
   error: string | null;
 }
 
 const EMPTY_STATE: AppState = {
   profile: null,
-  conditions: {},
-  scheduleBlocks: {},
   plannerItems: {},
-  studyLogs: {},
-  studyMaterials: [],
   homeworkAssignments: [],
   studySessions: {},
   allowedAppIntervals: {},
@@ -105,6 +101,7 @@ const EMPTY_STATE: AppState = {
   sentHomeworkProposals: {},
   schoolTimetable: [],
   studentSchoolTimetables: {},
+  homeworkReminderSettings: {},
   loading: true,
   error: null,
 };
@@ -130,18 +127,10 @@ type HomeworkScope = { mode: 'pages'; startPage: number; endPage: number } | { m
 interface AppStateActions {
   saveProfile: (profile: Profile) => Promise<void>;
   updateSubjectColor: (subjectId: SubjectId, color: string) => Promise<void>;
-  saveCondition: (date: DateKey, condition: DailyCondition) => Promise<void>;
-  upsertScheduleBlock: (date: DateKey, block: ScheduleBlock) => Promise<void>;
-  deleteScheduleBlock: (date: DateKey, id: string) => Promise<void>;
   addPlannerItem: (date: DateKey, item: Omit<PlannerItem, 'id' | 'order'>) => Promise<void>;
   updatePlannerItem: (date: DateKey, id: string, patch: Partial<PlannerItem>) => Promise<void>;
   deletePlannerItem: (date: DateKey, id: string) => Promise<void>;
   carryOverPlannerItem: (date: DateKey, id: string) => Promise<void>;
-  addStudyLog: (date: DateKey, entry: Omit<StudyLogEntry, 'id'>) => Promise<void>;
-  addStudyMaterial: (material: Omit<StudyMaterial, 'id' | 'createdAt'>) => Promise<void>;
-  updateStudyMaterial: (id: string, patch: Partial<StudyMaterial>) => Promise<void>;
-  deleteStudyMaterial: (id: string) => Promise<void>;
-  applyTomorrowRecommendation: (date: DateKey, items: TomorrowRecommendationItem[]) => Promise<void>;
   linkByInviteCode: (code: string) => Promise<void>;
   createHomeworkAssignment: (
     studentId: string,
@@ -196,6 +185,7 @@ interface AppStateActions {
   upsertTutoringSchedule: (studentId: string, weekdays: number[]) => Promise<void>;
   addTutoringException: (studentId: string, exception: { originalDate: DateKey; newDate: DateKey | null; note: string }) => Promise<void>;
   loadStudentPlannerItems: (studentId: string) => Promise<void>;
+  upsertHomeworkReminderSetting: (studentId: string, setting: { remindAt: string; enabled: boolean }) => Promise<void>;
   upsertSchoolTimetableSlot: (weekday: number, period: number, subject: string) => Promise<void>;
   deleteSchoolTimetableSlot: (slotId: string) => Promise<void>;
   loadStudentSchoolTimetable: (studentId: string) => Promise<void>;
@@ -212,6 +202,49 @@ function groupByPlannerItemId(rows: StudySession[]): Record<string, StudySession
     (grouped[row.plannerItemId] ??= []).push(row);
   }
   return grouped;
+}
+
+// 학습 세션 이벤트에 과목·출처를 붙이려면 plannerItemId로 항목을 되찾아야 한다. 방금 낙관적으로
+// 추가된 항목도 찾을 수 있도록 state가 아니라 ref(plannerItemsRef)를 넘겨 쓴다.
+function findPlannerItem(byDate: Record<DateKey, PlannerItem[]>, id: string): PlannerItem | undefined {
+  for (const date in byDate) {
+    const found = byDate[date].find((i) => i.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function daysBetween(from: DateKey, to: DateKey): number {
+  return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+}
+
+// 오늘 기준 며칠 뒤인지. 오늘이면 0, 어제면 -1. "계획을 며칠 앞서 세우는가"를 보려고 쓴다.
+function dayOffsetFromToday(date: DateKey): number {
+  return daysBetween(todayKey(), date);
+}
+
+// 프로필·연결 정보가 바뀔 때마다 user property를 현재 상태로 맞춘다. 이벤트마다 같은 값을
+// 실어 보내는 대신 여기 한 곳에서만 갱신한다.
+function syncUserProperties(state: AppState): void {
+  const profile = state.profile;
+  if (!profile) return;
+  setCommonProperties({ role: profile.role, is_onboarded: Boolean(profile.onboardedAt) });
+  // 역할이 확정되는 지점이 여기뿐이라, 세션 리플레이 허용 여부도 같이 정한다.
+  applySessionReplayPolicy(profile.role);
+  setUserProperties({
+    role: profile.role,
+    is_onboarded: Boolean(profile.onboardedAt),
+    onboarded_at: profile.onboardedAt ?? undefined,
+    grade: profile.grade ?? undefined,
+    main_subjects: profile.mainSubjects ?? undefined,
+    main_subject_count: profile.mainSubjects?.length,
+    has_goal: Boolean(profile.goal && profile.goal.trim()),
+    has_workbooks: Boolean(profile.workbooks && profile.workbooks.trim()),
+    main_exam_date: profile.examDate ?? undefined,
+    linked_manager_count: state.linkedManagers.length,
+    managed_student_count: state.managedStudents.length,
+    app_platform: APP_PLATFORM,
+  });
 }
 
 // 관리자가 담당하는 학생 프로필 목록. 최초 로드(loadAll)와 초대코드 연결 직후(linkByInviteCode)
@@ -288,20 +321,12 @@ async function deleteRangeLinkedItems(
 }
 
 async function loadAll(userId: string): Promise<AppState> {
-  const [profileRes, conditionsRes, blocksRes, itemsRes, logsRes, materialsRes, homeworkRes, sessionsRes] = await Promise.all([
+  const [profileRes, itemsRes, homeworkRes, sessionsRes] = await Promise.all([
     supabase.from('sb_profiles').select('*').eq('id', userId).maybeSingle(),
-    supabase.from('sb_daily_conditions').select('*').eq('user_id', userId),
-    supabase.from('sb_schedule_blocks').select('*').eq('user_id', userId),
     supabase.from('sb_planner_items').select('*').eq('user_id', userId).order('order'),
-    supabase.from('sb_study_logs').select('*').eq('user_id', userId),
-    supabase.from('sb_study_materials').select('*').eq('user_id', userId),
     supabase.from('sb_homework_assignments').select('*').eq('student_id', userId),
     supabase.from('sb_study_sessions').select('*').eq('user_id', userId),
   ]);
-
-  const conditionRows = (conditionsRes.data ?? []).map(conditionFromRow);
-  const conditions: Record<DateKey, DailyCondition> = {};
-  for (const c of conditionRows) conditions[c.date] = c;
 
   const profile = profileRes.data ? profileFromRow(profileRes.data) : null;
 
@@ -318,6 +343,7 @@ async function loadAll(userId: string): Promise<AppState> {
   let managerLabels: Record<string, string> = {};
   let homeworkProposals: HomeworkProposal[] = [];
   let schoolTimetable: SchoolTimetableSlot[] = [];
+  let homeworkReminderSettings: Record<string, HomeworkReminderSetting> = {};
 
   if (profile?.role === 'manager') {
     managedStudents = await fetchManagedStudents(userId);
@@ -326,15 +352,20 @@ async function loadAll(userId: string): Promise<AppState> {
     // 관리자 계정에서는 위 병렬 조회(student_id/user_id = 본인)가 항상 비어 있다.
     // 담당 학생들 기준으로 다시 조회해야 등록해둔 숙제와 학습 세션이 보인다.
     if (studentIds.length > 0) {
-      const [managerHomeworkRes, managerSessionsRes, examRes, scheduleRes, exceptionRes] = await Promise.all([
+      const [managerHomeworkRes, managerSessionsRes, examRes, scheduleRes, exceptionRes, reminderRes] = await Promise.all([
         supabase.from('sb_homework_assignments').select('*').in('student_id', studentIds),
         supabase.from('sb_study_sessions').select('*').in('user_id', studentIds),
         supabase.from('sb_exam_records').select('*').in('student_id', studentIds),
         supabase.from('sb_tutoring_schedules').select('*').eq('manager_id', userId),
         supabase.from('sb_tutoring_schedule_exceptions').select('*').eq('manager_id', userId),
+        supabase.from('sb_homework_reminder_settings').select('*').in('student_id', studentIds),
       ]);
       homeworkRows = managerHomeworkRes.data ?? [];
       sessionRows = managerSessionsRes.data ?? [];
+      for (const row of reminderRes.data ?? []) {
+        const setting = homeworkReminderSettingFromRow(row);
+        homeworkReminderSettings[setting.studentId] = setting;
+      }
       examRecords = (examRes.data ?? []).map(examRecordFromRow);
       tutoringSchedules = (scheduleRes.data ?? []).map(tutoringScheduleFromRow);
       tutoringScheduleExceptions = (exceptionRes.data ?? []).map(tutoringScheduleExceptionFromRow);
@@ -385,11 +416,7 @@ async function loadAll(userId: string): Promise<AppState> {
 
   return {
     profile,
-    conditions,
-    scheduleBlocks: groupByDate((blocksRes.data ?? []).map(scheduleBlockFromRow)),
     plannerItems: groupByDate((itemsRes.data ?? []).map(plannerItemFromRow)),
-    studyLogs: groupByDate((logsRes.data ?? []).map(studyLogFromRow)),
-    studyMaterials: (materialsRes.data ?? []).map(studyMaterialFromRow),
     homeworkAssignments: homeworkRows.map(homeworkAssignmentFromRow),
     studySessions: groupByPlannerItemId(sessionRows.map(studySessionFromRow)),
     // loadAll과 별도로 로그인 직후 loadAllowedAppIntervals가 채운다(아래 useEffect 참고).
@@ -408,6 +435,7 @@ async function loadAll(userId: string): Promise<AppState> {
     sentHomeworkProposals: {},
     schoolTimetable,
     studentSchoolTimetables: {},
+    homeworkReminderSettings,
     loading: false,
     error: null,
   };
@@ -446,6 +474,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     };
   }, [userId]);
 
+  // 프로필이 들어오거나 연결 관계가 바뀔 때마다 user property를 다시 맞춘다. 온보딩 직후
+  // saveProfile로 프로필이 세팅되는 경로도 여기로 흡수된다.
+  React.useEffect(() => {
+    syncUserProperties(state);
+  }, [state.profile, state.linkedManagers, state.managedStudents]);
+
   const actions: AppStateActions = React.useMemo(
     () => ({
       async saveProfile(profile) {
@@ -477,51 +511,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('updateSubjectColor failed:', error.message);
           setState((s) => (s.profile ? { ...s, profile: { ...s.profile, subjectColors: previous.subjectColors }, error: WRITE_FAILURE_MESSAGE } : s));
-        }
-      },
-
-      async saveCondition(date, condition) {
-        setState((s) => ({ ...s, conditions: { ...s.conditions, [date]: condition } }));
-        const { error } = await supabase.from('sb_daily_conditions').upsert(
-          {
-            user_id: userId,
-            date,
-            sleep_hours: condition.sleepHours,
-            fatigue: condition.fatigue,
-            focus: condition.focus,
-            mood: condition.mood,
-            notes: condition.notes,
-          },
-          { onConflict: 'user_id,date' }
-        );
-        if (error) {
-          console.error('saveCondition failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async upsertScheduleBlock(date, block) {
-        const list = state.scheduleBlocks[date] ?? [];
-        const exists = list.some((b) => b.id === block.id);
-        const nextList = exists ? list.map((b) => (b.id === block.id ? block : b)) : [...list, block];
-        nextList.sort((a, b) => a.startTime.localeCompare(b.startTime));
-        setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: nextList } }));
-
-        const row = { id: block.id, user_id: userId, date, type: block.type, label: block.label, start_time: block.startTime, end_time: block.endTime };
-        const { error } = await supabase.from('sb_schedule_blocks').upsert(row);
-        if (error) {
-          console.error('upsertScheduleBlock failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async deleteScheduleBlock(date, id) {
-        const previous = state.scheduleBlocks[date] ?? [];
-        setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: previous.filter((b) => b.id !== id) } }));
-        const { error } = await supabase.from('sb_schedule_blocks').delete().eq('id', id);
-        if (error) {
-          console.error('deleteScheduleBlock failed:', error.message);
-          setState((s) => ({ ...s, scheduleBlocks: { ...s.scheduleBlocks, [date]: previous }, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 
@@ -566,7 +555,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('addPlannerItem failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        } else if (fullItem.source === 'self') {
+          return;
+        }
+
+        track('Created Planner Item', {
+          subject_id: fullItem.subjectId,
+          source: fullItem.source,
+          is_must_do: fullItem.mustDo,
+          has_page_range: Boolean(fullItem.pageRange),
+          day_offset: dayOffsetFromToday(date),
+        });
+        incrementUserProperty('planner_items_created');
+
+        if (fullItem.source === 'self') {
           for (const manager of state.linkedManagers) {
             notifyUser(manager.id, '학생이 스스로 계획을 세웠어요', fullItem.material ? `${fullItem.material} 계획을 새로 추가했어요` : '새 계획을 추가했어요');
           }
@@ -606,6 +607,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('updatePlannerItem failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         } else if (patch.status === 'completed' && previousItem && previousItem.status !== 'completed') {
+          track('Completed Planner Item', {
+            subject_id: previousItem.subjectId,
+            source: previousItem.source,
+            is_must_do: previousItem.mustDo,
+            actual_minutes: patch.actualMinutes ?? previousItem.actualMinutes ?? undefined,
+            understanding: patch.understanding ?? previousItem.understanding ?? undefined,
+            day_offset: dayOffsetFromToday(date),
+          });
+          if (previousItem.source === 'homework') incrementUserProperty('homework_completed_count');
+
           const managerId = resolvePlannerItemManagerId(previousItem, state);
           if (managerId) {
             notifyUser(managerId, '학생이 숙제를 완료했어요', previousItem.material ? `${previousItem.material} 학습을 완료했어요` : '배정한 학습을 완료했어요');
@@ -655,6 +666,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         }
 
+        track('Carried Over Planner Item', {
+          subject_id: source.subjectId,
+          source: source.source,
+          day_offset: dayOffsetFromToday(date),
+        });
+
         const { error: insertError } = await supabase.from('sb_planner_items').insert({
           id: cloneId,
           user_id: userId,
@@ -685,140 +702,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
       },
 
-      async addStudyLog(date, entry) {
-        const list = state.studyLogs[date] ?? [];
-        const id = uid();
-        const fullEntry: StudyLogEntry = { ...entry, id };
-        setState((s) => ({ ...s, studyLogs: { ...s.studyLogs, [date]: [...list, fullEntry] } }));
-
-        const { error } = await supabase.from('sb_study_logs').insert({
-          id,
-          user_id: userId,
-          date,
-          planner_item_id: fullEntry.plannerItemId,
-          subject_id: fullEntry.subjectId,
-          rating: fullEntry.rating,
-          blocked_tags: fullEntry.blockedTags,
-          detail_note: fullEntry.detailNote,
-          self_message: fullEntry.selfMessage,
-        });
-        if (error) {
-          console.error('addStudyLog failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async addStudyMaterial(material) {
-        const id = uid();
-        const createdAt = new Date().toISOString();
-        const fullMaterial: StudyMaterial = { ...material, id, createdAt };
-        setState((s) => ({ ...s, studyMaterials: [...s.studyMaterials, fullMaterial] }));
-
-        const { error } = await supabase.from('sb_study_materials').insert({
-          id,
-          user_id: userId,
-          subject_id: fullMaterial.subjectId,
-          material_name: fullMaterial.materialName,
-          total_scope: fullMaterial.totalScope,
-          current_progress: fullMaterial.currentProgress,
-          target_passes: fullMaterial.targetPasses,
-          target_date: fullMaterial.targetDate,
-          session_interval_days: fullMaterial.sessionIntervalDays,
-        });
-        if (error) {
-          console.error('addStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async updateStudyMaterial(id, patch) {
-        setState((s) => ({ ...s, studyMaterials: s.studyMaterials.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
-
-        const dbPatch: Partial<SbStudyMaterialRow> = {};
-        if ('materialName' in patch) dbPatch.material_name = patch.materialName;
-        if ('totalScope' in patch) dbPatch.total_scope = patch.totalScope;
-        if ('currentProgress' in patch) dbPatch.current_progress = patch.currentProgress;
-        if ('targetPasses' in patch) dbPatch.target_passes = patch.targetPasses;
-        if ('targetDate' in patch) dbPatch.target_date = patch.targetDate;
-        if ('sessionIntervalDays' in patch) dbPatch.session_interval_days = patch.sessionIntervalDays;
-
-        const { error } = await supabase.from('sb_study_materials').update(dbPatch).eq('id', id);
-        if (error) {
-          console.error('updateStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async deleteStudyMaterial(id) {
-        const previous = state.studyMaterials;
-        setState((s) => ({ ...s, studyMaterials: s.studyMaterials.filter((m) => m.id !== id) }));
-        const { error } = await supabase.from('sb_study_materials').delete().eq('id', id);
-        if (error) {
-          console.error('deleteStudyMaterial failed:', error.message);
-          setState((s) => ({ ...s, studyMaterials: previous, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
-      async applyTomorrowRecommendation(date, items) {
-        const existing = state.plannerItems[date] ?? [];
-        const baseOrder = existing.length === 0 ? 1 : Math.max(...existing.map((i) => i.order)) + 1;
-        const newItems: PlannerItem[] = items.map((it, idx) => ({
-          id: uid(),
-          date,
-          order: baseOrder + idx,
-          subjectId: it.subjectId,
-          startTime: it.startTime,
-          studyType: it.studyType,
-          material: it.material,
-          unit: it.unit,
-          pageRange: it.pageRange,
-          endTime: it.endTime,
-          difficulty: it.difficulty,
-          restPattern: null,
-          mustDo: it.mustDo,
-          status: 'planned',
-          actualMinutes: null,
-          understanding: null,
-          partialReason: null,
-          incompleteReason: null,
-          source: 'self' as const,
-          homeworkAssignmentId: null,
-          examSubjectRangeId: null,
-        }));
-        setState((s) => ({ ...s, plannerItems: { ...s.plannerItems, [date]: [...existing, ...newItems] } }));
-
-        const { error } = await supabase.from('sb_planner_items').insert(
-          newItems.map((it) => ({
-            id: it.id,
-            user_id: userId,
-            date: it.date,
-            order: it.order,
-            subject_id: it.subjectId,
-            start_time: it.startTime,
-            study_type: it.studyType,
-            material: it.material,
-            unit: it.unit,
-            page_range: it.pageRange,
-            end_time: it.endTime,
-            difficulty: it.difficulty,
-            rest_pattern: it.restPattern,
-            must_do: it.mustDo,
-            status: it.status,
-            actual_minutes: it.actualMinutes,
-            understanding: it.understanding,
-            partial_reason: it.partialReason,
-            incomplete_reason: it.incompleteReason,
-            source: it.source,
-            homework_assignment_id: it.homeworkAssignmentId,
-            exam_subject_range_id: it.examSubjectRangeId,
-          }))
-        );
-        if (error) {
-          console.error('applyTomorrowRecommendation failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
-      },
-
       async linkByInviteCode(code) {
         // 아직 링크가 없는 상태라 RLS상 학생 프로필 행을 직접 select할 수 없다.
         // 정확한 코드를 아는 경우에만 id 하나를 돌려주는 security definer RPC를 쓴다(0006 마이그레이션).
@@ -828,21 +711,25 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (lookupError) {
           console.error('linkByInviteCode (lookup) failed:', lookupError.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          track('Linked Account', { result: 'lookup_failed' });
           return;
         }
         if (!studentId) {
           setState((s) => ({ ...s, error: '초대코드를 찾을 수 없어요. 다시 확인해주세요.' }));
+          track('Linked Account', { result: 'code_not_found' });
           return;
         }
         const { error } = await supabase.from('sb_student_manager_links').insert({ student_id: studentId, manager_id: userId });
         if (error) {
           console.error('linkByInviteCode failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          track('Linked Account', { result: 'link_failed' });
           return;
         }
         // 연결 직후 학생 목록을 다시 불러와야 관리자 화면에 바로 나타난다.
         const managedStudents = await fetchManagedStudents(userId);
         setState((s) => ({ ...s, managedStudents }));
+        track('Linked Account', { result: 'success', managed_student_count: managedStudents.length });
       },
 
       async createHomeworkAssignment(studentId, assignment) {
@@ -869,6 +756,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('createHomeworkAssignment failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         } else {
+          track('Created Homework Assignment', {
+            subject_id: assignment.subjectId,
+            amount_per_day: assignment.amountPerDay,
+            span_days: daysBetween(assignment.startDate, assignment.endDate) + 1,
+            starts_in_days: dayOffsetFromToday(assignment.startDate),
+          });
           notifyUser(studentId, '숙제가 등록됐어요', assignment.material ? `${assignment.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
         }
       },
@@ -930,6 +823,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
               setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
             }
           });
+
+        const item = findPlannerItem(plannerItemsRef.current, plannerItemId);
+        track('Started Study Session', { subject_id: item?.subjectId, source: item?.source, is_must_do: item?.mustDo });
         return id;
       },
 
@@ -974,7 +870,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('endStudySession failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          return;
         }
+
+        const item = findPlannerItem(plannerItemsRef.current, plannerItemId);
+        track('Ended Study Session', {
+          subject_id: item?.subjectId,
+          source: item?.source,
+          duration_seconds: durationSeconds ?? undefined,
+          // 화면에서 정지를 누른 경우에만 displayedSeconds가 넘어온다. 없으면 앱을 벗어나서
+          // 자동으로 끝난 세션이다 — 이 구분이 "타이머를 켜두고 딴짓" 패턴을 잡아준다.
+          ended_reason: displayedSeconds === undefined ? 'auto' : 'manual',
+        });
+        incrementUserProperty('total_study_sessions');
+        if (durationSeconds) incrementUserProperty('total_study_minutes', Math.round(durationSeconds / 60));
+        setUserProperties({ last_study_session_at: endedAt });
       },
 
       // 학생이 멈춤을 누르지 않아 3시간이 지난 세션을 닫는다. endStudySession을 재사용하지
@@ -1052,7 +962,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase
           .from('sb_device_tokens')
           .upsert({ user_id: userId, fcm_token: token, platform: 'android' }, { onConflict: 'user_id,fcm_token' });
-        if (error) console.error('registerDeviceToken failed:', error.message);
+        if (error) {
+          console.error('registerDeviceToken failed:', error.message);
+          return;
+        }
+        // 이벤트로 남기지 않는다 — 앱을 켤 때마다 불려서 노이즈만 된다. "푸시를 받을 수 있는
+        // 사용자"인지만 user property로 남기면 리텐션 분석에 필요한 건 다 된다.
+        setUserProperties({ push_enabled: true });
       },
 
       async createHomeworkProposal(studentId, proposal) {
@@ -1099,6 +1015,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             error: WRITE_FAILURE_MESSAGE,
           }));
         } else {
+          track('Sent Homework Proposal', {
+            subject_id: proposal.subjectId,
+            has_page_range: Boolean(proposal.pageRange),
+            day_offset: dayOffsetFromToday(proposal.date),
+          });
           notifyUser(studentId, '숙제 제안이 왔어요', proposal.material ? `${proposal.material} 숙제를 제안했어요. 확인해보세요` : '새 숙제를 제안했어요');
         }
       },
@@ -1117,6 +1038,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           setState((s) => ({ ...s, homeworkProposals: [...s.homeworkProposals, proposal], error: WRITE_FAILURE_MESSAGE }));
           return;
         }
+
+        track('Responded To Homework Proposal', {
+          response: accept ? 'accepted' : 'rejected',
+          subject_id: proposal.subjectId,
+          // 제안이 온 지 얼마나 지나서 답했는지. 낮으면 알림이 실제로 먹힌다는 뜻이다.
+          hours_to_respond: Math.round((Date.now() - Date.parse(proposal.createdAt)) / 3_600_000),
+        });
 
         if (accept) {
           await actions.addPlannerItem(proposal.date, {
@@ -1175,6 +1103,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('createExamRecord failed:', error.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        } else {
+          track('Created Exam Record', { is_main: exam.isMain, days_until_exam: dayOffsetFromToday(exam.examDate) });
         }
         return id;
       },
@@ -1358,6 +1288,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('registerHomeworkRange (items) failed:', itemsError.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
         } else {
+          track('Registered Homework Range', {
+            subject_id: params.subjectId,
+            mode: params.mode,
+            date_count: selectedDates.length,
+            // 자유 입력 모드는 페이지 수를 알 수 없다 — 그때는 아예 안 붙인다.
+            page_count: params.mode === 'pages' ? params.endPage - params.startPage + 1 : undefined,
+          });
           notifyUser(studentId, '숙제가 등록됐어요', params.material ? `${params.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
         }
       },
@@ -1693,6 +1630,33 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 매니저가 이 학생 화면을 열 때도 그 학생의 허용앱 사용 구간을 불러온다. 부가 정보라
         // 실패해도 위에서 이미 반영된 학생 planner 로드를 막지 않는다.
         void this.loadAllowedAppIntervals(studentId);
+      },
+
+      // 숙제 미시작 알림 설정. 실패하면 이전 값(없었으면 없던 상태)으로 되돌린다 — 낙관적
+      // 업데이트만 하고 롤백을 안 하면 매니저는 "9시로 바꿨다"고 믿는데 서버는 21시로 남는다.
+      async upsertHomeworkReminderSetting(studentId, setting) {
+        const previous = state.homeworkReminderSettings[studentId];
+        const optimistic: HomeworkReminderSetting = { studentId, remindAt: setting.remindAt, enabled: setting.enabled };
+        setState((s) => ({ ...s, homeworkReminderSettings: { ...s.homeworkReminderSettings, [studentId]: optimistic } }));
+
+        const { error } = await supabase.from('sb_homework_reminder_settings').upsert(
+          {
+            student_id: studentId,
+            remind_at: setting.remindAt,
+            enabled: setting.enabled,
+            updated_by: userId,
+          },
+          { onConflict: 'student_id' }
+        );
+        if (error) {
+          console.error('upsertHomeworkReminderSetting failed:', error.message);
+          setState((s) => {
+            const next = { ...s.homeworkReminderSettings };
+            if (previous) next[studentId] = previous;
+            else delete next[studentId];
+            return { ...s, homeworkReminderSettings: next, error: WRITE_FAILURE_MESSAGE };
+          });
+        }
       },
 
       async upsertSchoolTimetableSlot(weekday, period, subject) {

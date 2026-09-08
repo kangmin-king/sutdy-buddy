@@ -1,25 +1,17 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './state/AuthContext';
+import { ThemeProvider } from './state/ThemeContext';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { BottomNav, Card, Button, TopAppBar } from './primitives';
-import type { TabId } from './primitives';
-import { NAV_TABS, STUDENT_NAV_TABS } from './constants';
+import { STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
 import ResetPasswordScreen from './screens/ResetPassword';
 import OnboardingScreen from './screens/Onboarding';
-import HomeScreen from './screens/Home';
-import CalendarScreen from './screens/Calendar';
-import PlannerCreateScreen from './screens/PlannerCreate';
-import ExecutionCheckScreen from './screens/ExecutionCheck';
-import ConditionInputScreen from './screens/ConditionInput';
-import StudyLogScreen from './screens/StudyLog';
-import TomorrowRecommendationScreen from './screens/TomorrowRecommendation';
 import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import MockExamTimerScreen from './screens/student/MockExamTimer';
-import StudentPlannerScreen from './screens/student/StudentPlanner';
+import MyPageScreen from './screens/student/MyPage';
 import StudentCalendarScreen from './screens/student/StudentCalendar';
-import DistractionFab from './screens/shared/DistractionFab';
 import ManagerStudentListScreen from './screens/manager/ManagerStudentList';
 import StudentSelector from './screens/manager/StudentSelector';
 import ManagerHomeScreen from './screens/manager/ManagerHome';
@@ -30,15 +22,17 @@ import { useOpenDistractionStopRequest, isNativePlatform } from './native/distra
 import { usePushRegistration } from './native/push';
 import { usePendingStudyPause } from './screens/student/usePendingStudyPause';
 import { useAllowedAppUsageFlush } from './screens/student/useAllowedAppUsageFlush';
+import { track } from './lib/analytics';
 import { useExpiredSessionClose } from './screens/student/useExpiredSessionClose';
-import type { PlannerItem } from './types';
 
-type Overlay = 'condition' | 'studyLog' | 'aiRecommendation' | null;
-
+// "진도관리"는 진도를 보는 화면이 아니라 시험·과목 목표·교재 범위를 만드는 화면이다
+// (ManagerProgress). 이름을 실제 내용에 맞춘다.
+// "홈"은 실제로 이 학생의 오늘을 보는 화면이고, 학생을 안 고른 상태에서는 명단이 그 자리에
+// 온다 — 둘 다 "오늘"에 관한 것이라 이름을 그렇게 맞췄다.
 const MANAGER_TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar_today' },
-  { id: 'home', label: '홈', icon: 'home' },
-  { id: 'progress', label: '진도관리', icon: 'trending_up' },
+  { id: 'home', label: '오늘', icon: 'today' },
+  { id: 'progress', label: '학습설계', icon: 'school' },
 ] as const;
 
 // 쓰기 실패/초대코드 오류 같은 전역 오류는 어느 셸(학생/관리자/레거시)에 있든 보여야 한다.
@@ -61,8 +55,9 @@ function AppShell() {
   // 학생/선생님 셸 공통 진입점이라 여기 한 번만 등록하면 역할과 무관하게 기기 토큰이 저장된다.
   usePushRegistration(React.useCallback((token: string) => actions.registerDeviceToken(token), [actions]));
 
+  // 프로필이 아직 없으면 역할을 알 수 없다 — 로딩 중이거나 온보딩을 안 끝낸 계정이다.
   if (state.loading || !state.profile) {
-    return <LegacyStudentAppShell />;
+    return <BootstrapShell />;
   }
 
   if (state.profile.role === 'manager') {
@@ -77,9 +72,20 @@ function StudentAppShell() {
   const [showDistractionStop, setShowDistractionStop] = React.useState(false);
   const [showMockExam, setShowMockExam] = React.useState(false);
 
+  // 알림으로 여는 경로와 화면 버튼으로 여는 경로를 분석에서 구분한다 — 설정을 끝낸 학생이
+  // 실제로 어느 쪽으로 들어오는지가 이 기능의 재방문을 좌우한다.
+  //
+  // 예전에는 'fab'(오른쪽 가장자리에 붙어 있던 자물쇠 버튼)도 있었다. 그걸 없앨지 판단하려고
+  // 경로를 나눠 세고 있었는데, "나" 탭 학습 도구에 같은 항목이 이미 있어 중복이라 2026-09-04에
+  // FAB을 제거했다. 남은 두 경로는 성격이 달라서 계속 구분한다.
+  const openDistractionStop = React.useCallback((entryPoint: 'notification' | 'my_page') => {
+    setShowDistractionStop(true);
+    track('Opened Distraction Stop', { entry_point: entryPoint });
+  }, []);
+
   // 딴짓 멈춰는 설정 후에는 대부분 네이티브 알림(상단바 내려서)으로 여닫는다 — 그 요청이 오면
   // 탭 전환 대신 이 오버레이를 띄운다.
-  useOpenDistractionStopRequest(React.useCallback(() => setShowDistractionStop(true), []));
+  useOpenDistractionStopRequest(React.useCallback(() => openDistractionStop('notification'), [openDistractionStop]));
 
   // 쉬는 시간이 시작되면 네이티브가 표식을 남긴다. 오버레이가 떠서 학생 홈이 언마운트돼도
   // 처리되어야 하므로 셸에서 부른다.
@@ -123,50 +129,93 @@ function StudentAppShell() {
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {activeTab === 'home' && (
-        <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} onOpenMockExam={() => setShowMockExam(true)} />
-      )}
+      {activeTab === 'home' && <StudentHomeScreen onNavigateToCalendar={() => setActiveTab('calendar')} />}
       {activeTab === 'calendar' && <StudentCalendarScreen />}
-      {activeTab === 'planner' && <StudentPlannerScreen />}
-      {isNativePlatform() && <DistractionFab onOpen={() => setShowDistractionStop(true)} />}
+      {activeTab === 'me' && (
+        <MyPageScreen onOpenMockExam={() => setShowMockExam(true)} onOpenDistractionStop={() => openDistractionStop('my_page')} />
+      )}
       <BottomNav tabs={STUDENT_NAV_TABS} active={activeTab} onChange={setActiveTab} />
     </div>
   );
 }
 
 function ManagerAppShell() {
+  const { state } = useAppState();
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<(typeof MANAGER_TABS)[number]['id']>('home');
+  // 학생 목록의 알림 칩으로 들어온 경우엔 캘린더 탭을 열면서 그 학생의 설정 시트까지 펼친다.
+  // 학생 id로 들고 있는 이유: 시트를 펼치기 전에 다른 학생으로 바꾸면 펼치지 않아야 한다.
+  const [reminderSheetFor, setReminderSheetFor] = React.useState<string | null>(null);
 
-  if (!selectedStudentId) {
-    return (
-      <div id="app-shell">
-        <ErrorBanner />
-        <ManagerStudentListScreen onSelectStudent={setSelectedStudentId} />
-      </div>
-    );
-  }
+  // 학생 명단은 별도 셸이 아니라 "오늘" 탭의 기본 상태다. 예전에는 학생을 고르기 전엔 하단
+  // 탭이 아예 없다가 고른 뒤에 생겨서, 사용자는 명단이 홈보다 윗 단계인지 별도 페이지인지
+  // 알 수 없었다. 게다가 selectedStudentId를 다시 null로 만드는 경로가 없어 명단으로 돌아갈
+  // 수 없었고, 명단에만 있는 초대코드 폼 때문에 새 학생을 추가하려면 앱을 껐다 켜야 했다.
+  // 이제 탭이 항상 보이고, 학생 선택은 "오늘" 탭 안에서 오간다.
+  const showRoster = selectedStudentId == null;
 
   return (
     <div id="app-shell">
       <ErrorBanner />
-      <TopAppBar />
-      <StudentSelector selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />
-      {tab === 'calendar' && <ManagerCalendarScreen studentId={selectedStudentId} />}
-      {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
-      {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
-      <BottomNav tabs={MANAGER_TABS} active={tab} onChange={setTab} />
+      {!showRoster && (
+        <>
+          <TopAppBar />
+          <StudentSelector
+            selectedStudentId={selectedStudentId}
+            onSelectStudent={setSelectedStudentId}
+            onBackToList={() => setSelectedStudentId(null)}
+          />
+        </>
+      )}
+
+      {showRoster ? (
+        <ManagerStudentListScreen
+          onSelectStudent={(studentId) => {
+            setSelectedStudentId(studentId);
+            setTab('home');
+          }}
+          onOpenReminderSetting={(studentId) => {
+            setSelectedStudentId(studentId);
+            setTab('calendar');
+            setReminderSheetFor(studentId);
+          }}
+        />
+      ) : (
+        <>
+          {tab === 'calendar' && (
+            <ManagerCalendarScreen
+              studentId={selectedStudentId}
+              openReminderSheet={reminderSheetFor === selectedStudentId}
+              onReminderSheetOpened={() => setReminderSheetFor(null)}
+            />
+          )}
+          {tab === 'home' && <ManagerHomeScreen studentId={selectedStudentId} />}
+          {tab === 'progress' && <ManagerProgressScreen studentId={selectedStudentId} />}
+        </>
+      )}
+
+      <BottomNav
+        tabs={MANAGER_TABS}
+        active={showRoster ? 'home' : tab}
+        onChange={(next) => {
+          // 명단을 보는 중에 캘린더·학습설계를 누르면 대상 학생이 없다. 첫 학생을 자동으로
+          // 골라 준다 — 학생이 한 명뿐인 학부모는 이 경로가 사실상 기본 동선이다.
+          if (showRoster && next !== 'home') {
+            const first = state.managedStudents[0];
+            if (!first) return;
+            setSelectedStudentId(first.id);
+          }
+          setTab(next);
+        }}
+      />
     </div>
   );
 }
 
-function LegacyStudentAppShell() {
+// 역할이 확정되기 전(로드 중)과 온보딩 전용 셸. 온보딩이 프로필을 저장하면 AppShell이 곧바로
+// 학생/관리자 셸로 넘어가므로, 여기서 따로 화면을 전환할 필요가 없다.
+function BootstrapShell() {
   const { state } = useAppState();
-  const [activeTab, setActiveTab] = React.useState<TabId>('home');
-  const [overlay, setOverlay] = React.useState<Overlay>(null);
-  const [studyLogItem, setStudyLogItem] = React.useState<PlannerItem | null>(null);
-
-  useOpenDistractionStopRequest(React.useCallback(() => setActiveTab('distractionStop'), []));
 
   if (state.loading) {
     return (
@@ -176,42 +225,10 @@ function LegacyStudentAppShell() {
     );
   }
 
-  if (!state.profile) {
-    return (
-      <div id="app-shell">
-        <OnboardingScreen onComplete={() => setActiveTab('home')} />
-      </div>
-    );
-  }
-
-  const openStudyLog = (item: PlannerItem) => {
-    setStudyLogItem(item);
-    setOverlay('studyLog');
-  };
-  const closeOverlay = () => setOverlay(null);
-
-  let overlayScreen: React.ReactNode = null;
-  if (overlay === 'condition') {
-    overlayScreen = <ConditionInputScreen onBack={closeOverlay} />;
-  } else if (overlay === 'studyLog' && studyLogItem) {
-    overlayScreen = <StudyLogScreen plannerItem={studyLogItem} onBack={closeOverlay} />;
-  } else if (overlay === 'aiRecommendation') {
-    overlayScreen = <TomorrowRecommendationScreen onBack={closeOverlay} />;
-  }
-
   return (
     <div id="app-shell">
       <ErrorBanner />
-      {overlayScreen ?? (
-        <>
-          {activeTab === 'home' && <HomeScreen onNavigate={setActiveTab} onOpenOverlay={setOverlay} />}
-          {activeTab === 'calendar' && <CalendarScreen onNavigate={setActiveTab} />}
-          {activeTab === 'planner' && <PlannerCreateScreen />}
-          {activeTab === 'check' && <ExecutionCheckScreen onOpenStudyLog={openStudyLog} onOpenAiRecommendation={() => setOverlay('aiRecommendation')} />}
-          {activeTab === 'distractionStop' && <DistractionStopScreen />}
-          <BottomNav tabs={NAV_TABS} active={activeTab} onChange={setActiveTab} />
-        </>
-      )}
+      <OnboardingScreen onComplete={() => undefined} />
     </div>
   );
 }
@@ -245,8 +262,10 @@ function Gate() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Gate />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Gate />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -3,6 +3,7 @@ import { useAppState } from '../state/AppStateContext';
 import { useAuth } from '../state/AuthContext';
 import { GRADES, SUBJECTS } from '../constants';
 import { Button, ChipGroup, TextField, SelectField } from '../primitives';
+import { track } from '../lib/analytics';
 import type { Grade, SubjectId, Role } from '../types';
 
 /**
@@ -61,6 +62,17 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
       inviteCode: crypto.randomUUID().slice(0, 8).toUpperCase(),
       subjectColors: {},
     });
+    // user property(role·grade·main_subjects…)는 프로필이 state에 들어가는 순간 AppStateContext가
+    // 한 곳에서 동기화한다. 여기서는 "온보딩을 끝냈다"는 행동만 남긴다.
+    track('Completed Onboarding', {
+      role: 'student',
+      grade,
+      main_subjects: mainSubjects,
+      main_subject_count: mainSubjects.length,
+      has_goal: goal.trim().length > 0,
+      has_exam_date: Boolean(examDate),
+      has_workbooks: workbooks.trim().length > 0,
+    });
     setSubmitting(false);
     onComplete();
   };
@@ -81,6 +93,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
       subjectColors: {},
     });
     const code = inviteCodeInput.trim();
+    track('Completed Onboarding', { role: 'manager', entered_invite_code: code.length > 0 });
     if (code) {
       await actions.linkByInviteCode(code.toUpperCase());
     }

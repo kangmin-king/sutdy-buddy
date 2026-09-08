@@ -1,5 +1,6 @@
 import React from 'react';
 import { BackBar, Card, Button, ChipGroup, TextField } from '../../primitives';
+import { track } from '../../lib/analytics';
 
 // 실제 수능 과목별 시험 시간(분). "직접입력"은 사용자가 분 단위로 직접 정한다.
 const PRESETS: { id: string; label: string; minutes: number | null }[] = [
@@ -52,6 +53,12 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
       setEndAt(null);
       setRemainingMsPaused(0);
       setPhase('done');
+      track('Ended Mock Exam Timer', {
+        preset_id: presetId,
+        planned_minutes: totalMinutes,
+        elapsed_seconds: Math.round(totalMs / 1000),
+        ended_reason: 'time_up',
+      });
       if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
     }
   }, [timeUp]);
@@ -61,6 +68,9 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
     setRemainingMsPaused(null);
     setRunning(true);
     setPhase('running');
+    // preset_id는 수능 시험지 단위(한국사·탐구·제2외국어 포함)라서 플래너의 subject_id와
+    // 값 집합이 다르다. 같은 이름을 쓰면 두 열거형이 한 속성에 섞여서 못 쓰게 된다.
+    track('Started Mock Exam Timer', { preset_id: presetId, planned_minutes: totalMinutes });
   };
 
   const handlePauseResume = () => {
@@ -84,6 +94,12 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
     setRunning(false);
     setEndAt(null);
     setPhase('done');
+    track('Ended Mock Exam Timer', {
+      preset_id: presetId,
+      planned_minutes: totalMinutes,
+      elapsed_seconds: Math.round((totalMs - remaining) / 1000),
+      ended_reason: 'manual',
+    });
   };
 
   const handleReset = () => {

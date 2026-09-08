@@ -1,0 +1,111 @@
+# Context — 숙제 미시작 알림
+
+**Last Updated**: 2026-09-02
+
+PRD §5.12의 "숙제 미시작 알림". §8.1 백로그 1순위였던 항목이다.
+
+> 이 폴더에는 `-plan.md`·`-tasks.md`가 없다 — 한 번에 끝낸 작업이라 계획·체크리스트가 남을
+> 이유가 없었다. 남길 가치가 있는 건 의사결정과 배포 전제뿐이다.
+
+## 핵심 파일
+
+| 파일 | 역할 |
+|---|---|
+| `supabase/functions/homework-not-started-reminder/index.ts` | 조회 → 판정 → 발송 기록 → FCM |
+| `supabase/functions/homework-not-started-reminder/reminderTargets.ts` | **판정 로직(순수 함수)** |
+| `supabase/functions/homework-not-started-reminder/reminderTargets.test.ts` | 그 판정의 테스트(vitest) |
+| `supabase/functions/_shared/authClient.ts` | `authenticateServiceRole` — cron 호출용 인증 |
+| `supabase/migrations/0023_homework_reminders.sql` | 설정 표 + 발송 기록 표 + RLS |
+| `supabase/migrations/0024_homework_reminder_cron.sql` | pg_cron 15분 스케줄 (Vault 전제) |
+| `src/screens/manager/ManagerCalendar.tsx` | 매니저 설정 UI (아이콘 줄 → `미시작 알림`) |
+| `src/state/AppStateContext.tsx` | `homeworkReminderSettings` 상태 + `upsertHomeworkReminderSetting` |
+| `supabase/functions/_shared/homeworkReminder.ts` | **기본 알림 시각의 유일한 정의** (앱·함수 공용) |
+| `src/constants.ts` | 위 상수를 앱 쪽 import 경로로 re-export |
+
+## 배포 전제 (이것 없이는 cron이 매번 실패한다)
+
+```bash
+supabase functions deploy homework-not-started-reminder
+supabase db push        # 0023, 0024
+```
+
+Vault에 두 값을 넣어야 한다(대시보드 SQL Editor, 한 번만):
+
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+select vault.create_secret('<service_role_key>', 'service_role_key');
+```
+
+## 확인 명령
+
+```bash
+# 손으로 한 번 돌려보기 (cron과 같은 경로. 시각·대상 판정 결과가 JSON으로 나온다)
+curl -s -X POST "$URL/functions/v1/homework-not-started-reminder" \
+  -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d '{}'
+```
+
+```sql
+-- cron 실행 이력
+select * from cron.job_run_details order by start_time desc limit 20;
+-- 오늘 누구에게 보냈나
+select * from sb_homework_reminder_log where date = current_date;
+-- cron이 받은 응답 (pg_net은 응답을 이 표에 남긴다 — 진단은 대개 여기서 끝난다)
+select status_code, content, created from net._http_response order by id desc limit 5;
+```
+
+응답 모양: `{today, now, checked, notified, sent, alreadySent, skipped:{disabled, beforeTime, started}}`
+- `checked` 오늘 숙제가 있는 학생 수 · `notified` 이번 호출에서 새로 보낸 수 · `sent` FCM 성공 건수
+- `alreadySent` 대상이지만 오늘 이미 보낸 수 · `skipped` 대상에서 빠진 이유별 학생 수
+
+**실전 검증 (2026-09-03)**: 오늘 숙제 1개를 배정하고 시작하지 않은 상태에서 알림 시각을 앞당겨
+호출 → 매니저 기기에 푸시 도착 확인. 판정·하루 1회 기록·FCM 전달 전 구간이 실제로 동작한다.
+
+되돌리려면 `select cron.unschedule('homework-not-started-reminder');`.
+
+## 의사결정 로그
+
+- **서버 타이머(pg_cron)를 도입했다** — 이 저장소의 첫 서버 타이머다. 밀린 숙제 재분배는
+  "누가 화면을 열 때 계산"으로 서버 없이 해결했지만(2026-08-07 design 문서), *시작하지 않았다*는
+  그 방식으로 알 수 없다. 학생이 앱을 열지 않아야 성립하는 조건이라 트리거를 당겨줄 사람이 없다.
+- **15분 간격** — 알림 시각을 21:30처럼 30분 단위로 잡을 수 있어야 하고, "정해진 시각 직후"에
+  도착하려면 그보다 촘촘해야 한다. 하루 한 번 제한이 있으니 자주 돌아도 중복은 없다.
+- **발송 기록을 보내기 전에 남긴다** — `(student_id, date)` 유니크 + `ignoreDuplicates`로
+  "오늘 첫 발송인가"를 원자적으로 판정한다. 대가로 FCM이 일시적으로 실패하면 오늘은 재시도하지
+  않는다. 같은 잔소리를 두 번 보내는 쪽이 한 번 놓치는 쪽보다 나쁘다고 봤다.
+- **하나라도 시작했으면 안 보낸다** — 이 알림이 노리는 건 몰아서 하기가 아니라 손도 안 대기다.
+  "몰아서 하기"는 이미 진도관리의 날짜별 분배와 "어제 못한 숙제" 배너가 담당한다.
+- **오늘 숙제가 없는 날은 안 보낸다** — 아무것도 배정하지 않은 날까지 알림이 오면 매니저가
+  알림 자체를 무시하게 된다.
+- **`start_time`을 기준으로 쓰지 않았다** — 숙제 항목의 `start_time`은 생성 경로 전부에서
+  `'09:00'`으로 하드코딩돼 있어(진도관리 등록·제안 수락·레거시 지연생성) 아무 의미가 없다.
+  학생이 직접 넣은 자기계획만 실제 시각을 갖는다. 그래서 알림 시각은 별도 설정으로 뺐다.
+- **학생은 설정을 읽을 수만 있다** — 감시받는 쪽이 알림을 끌 수 있으면 기능이 성립하지 않는다.
+  RLS에서 학생에게 SELECT만 줬다.
+- **학생에게는 알림을 보내지 않는다** — 미리 알려주면 "안 하면 불편함"이 사라진다. PRD §8.1이
+  경계하라고 적어둔 방향이라 의도적으로 뺐다.
+- **서비스 롤 판정을 키 문자열 비교에서 role 클레임 확인으로 바꿨다** (2026-09-03) — 이 프로젝트는
+  새 API 키 체계를 쓰기 때문에 런타임에 주입되는 `SUPABASE_SERVICE_ROLE_KEY`가 `sb_secret_...`
+  형식인데, cron은 Vault에 넣어둔 legacy service_role JWT를 들고 온다. 문자열 비교로는 영원히
+  어긋나 매 실행이 401이었다. 게이트웨이가 서명을 검증한 뒤에 함수가 도니 role 클레임을 신뢰할 수
+  있다 — 단 `--no-verify-jwt`로 배포하면 위조 가능해지므로 그렇게 배포하지 말 것.
+- **응답에 `skipped`·`alreadySent`를 실었다** (2026-09-03) — 그전에는 "대상 없음"과 "오늘 이미
+  보냄"이 똑같이 `notified: 0`이라, 실전 테스트에서 원인을 찾으려고 설정·세션·로그 표를 차례로
+  뒤져야 했다. 응답 한 줄로 끝나야 한다.
+- **알림 시각을 학생 목록 카드에도 노출했다** (2026-09-03) — 설정이 캘린더 탭 안쪽에만 있어서
+  "시각을 정할 수 있다"는 것 자체가 보이지 않았다(사용자가 기능을 만든 다음 날 같은 기능을
+  요청했다). 칩을 누르면 그 학생의 설정 시트로 바로 들어간다.
+- **판정을 순수 함수로 분리했다** — 이 기능의 전부가 그 판정이라 DB·FCM 없이 테스트해야 했다.
+  단, `supabase/`는 앱 `tsconfig.json`의 `include: ["src"]` 밖이라 `npx tsc -b`가 타입체크하지
+  않는다(나머지 Edge Function과 같은 처지). vitest는 기본 include로 이 테스트를 집어간다.
+
+## 알려진 제약 / 다음에 손댈 것
+
+- **기본 시각을 바꾸려면** `supabase/functions/_shared/homeworkReminder.ts` 한 줄만 고치면 된다.
+  앱(`src/constants.ts`의 re-export), 알림 함수, 그 테스트가 모두 이 파일을 읽는다. DB 컬럼에는
+  기본값을 두지 않았다 — 처음엔 세 군데(컬럼 default · 앱 상수 · 함수 상수)에 같은 "21:00"이
+  박혀 있었고, 한쪽만 고치면 조용히 어긋나는 구조였다.
+  단, **이미 저장된 학생별 설정 값은 바뀌지 않는다**(기본값은 설정 행이 없는 학생에게만 적용).
+- 매니저 앱 안에는 이 알림의 흔적이 남지 않는다(푸시만 간다). "며칠 미시작"처럼 화면에
+  누적해 보여주려면 `sb_homework_reminder_log`를 읽는 SELECT 정책부터 추가해야 한다.
+- 시간대가 `Asia/Seoul` 하드코딩이다. 해외 사용자가 생기면 학생별 시간대가 필요하다.
+- iOS에는 푸시 자체가 없다(PWA). 안드로이드 전용이다.
