@@ -1,4 +1,5 @@
 import type { PlannerItem, DateKey, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
+import { DAY_ROLLOVER_HOUR } from '../supabase/functions/_shared/day';
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -32,8 +33,11 @@ function getOverrideDate(): DateKey | null {
  *
  * 날짜 문자열 자체는 그대로이므로 이미 저장된 데이터는 영향을 받지 않는다 — 앞으로 어느
  * 날짜에 쓰고 어느 날짜를 "오늘"로 보여줄지만 달라진다.
+ *
+ * 정의는 `_shared/`에 둔다 — 알림 스케줄(Edge Function)이 같은 값을 읽어야 하기 때문이다.
+ * 한쪽만 자정으로 남으면 "학생 화면의 오늘"과 "서버가 알림을 거는 오늘"이 새벽에 어긋난다.
  */
-export const DAY_ROLLOVER_HOUR = 4;
+export { DAY_ROLLOVER_HOUR } from '../supabase/functions/_shared/day';
 
 /**
  * 그 시각이 속한 "하루"의 날짜. 새벽 4시 이전은 전날로 친다.

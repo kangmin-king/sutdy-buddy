@@ -4,6 +4,8 @@
 // Deno API를 쓰지 않는다(vitest가 이 파일을 그대로 돌린다). 다만 supabase/는 앱의 tsconfig
 // include 밖이라 `npx tsc -b`의 타입체크 대상이 아니다 — 나머지 Edge Function과 같은 처지다.
 
+import { minutesSinceDayStart } from '../_shared/day.ts';
+
 export interface ReminderSetting {
   remindAt: string; // "HH:MM" 또는 "HH:MM:SS"
   enabled: boolean;
@@ -69,10 +71,12 @@ export function selectReminderTargets(params: {
       continue;
     }
 
-    // Postgres time은 "21:00:00"으로 오므로 "HH:MM"으로 자른다. 둘 다 0으로 패딩된 24시간
-    // 표기라서 문자열 사전순 비교가 곧 시각 비교다.
+    // Postgres time은 "21:00:00"으로 오므로 "HH:MM"으로 자른다.
     const remindAt = (setting?.remindAt ?? defaultRemindAt).slice(0, 5);
-    if (now < remindAt) {
+    // 하루가 새벽 4시에 시작하므로 벽시계 문자열을 그대로 비교하면 안 된다. 예전엔 사전순으로
+    // 비교했는데, 그러면 00:01로 걸어둔 알림이 `"04:00" >= "00:01"`에 걸려 하루가 시작하자마자
+    // 새벽 4시에 발송된다. 둘 다 "하루 시작으로부터 몇 분"으로 바꿔서 순서를 맞춘다.
+    if (minutesSinceDayStart(now) < minutesSinceDayStart(remindAt)) {
       skipped.beforeTime += 1;
       continue;
     }

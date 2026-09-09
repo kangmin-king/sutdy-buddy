@@ -43,9 +43,44 @@ describe('selectReminderTargets', () => {
     expect(select({ now: '20:45', homeworkItems: [item({})], settings: AT_21 })).toEqual([]);
   });
 
+  // 하루가 자정이 아니라 새벽 4시에 끝난다(_shared/day.ts). 벽시계 문자열을 그대로 비교하면
+  // 새벽에 걸어둔 알림의 순서가 뒤집힌다 — 실제로 한 학생이 00:01로 설정돼 있었다.
+  describe('하루 경계(새벽 4시)를 넘는 시각', () => {
+    const AT_0001 = { s1: { remindAt: '00:01', enabled: true } };
+
+    it('새벽 알림은 하루가 시작하는 4시에 발송되지 않는다', () => {
+      // 사전순으로 비교하던 때의 버그: "04:00" >= "00:01"이 참이라 여기서 나갔다.
+      expect(select({ now: '04:00', homeworkItems: [item({})], settings: AT_0001 })).toEqual([]);
+      expect(select({ now: '12:00', homeworkItems: [item({})], settings: AT_0001 })).toEqual([]);
+      expect(select({ now: '23:59', homeworkItems: [item({})], settings: AT_0001 })).toEqual([]);
+    });
+
+    it('새벽 알림은 자정을 넘긴 그 시각에 발송된다', () => {
+      expect(select({ now: '00:01', homeworkItems: [item({})], settings: AT_0001 })).toEqual([
+        { studentId: 's1', remindAt: '00:01', homeworkCount: 1 },
+      ]);
+      expect(select({ now: '03:59', homeworkItems: [item({})], settings: AT_0001 })).toEqual([
+        { studentId: 's1', remindAt: '00:01', homeworkCount: 1 },
+      ]);
+    });
+
+    it('낮 알림은 자정을 넘겨도 그날 몫으로 남는다', () => {
+      // 00:30은 아직 어제의 학습일이다 — 21:00은 이미 지났다. 실제로는 21:00에 한 번 나가고
+      // 발송 로그(student_id, date)에 막히지만, 판정 자체는 "지났다"가 맞다.
+      expect(select({ now: '00:30', homeworkItems: [item({})], settings: AT_21 })).toEqual([
+        { studentId: 's1', remindAt: '21:00', homeworkCount: 1 },
+      ]);
+    });
+
+    it('하루가 막 시작한 4시에는 낮 알림도 아직이다', () => {
+      expect(select({ now: '04:00', homeworkItems: [item({})], settings: AT_21 })).toEqual([]);
+    });
+  });
+
   it('설정 행이 없으면 기본 시각을 쓴다', () => {
     // 기본값을 바꿔도 이 테스트는 그대로 유효해야 하므로 상수를 그대로 쓴다.
-    expect(select({ now: '00:00', homeworkItems: [item({})] })).toEqual([]);
+    // 10:00은 하루(새벽 4시 시작) 안에서 기본값 21:00보다 앞이다.
+    expect(select({ now: '10:00', homeworkItems: [item({})] })).toEqual([]);
     expect(select({ now: DEFAULT_HOMEWORK_REMIND_AT, homeworkItems: [item({})] })).toEqual([
       { studentId: 's1', remindAt: DEFAULT_HOMEWORK_REMIND_AT, homeworkCount: 1 },
     ]);

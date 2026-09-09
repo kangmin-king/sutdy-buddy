@@ -4,11 +4,21 @@ import { corsHeaders, handleCorsPreflight } from '../_shared/cors.ts';
 import { sendFcmMessage } from '../_shared/fcm.ts';
 import { selectReminderTargets } from './reminderTargets.ts';
 import { DEFAULT_HOMEWORK_REMIND_AT } from '../_shared/homeworkReminder.ts';
+import { DAY_ROLLOVER_HOUR } from '../_shared/day.ts';
 
 // 앱의 날짜·시간 계산은 전부 학생이 실제로 겪는 로컬 시각 기준이다(todayKey, toMinutesOfDay).
 // 서버는 UTC로 돌기 때문에 여기서 명시적으로 변환해야 "오늘"과 알림 시각이 학생과 같은 뜻이 된다.
 const TIME_ZONE = 'Asia/Seoul';
 
+/**
+ * 서울 기준 "지금"을, 앱과 같은 하루 경계(새벽 4시)로 끊어서 돌려준다.
+ *
+ * `date`는 그 시각이 속한 **학습일**이다 — 새벽 4시 이전이면 전날이다. 앱의 `todayKey()`와
+ * 같은 규칙이어야 한다. 안 그러면 새벽 1시에 학생 화면에는 어제 숙제가 떠 있는데 서버는
+ * 오늘 숙제를 보고 "시작 안 했다"고 알리는, 서로 다른 날 얘기를 하는 상태가 된다.
+ *
+ * `time`은 벽시계 그대로다. 알림 시각과의 비교는 `minutesSinceDayStart`가 맡는다.
+ */
 function nowInSeoul(): { date: string; time: string } {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: TIME_ZONE,
@@ -20,7 +30,12 @@ function nowInSeoul(): { date: string; time: string } {
     hourCycle: 'h23',
   }).formatToParts(new Date());
   const get = (type: string) => parts.find((p) => p.type === type)!.value;
-  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` };
+
+  // 날짜만 담은 UTC 값으로 빼야 월·연 넘김이 안전하고 서버 표준시에 휘둘리지 않는다.
+  const shifted = new Date(Date.UTC(Number(get('year')), Number(get('month')) - 1, Number(get('day'))));
+  if (Number(get('hour')) < DAY_ROLLOVER_HOUR) shifted.setUTCDate(shifted.getUTCDate() - 1);
+
+  return { date: shifted.toISOString().slice(0, 10), time: `${get('hour')}:${get('minute')}` };
 }
 
 Deno.serve(async (req: Request) => {
