@@ -9,6 +9,7 @@ import {
   splitPagesAcrossDates,
   computeMissedHomeworkRedistribution,
   resolvePlannerItemManagerId,
+  dayStartOf,
 } from '../lib';
 import {
   profileFromRow,
@@ -1640,8 +1641,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async loadAllowedAppIntervals(userId) {
-        const dayStart = new Date();
-        dayStart.setHours(0, 0, 0, 0);
+        // 하루 경계는 자정이 아니라 새벽 4시다(lib.ts의 DAY_ROLLOVER_HOUR). 여기가 자정으로
+        // 남아 있으면 밤 12시를 넘긴 순간 허용앱 사용시간만 0으로 돌아가, 같은 화면에서
+        // 숙제는 어제 것이 보이는데 사용시간은 초기화된 상태가 된다.
+        const dayStart = dayStartOf(new Date());
         const { data, error } = await supabase
           .from('sb_allowed_app_intervals')
           .select('*')

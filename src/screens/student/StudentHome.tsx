@@ -105,6 +105,25 @@ export default function StudentHomeScreen({
     return () => clearInterval(id);
   }, []);
 
+  // 앱을 켠 채로 하루가 넘어가는 순간(새벽 4시) 돌아가던 세션은 **어제 항목**에 속한다.
+  // 그런데 화면은 오늘 목록으로 갈아끼워지고, 위의 복구 효과는 오늘 항목만 보므로 그 세션을
+  // 찾지 못한다 — 결과적으로 타이머는 화면에서 사라지는데 DB에서는 열린 채로 남아, 학생이
+  // 그때까지 한 공부가 어디에도 기록되지 않는다. 날짜가 바뀌면 여기서 닫아 어제 쪽에 남긴다.
+  // displayedSeconds를 넘기지 않는 것은 의도다 — 화면에 보이던 값이 아니라 실제 경과로
+  // 정밀 계산되고, ended_reason도 'auto'로 남아 학생이 직접 멈춘 것과 구분된다.
+  const lastSeenDay = React.useRef(today);
+  React.useEffect(() => {
+    if (lastSeenDay.current === today) return;
+    lastSeenDay.current = today;
+    const running = Object.entries(runningSessionId);
+    if (running.length === 0) return;
+    for (const [itemId, sessionId] of running) {
+      void actions.endStudySession(itemId, sessionId);
+    }
+    if (isNativePlatform()) setTimeout(() => DistractionStop.setSessionActive({ active: false }), 0);
+    setRunningSessionId({});
+  }, [today, runningSessionId, actions]);
+
   const handleStart = async (itemId: string) => {
     if (startPending[itemId] || !canStartStudyItem(runningSessionId, itemId)) return;
     setStartPending((m) => ({ ...m, [itemId]: true }));

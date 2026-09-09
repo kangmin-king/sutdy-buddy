@@ -19,8 +19,40 @@ function getOverrideDate(): DateKey | null {
   return null;
 }
 
+/**
+ * 하루가 넘어가는 시각. 자정이 아니라 **새벽 4시**다.
+ *
+ * 자정 기준일 때 학생이 겪은 일: 타이머를 켜고 공부하다 12시가 지나면 지금까지의 공부가
+ * 전부 사라진다. 공부 시간은 그날 항목의 id에 붙는데, 자정에 `todayKey()`가 다음 날짜를
+ * 반환하면 홈 화면이 새 날짜의 (갓 만들어진 빈) 목록을 그리기 때문이다. 게다가 그때
+ * 돌아가던 세션은 화면에서만 사라지고 DB에서는 닫히지 않아 기록이 어디에도 안 남았다.
+ *
+ * 학생에게 "오늘"은 자정이 아니라 자기 전까지다. 새벽 4시면 밤늦게까지 하는 학생을 거의
+ * 다 덮으면서, 새벽에 일어나 공부하는 학생과도 겹치지 않는다.
+ *
+ * 날짜 문자열 자체는 그대로이므로 이미 저장된 데이터는 영향을 받지 않는다 — 앞으로 어느
+ * 날짜에 쓰고 어느 날짜를 "오늘"로 보여줄지만 달라진다.
+ */
+export const DAY_ROLLOVER_HOUR = 4;
+
+/**
+ * 그 시각이 속한 "하루"의 날짜. 새벽 4시 이전은 전날로 친다.
+ * 시각을 `DAY_ROLLOVER_HOUR`만큼 뒤로 밀면 자정 기준 계산이 그대로 성립한다.
+ */
+export function dayKeyOf(instant: Date): DateKey {
+  const shifted = new Date(instant.getTime());
+  shifted.setHours(shifted.getHours() - DAY_ROLLOVER_HOUR);
+  return toDateKey(shifted);
+}
+
+/** 그 "하루"가 시작한 실제 시각 — 타임스탬프로 걸러야 하는 곳(허용앱 사용시간 등)에서 쓴다. */
+export function dayStartOf(instant: Date): Date {
+  const [y, m, d] = dayKeyOf(instant).split('-').map(Number);
+  return new Date(y, m - 1, d, DAY_ROLLOVER_HOUR, 0, 0, 0);
+}
+
 export function todayKey(): DateKey {
-  return getOverrideDate() ?? toDateKey(new Date());
+  return getOverrideDate() ?? dayKeyOf(new Date());
 }
 
 export function addDaysToKey(dateKey: DateKey, days: number): DateKey {

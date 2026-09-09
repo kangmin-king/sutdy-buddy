@@ -16,8 +16,51 @@ import {
   computeMissedHomeworkRedistribution,
   resolvePlannerItemManagerId,
   managerDisplayLabel,
+  dayKeyOf,
+  dayStartOf,
+  DAY_ROLLOVER_HOUR,
 } from './lib';
 import type { PlannerItem, HomeworkAssignment, ExamSubjectRange, ExamSubject, ExamRecord } from './types';
+
+describe('dayKeyOf — 하루는 자정이 아니라 새벽 4시에 넘어간다', () => {
+  // 학생이 타이머를 켜고 공부하다 12시를 넘기면 그때까지 한 공부가 다 사라지던 문제.
+  // 공부 시간은 그날 항목에 붙는데 자정에 "오늘"이 바뀌면 화면이 빈 새 목록으로 갈아끼워졌다.
+  it('밤 12시를 넘겨도 자기 전까지는 같은 날이다', () => {
+    expect(dayKeyOf(new Date(2026, 8, 9, 23, 59))).toBe('2026-09-09');
+    expect(dayKeyOf(new Date(2026, 8, 10, 0, 0))).toBe('2026-09-09');
+    expect(dayKeyOf(new Date(2026, 8, 10, 2, 30))).toBe('2026-09-09');
+    expect(dayKeyOf(new Date(2026, 8, 10, 3, 59, 59))).toBe('2026-09-09');
+  });
+
+  it('새벽 4시가 되면 다음 날로 넘어간다', () => {
+    expect(dayKeyOf(new Date(2026, 8, 10, 4, 0))).toBe('2026-09-10');
+    expect(dayKeyOf(new Date(2026, 8, 10, 9, 0))).toBe('2026-09-10');
+  });
+
+  it('월이 바뀌는 경계에서도 전날을 제대로 짚는다', () => {
+    expect(dayKeyOf(new Date(2026, 9, 1, 1, 0))).toBe('2026-09-30');
+    expect(dayKeyOf(new Date(2026, 0, 1, 1, 0))).toBe('2025-12-31');
+  });
+
+  it('dayStartOf는 그 하루가 시작한 실제 시각을 준다', () => {
+    // 허용앱 사용시간처럼 타임스탬프로 걸러야 하는 곳이 같은 경계를 쓰게 하기 위한 것.
+    const start = dayStartOf(new Date(2026, 8, 10, 1, 30));
+    expect(start.getFullYear()).toBe(2026);
+    expect(start.getMonth()).toBe(8);
+    expect(start.getDate()).toBe(9);
+    expect(start.getHours()).toBe(DAY_ROLLOVER_HOUR);
+    expect(start.getMinutes()).toBe(0);
+    // 새벽 1시 30분에 조회하면 어제 새벽 4시부터가 "오늘"이다 — 21시간 30분 전.
+    expect(new Date(2026, 8, 10, 1, 30).getTime() - start.getTime()).toBe((21 * 60 + 30) * 60 * 1000);
+  });
+
+  it('dayKeyOf와 dayStartOf가 같은 하루를 가리킨다', () => {
+    for (const hour of [0, 3, 4, 12, 23]) {
+      const instant = new Date(2026, 8, 10, hour, 15);
+      expect(dayKeyOf(dayStartOf(instant))).toBe(dayKeyOf(instant));
+    }
+  });
+});
 
 describe('timeToMinutes / minutesToTime', () => {
   it('converts HH:MM to minutes and back', () => {
