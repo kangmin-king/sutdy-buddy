@@ -21,7 +21,7 @@ android {
         // 인정한다. 1은 드라이브로 직접 배포한 APK가 이미 쓰고 있어서 2부터 시작한다 —
         // 그래야 그 APK를 쓰는 학생이 스토어 버전으로 넘어올 수 있다.
         // **스토어에 올릴 때마다 반드시 올릴 것.**
-        versionCode 8
+        versionCode 9
         // 사용자에게 보이는 버전. 1.1(학생 폰에 이미 깔려 있던 APK) 이후로 다크 모드,
         // 학생 탭 개편(플래너 → "나"), 매니저 화면 결함 수정, 회원 탈퇴 위치 변경이 들어갔다.
         // 1.2(versionCode 3)는 다크 대비 수정 전에 빌드해서 내 기기에만 설치됐다.
@@ -33,7 +33,9 @@ android {
         // 1.2.5(versionCode 8)는 Supabase 키를 legacy anon JWT에서 새 publishable 키로 갈았다.
         // **이 APK가 깔려야 legacy 키를 끌 수 있다** — 옛 APK에는 legacy anon 키가 구워져 있어서
         // legacy를 끄는 순간 서버에 못 붙는다. 노출된 service_role을 무효화하려면 꺼야 한다.
-        versionName "1.2.5"
+        // 1.2.6(versionCode 9)은 거기에 기기 최근접속 시각 기록을 더했다 — 이게 있어야
+        // "학생이 새 APK를 깔았는지"를 sb_device_tokens.updated_at으로 확인할 수 있다.
+        versionName "1.2.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

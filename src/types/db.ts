@@ -196,7 +196,10 @@ export interface Database {
       sb_exam_subject_ranges: { Row: SbExamSubjectRangeRow; Insert: Omit<SbExamSubjectRangeRow, 'created_at'>; Update: Partial<SbExamSubjectRangeRow>; Relationships: [] };
       sb_tutoring_schedules: { Row: SbTutoringScheduleRow; Insert: Omit<SbTutoringScheduleRow, 'id' | 'updated_at'>; Update: Partial<SbTutoringScheduleRow>; Relationships: [] };
       sb_tutoring_schedule_exceptions: { Row: SbTutoringScheduleExceptionRow; Insert: Omit<SbTutoringScheduleExceptionRow, 'id' | 'created_at'>; Update: Partial<SbTutoringScheduleExceptionRow>; Relationships: [] };
-      sb_device_tokens: { Row: SbDeviceTokenRow; Insert: Omit<SbDeviceTokenRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbDeviceTokenRow>; Relationships: [] };
+      // updated_at은 다른 표와 달리 **클라이언트가 직접 보낸다.** 컬럼 기본값 now()는 INSERT에만
+      // 걸리고 트리거도 없어서, 앱을 다시 켤 때(같은 FCM 토큰 → 충돌 → UPDATE) 값이 안 바뀌어
+      // "이 기기가 마지막으로 붙은 시각"을 알 수 없었다. registerDeviceToken 주석 참고.
+      sb_device_tokens: { Row: SbDeviceTokenRow; Insert: Omit<SbDeviceTokenRow, 'id' | 'created_at'>; Update: Partial<SbDeviceTokenRow>; Relationships: [] };
       sb_banners: { Row: SbBannerRow; Insert: Omit<SbBannerRow, 'id' | 'created_at' | 'updated_at'>; Update: Partial<SbBannerRow>; Relationships: [] };
       sb_homework_proposals: {
         Row: SbHomeworkProposalRow;

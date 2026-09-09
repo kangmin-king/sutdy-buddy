@@ -890,9 +890,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async registerDeviceToken(token) {
+        // updated_at을 명시적으로 넣는다. 컬럼 기본값 now()는 INSERT에만 걸리고 트리거도 없어서,
+        // 예전에는 같은 기기가 앱을 다시 켜도(같은 FCM 토큰 → 충돌 → UPDATE) 값이 처음 등록
+        // 시각에 멈춰 있었다. 그래서 "이 기기가 마지막으로 서버에 붙은 게 언제냐"를 알 방법이
+        // 없었다 — 2026-09-09에 키를 갈면서 "학생이 새 APK를 깔았는지"를 확인해야 했는데 이 값이
+        // 죽어 있어 확인이 불가능했다. 앱을 켤 때마다 갱신되므로 그 자체가 최근 접속 신호가 된다.
         const { error } = await supabase
           .from('sb_device_tokens')
-          .upsert({ user_id: userId, fcm_token: token, platform: 'android' }, { onConflict: 'user_id,fcm_token' });
+          .upsert(
+            { user_id: userId, fcm_token: token, platform: 'android', updated_at: new Date().toISOString() },
+            { onConflict: 'user_id,fcm_token' }
+          );
         if (error) {
           console.error('registerDeviceToken failed:', error.message);
           return;
