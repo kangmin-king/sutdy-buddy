@@ -7,6 +7,7 @@ import { STUDENT_NAV_TABS } from './constants';
 import AuthScreen from './screens/AuthScreen';
 import ResetPasswordScreen from './screens/ResetPassword';
 import OnboardingScreen from './screens/Onboarding';
+import { bootstrapViewOf } from './screens/bootstrapModel';
 import DistractionStopScreen from './screens/DistractionStop';
 import StudentHomeScreen from './screens/student/StudentHome';
 import MockExamTimerScreen from './screens/student/MockExamTimer';
@@ -209,13 +210,31 @@ function ManagerAppShell() {
 
 // 역할이 확정되기 전(로드 중)과 온보딩 전용 셸. 온보딩이 프로필을 저장하면 AppShell이 곧바로
 // 학생/관리자 셸로 넘어가므로, 여기서 따로 화면을 전환할 필요가 없다.
+//
+// **세 경우를 반드시 구별해야 한다**: 로드 중 / 로드 실패 / 온보딩 전.
+// 예전에는 실패와 온보딩 전이 똑같이 `profile === null`이라 구별되지 않았고, 네트워크가 잠깐
+// 끊긴 기존 사용자에게 온보딩이 떴다. 그걸 끝내면 초대코드가 재발급되고 과목 색이 초기화되고,
+// 소셜 로그인 계정은 역할까지 바뀌어 담당 학생 목록이 사라졌다.
 function BootstrapShell() {
-  const { state } = useAppState();
+  const { state, actions } = useAppState();
+  const view = bootstrapViewOf(state);
 
-  if (state.loading) {
+  if (view === 'loading') {
     return (
       <div id="app-shell" className="flex items-center justify-center min-h-screen">
         <p className="text-sm text-on-surface-variant">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (view === 'load-failed') {
+    return (
+      <div id="app-shell" className="flex min-h-screen flex-col items-center justify-center gap-5 px-8 text-center">
+        <p className="text-base font-semibold text-on-surface">정보를 불러오지 못했어요</p>
+        <p className="text-sm leading-relaxed text-on-surface-variant">
+          인터넷 연결을 확인하고 다시 시도해주세요. 저장된 학습 기록은 그대로 있어요.
+        </p>
+        <Button onClick={() => actions.retryInitialLoad()}>다시 시도</Button>
       </div>
     );
   }

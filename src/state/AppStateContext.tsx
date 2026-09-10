@@ -78,6 +78,10 @@ interface AppState {
   // 키가 없는 학생은 기본값(DEFAULT_HOMEWORK_REMIND_AT · 켜짐)이다 — DB에 행이 없는 것과 같다.
   homeworkReminderSettings: Record<string, HomeworkReminderSetting>;
   loading: boolean;
+  // 초기 로드가 실패했다. `profile === null`만으로는 "아직 온보딩을 안 했다"와 구별할 수 없어서
+  // 따로 둔다 — 구별하지 않으면 네트워크가 잠깐 끊긴 기존 사용자에게 온보딩 화면이 뜨고,
+  // 그걸 끝내면 초대코드가 재발급되고 과목 색이 초기화되고 역할까지 바뀔 수 있다.
+  loadFailed: boolean;
   error: string | null;
 }
 
@@ -103,6 +107,7 @@ const EMPTY_STATE: AppState = {
   studentSchoolTimetables: {},
   homeworkReminderSettings: {},
   loading: true,
+  loadFailed: false,
   error: null,
 };
 
@@ -181,6 +186,8 @@ interface AppStateActions {
   loadStudentSchoolTimetable: (studentId: string) => Promise<void>;
   loadAllowedAppIntervals: (userId: string) => Promise<void>;
   recordAllowedAppIntervals: (rows: { user_id: string; started_at: string; ended_at: string }[]) => Promise<void>;
+  // 초기 로드가 실패했을 때(loadFailed) 다시 시도한다. 실패 화면의 버튼이 부른다.
+  retryInitialLoad: () => void;
   dismissError: () => void;
 }
 
@@ -318,6 +325,16 @@ async function loadAll(userId: string): Promise<AppState> {
     supabase.from('sb_study_sessions').select('*').eq('user_id', userId),
   ]);
 
+  // **네 조회 모두 실패를 던진다.** 예전에는 `.data`만 보고 실패를 무시했다. 그러면
+  // ① 프로필 조회가 실패하면 profile=null이 되어 기존 사용자가 온보딩 화면으로 떨어지고,
+  // ② 나머지가 실패하면 학생에게 "숙제가 사라진" 빈 화면이 보인다 — 둘 다 사용자가
+  // 잘못된 상태를 기준으로 다음 행동을 하게 만든다(온보딩 재작성, 숙제 재생성).
+  // 던진 예외는 AppStateProvider가 loadFailed로 받아 재시도 화면을 띄운다.
+  if (profileRes.error) throw profileRes.error;
+  if (itemsRes.error) throw itemsRes.error;
+  if (homeworkRes.error) throw homeworkRes.error;
+  if (sessionsRes.error) throw sessionsRes.error;
+
   const profile = profileRes.data ? profileFromRow(profileRes.data) : null;
 
   let managedStudents: Profile[] = [];
@@ -427,6 +444,7 @@ async function loadAll(userId: string): Promise<AppState> {
     studentSchoolTimetables: {},
     homeworkReminderSettings,
     loading: false,
+    loadFailed: false,
     error: null,
   };
 }
@@ -451,18 +469,31 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     studentPlannerItemsRef.current = state.studentPlannerItems;
   }, [state.studentPlannerItems]);
 
+  // 재시도 버튼이 초기 로드를 다시 돌리게 하는 카운터. 값이 바뀌면 아래 effect가 다시 뛴다.
+  const [reloadNonce, setReloadNonce] = React.useState(0);
+
   React.useEffect(() => {
     let cancelled = false;
-    loadAll(userId).then((loaded) => {
-      if (!cancelled) setState(loaded);
-      // 로그인 직후 본인 허용앱 사용 구간도 불러온다. loadAll 자체엔 안 넣는다 — 부가 정보라
-      // 실패해도 나머지 로드를 막으면 안 된다.
-      void actions.loadAllowedAppIntervals(userId);
-    });
+    // 재시도로 다시 들어올 때는 로딩 상태로 되돌려야 한다 — 그러지 않으면 실패 화면이
+    // 그대로 남아 눌러도 아무 일도 안 하는 것처럼 보인다.
+    setState((s) => (s.loadFailed ? { ...s, loading: true, loadFailed: false, error: null } : s));
+    loadAll(userId)
+      .then((loaded) => {
+        if (!cancelled) setState(loaded);
+        // 로그인 직후 본인 허용앱 사용 구간도 불러온다. loadAll 자체엔 안 넣는다 — 부가 정보라
+        // 실패해도 나머지 로드를 막으면 안 된다.
+        void actions.loadAllowedAppIntervals(userId);
+      })
+      .catch((err) => {
+        // 여기서 잡지 않으면 unhandled rejection이 되고 loading이 true에 영구히 머물러
+        // "불러오는 중..."에서 멈춘다. 온보딩으로 떨어뜨리지 않는 것이 핵심이다.
+        console.error('loadAll failed:', err);
+        if (!cancelled) setState((s) => ({ ...s, loading: false, loadFailed: true }));
+      });
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, reloadNonce]);
 
   // 프로필이 들어오거나 연결 관계가 바뀔 때마다 user property를 다시 맞춘다. 온보딩 직후
   // saveProfile로 프로필이 세팅되는 경로도 여기로 흡수된다.
@@ -1678,6 +1709,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('recordAllowedAppIntervals failed:', error.message);
           throw new Error(error.message);
         }
+      },
+
+      retryInitialLoad() {
+        setReloadNonce((n) => n + 1);
       },
 
       dismissError() {
