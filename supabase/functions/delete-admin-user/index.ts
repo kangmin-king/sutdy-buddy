@@ -38,6 +38,19 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: '자기 자신은 삭제할 수 없어요' }), { status: 400, headers: corsHeaders });
     }
 
+    // **삭제 대상이 운영자 계정인지 반드시 확인한다.** 예전에는 호출자가 admin인지만 보고
+    // 대상은 검사하지 않았다. 그래서 일반 학생·매니저의 UUID를 넣으면 그 계정이 지워지고,
+    // auth.users에 걸린 on delete cascade로 **학습 데이터까지 전부 사라졌다.**
+    // 이 함수의 용도는 이름 그대로 운영자 계정 삭제뿐이므로 admin 계정도 대상에서 제외한다.
+    const { data: target, error: targetError } = await admin.from('sb_admin_users').select('role').eq('id', userId).maybeSingle();
+    if (targetError) throw targetError;
+    if (!target) {
+      return new Response(JSON.stringify({ error: '운영자 계정이 아니에요' }), { status: 404, headers: corsHeaders });
+    }
+    if (target.role !== 'operator') {
+      return new Response(JSON.stringify({ error: '운영자 계정만 삭제할 수 있어요' }), { status: 400, headers: corsHeaders });
+    }
+
     // sb_admin_users 행은 auth.users에 on delete cascade가 걸려있어 auth 계정을 지우면 같이 지워진다.
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) throw deleteError;
