@@ -191,7 +191,13 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
 export function BackBar({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-2 bg-surface/90 backdrop-blur px-3 py-4">
-      <button onClick={onBack} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container">
+      {/* 36px(w-9)이었다 — 앱의 다른 아이콘 버튼은 전부 44px인데 여기만 작았다.
+          aria-label도 없어서 스크린리더가 아이콘 폰트의 리거처 문자열("arrow_back")을 읽었다. */}
+      <button
+        onClick={onBack}
+        aria-label="뒤로"
+        className="h-11 w-11 rounded-full flex items-center justify-center hover:bg-surface-container"
+      >
         <Icon name="arrow_back" />
       </button>
       <span className="text-lg font-bold text-on-surface">{title}</span>
@@ -594,10 +600,19 @@ export function TextField({
   placeholder?: string;
   type?: string;
 }) {
+  const id = React.useId();
   return (
+    // 라벨과 입력칸을 id로 묶는다. 예전에는 <label>이 떠 있는 글씨일 뿐이어서 스크린리더가
+    // 칸 이름을 못 읽었고("편집 텍스트"만 읽힘), 라벨을 눌러도 칸에 포커스가 안 갔다 —
+    // 손이 불편한 사용자에게는 라벨만큼의 터치 영역이 그냥 없는 것이었다.
     <div>
-      {label && <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">{label}</label>}
+      {label && (
+        <label htmlFor={id} className="block text-sm font-semibold text-on-surface-variant mb-1.5">
+          {label}
+        </label>
+      )}
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -623,10 +638,16 @@ export function TextArea({
   placeholder?: string;
   rows?: number;
 }) {
+  const id = React.useId();
   return (
     <div>
-      {label && <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">{label}</label>}
+      {label && (
+        <label htmlFor={id} className="block text-sm font-semibold text-on-surface-variant mb-1.5">
+          {label}
+        </label>
+      )}
       <textarea
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -648,10 +669,15 @@ export function SelectField({
   onChange: (v: string) => void;
   options: { id: string; label: string }[];
 }) {
+  const fieldId = React.useId();
   return (
     <div>
-      {label && <label className="block text-sm font-semibold text-on-surface-variant mb-1.5">{label}</label>}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary">
+      {label && (
+        <label htmlFor={fieldId} className="block text-sm font-semibold text-on-surface-variant mb-1.5">
+          {label}
+        </label>
+      )}
+      <select id={fieldId} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary">
         {options.map((opt) => (
           <option key={opt.id} value={opt.id}>
             {opt.label}

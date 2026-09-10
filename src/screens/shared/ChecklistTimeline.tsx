@@ -73,10 +73,14 @@ export default function ChecklistTimeline({
             <div key={item.id} className="flex items-center gap-2">
               {editable ? (
                 <button onClick={() => setPickerSubjectId(item.subjectId)} className="shrink-0">
-                  <span className="block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="block w-2.5 h-2.5 rounded-full ring-1 ring-inset ring-on-surface/25" style={{ backgroundColor: color }} />
                 </button>
               ) : (
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                // 과목 색은 학생이 12색 팔레트에서 고르는데, 그중 7색(노랑·라임·호박·초록·하늘·
+                // 청록·주황)이 **라이트 배경에서 3:1을 못 넘긴다**(노랑은 1.82:1). 다크에서는
+                // 전부 통과하므로 팔레트를 바꾸는 건 답이 아니다 — 얇은 링으로 원의 윤곽을
+                // 잡아주면 어떤 색이 와도 형태가 읽힌다(과외 날 범례에서 쓴 방법과 같다).
+                <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-inset ring-on-surface/25" style={{ backgroundColor: color }} />
               )}
               <p className="flex-1 min-w-0 truncate">
                 <span className="text-base font-bold">{subject.label}</span>{' '}

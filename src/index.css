@@ -109,6 +109,23 @@
   }
 }
 
+/*
+  키보드 포커스 표시. 앱 전체 버튼 114개 중 포커스 스타일이 있는 것이 **하나도 없었다** —
+  입력칸만 `focus:ring`을 갖고 있었다. 이 앱은 브라우저로도 쓰이고(아이폰은 웹앱뿐이다)
+  블루투스 키보드·스위치 접근성으로 쓰는 경우도 있는데, 그런 사용자는 자기가 지금 어디에
+  있는지 볼 방법이 없었다.
+
+  `:focus-visible`이라 마우스 클릭·터치에는 안 뜬다 — 기존 사용자에게 보이는 변화는 없다.
+  `:where()`로 특이도를 0으로 두어 컴포넌트 클래스가 필요하면 덮어쓸 수 있게 한다.
+  입력칸은 제외한다 — 이미 `focus:ring-2`를 갖고 있어서 겹치면 테가 두 겹으로 그려진다.
+*/
+@layer base {
+  :where(button, a, summary, [role='button'], [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: 2px solid rgb(var(--primary));
+    outline-offset: 2px;
+  }
+}
+
 html,
 body {
   background: rgb(var(--surface));
