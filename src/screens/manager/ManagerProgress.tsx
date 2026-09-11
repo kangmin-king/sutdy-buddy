@@ -82,6 +82,11 @@ function CompactMonthPicker({
             <button
               key={d.key}
               disabled={isDisabled}
+              // 날짜를 여러 개 고르는 UI인데 선택 여부가 색으로만 표현돼 있었다. 스크린리더는
+              // 숫자만 읽어서 어떤 날짜를 골랐는지, 왜 어떤 날짜는 안 눌리는지 알 수 없었다.
+              // aria-pressed로 선택 상태를, 라벨로 월·일과 잠김 여부를 읽히게 한다.
+              aria-pressed={isSelected}
+              aria-label={`${Number(d.key.slice(5, 7))}월 ${Number(d.key.slice(8, 10))}일${isLocked ? ', 수정할 수 없음' : ''}`}
               onClick={() => !isLocked && !isDisabled && onToggleDate(d.key)}
               className="flex flex-col items-center justify-center py-0.5"
             >

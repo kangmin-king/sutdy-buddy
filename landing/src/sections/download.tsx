@@ -3,7 +3,7 @@ import { AppleIcon, ArrowRightIcon, DownloadIcon, SmartphoneIcon } from 'lucide-
 import { Reveal } from '@/components/reveal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { track } from '@/analytics';
+import { track, trackNavigation } from '@/analytics';
 import { APK_URL, APP_URL } from '@/lib/site';
 
 export function Download() {
@@ -63,7 +63,7 @@ export function Download() {
               </CardHeader>
               <CardContent className="mt-auto">
                 <Button asChild variant="outline">
-                  <a href={APP_URL} onClick={() => track('Clicked Start App', { placement: 'ios_guide' })}>
+                  <a href={APP_URL} onClick={(e) => trackNavigation(e, 'Clicked Start App', { placement: 'ios_guide' })}>
                     사파리로 웹앱 열기
                     <ArrowRightIcon />
                   </a>

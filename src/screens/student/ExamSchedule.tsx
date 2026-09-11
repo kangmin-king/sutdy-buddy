@@ -15,7 +15,18 @@ export default function ExamSchedule() {
   const { state } = useAppState();
   const today = todayKey();
   const exams = state.examRecords.slice().sort((a, b) => (a.examDate < b.examDate ? -1 : 1));
+  // "첫 시험은 펼쳐 둔다"를 초기값으로만 정하면, 첫 렌더에 시험이 비어 있는 경우 나중에
+  // 목록이 채워져도 아무것도 안 열린다. 지금 구조에서는 ExamSchedule이 loadAll이 끝난 뒤에야
+  // 마운트되므로 그 경로가 실제로 열리지는 않는다 — 다만 위쪽에서 로딩 순서가 바뀌면
+  // 조용히 깨지는 자리라 목록이 바뀔 때마다 다시 맞춘다.
   const [openExamId, setOpenExamId] = React.useState<string | null>(exams[0]?.id ?? null);
+  const examIds = exams.map((e) => e.id).join('|');
+  React.useEffect(() => {
+    // 열어둔 시험이 목록에서 사라졌을 때(삭제 등)도 첫 시험으로 되돌린다.
+    setOpenExamId((current) => (current && exams.some((e) => e.id === current) ? current : (exams[0]?.id ?? null)));
+    // exams 배열은 매 렌더 새로 만들어지므로 id 문자열로 의존성을 줄인다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examIds]);
 
   if (exams.length === 0) return null;
 

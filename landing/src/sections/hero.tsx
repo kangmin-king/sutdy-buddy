@@ -6,7 +6,7 @@ import mascotBunny from '@/assets/mascot-bunny-color.png';
 import { PhoneFrame } from '@/components/phone-frame';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { track } from '@/analytics';
+import { trackNavigation } from '@/analytics';
 import { APP_URL } from '@/lib/site';
 
 const TRUST = ['설치 없이 웹에서 바로', '안드로이드 앱 제공', '과외쌤·학생 계정 분리'];
@@ -60,7 +60,7 @@ export function Hero() {
 
           <div className="mt-9 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <a href={APP_URL} onClick={() => track('Clicked Start App', { placement: 'hero' })}>
+              <a href={APP_URL} onClick={(e) => trackNavigation(e, 'Clicked Start App', { placement: 'hero' })}>
                 웹으로 시작하기
                 <ArrowRightIcon />
               </a>

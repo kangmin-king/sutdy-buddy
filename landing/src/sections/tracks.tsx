@@ -3,7 +3,7 @@ import { ArrowRightIcon, CheckIcon, GraduationCapIcon, UsersIcon, type LucideIco
 import { Reveal } from '@/components/reveal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { track } from '@/analytics';
+import { trackNavigation } from '@/analytics';
 import { APP_URL } from '@/lib/site';
 
 // 앱은 학생 계정과 관리자(과외쌤·학부모) 계정이 갈리는 two-track 구조인데, 그 얘기가 랜딩에
@@ -75,7 +75,7 @@ export function Tracks() {
 
         <Reveal className="mt-8">
           <Button asChild variant="ghost" className="px-0 hover:bg-transparent hover:text-primary">
-            <a href={APP_URL} onClick={() => track('Clicked Start App', { placement: 'tracks' })}>
+            <a href={APP_URL} onClick={(e) => trackNavigation(e, 'Clicked Start App', { placement: 'tracks' })}>
               가입하면서 역할 고르기
               <ArrowRightIcon />
             </a>

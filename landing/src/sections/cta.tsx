@@ -3,7 +3,7 @@ import { ArrowRightIcon, DownloadIcon } from 'lucide-react';
 import mascotBunny from '@/assets/mascot-bunny-color.png';
 import { Reveal } from '@/components/reveal';
 import { Button } from '@/components/ui/button';
-import { track } from '@/analytics';
+import { track, trackNavigation } from '@/analytics';
 import { APK_URL, APP_URL } from '@/lib/site';
 
 export function Cta() {
@@ -29,7 +29,7 @@ export function Cta() {
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">
-            <a href={APP_URL} onClick={() => track('Clicked Start App', { placement: 'final_cta' })}>
+            <a href={APP_URL} onClick={(e) => trackNavigation(e, 'Clicked Start App', { placement: 'final_cta' })}>
               웹으로 시작하기
               <ArrowRightIcon />
             </a>

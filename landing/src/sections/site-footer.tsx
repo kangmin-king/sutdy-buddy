@@ -1,5 +1,5 @@
 import mascotFace from '@/assets/mascot-face.png';
-import { track } from '@/analytics';
+import { track, trackNavigation } from '@/analytics';
 import { APK_URL, APP_URL, CONTACT_OPENCHAT_URL, NAV_LINKS } from '@/lib/site';
 
 export function SiteFooter() {
@@ -35,7 +35,7 @@ export function SiteFooter() {
               <p className="text-xs font-bold text-foreground">시작하기</p>
               <a
                 href={APP_URL}
-                onClick={() => track('Clicked Start App', { placement: 'footer' })}
+                onClick={(e) => trackNavigation(e, 'Clicked Start App', { placement: 'footer' })}
                 className="text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 웹앱 열기
