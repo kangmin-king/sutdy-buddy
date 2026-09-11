@@ -48,9 +48,10 @@ export default function ManagerStudentListScreen({
         <TextField label="학생 초대코드" value={code} onChange={setCode} placeholder="예: A1B2C3D4" />
         <Button
           className="w-full"
-          onClick={() => {
-            actions.linkByInviteCode(code);
-            setCode('');
+          onClick={async () => {
+            // 성공했을 때만 입력을 비운다. 예전에는 결과와 무관하게 비워서, 코드를 잘못 쳤거나
+            // 저장이 실패하면 8자리를 다시 물어봐야 했다(학생에게 받은 코드라 화면에 없다).
+            if (await actions.linkByInviteCode(code)) setCode('');
           }}
         >
           학생 연결하기

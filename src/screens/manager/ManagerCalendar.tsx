@@ -382,14 +382,17 @@ export default function ManagerCalendarScreen({
           <TextField label="범위 (선택)" value={proposalPageRange} onChange={setProposalPageRange} placeholder="예: 30~40페이지" />
           <Button
             className="w-full"
-            onClick={() => {
-              actions.createHomeworkProposal(studentId, {
+            onClick={async () => {
+              // 저장에 성공했을 때만 시트를 닫는다. 예전에는 결과를 기다리지 않고 닫아서,
+              // 실패하면 교재명과 범위를 처음부터 다시 타이핑해야 했다.
+              // (액션이 전역 에러 배너를 띄우므로 여기서는 입력을 지키는 것이 할 일이다.)
+              const sent = await actions.createHomeworkProposal(studentId, {
                 date: selectedDate,
                 subjectId: proposalSubjectId,
                 material: proposalMaterial,
                 pageRange: proposalPageRange,
               });
-              setProposalSheetOpen(false);
+              if (sent) setProposalSheetOpen(false);
             }}
           >
             제안 보내기

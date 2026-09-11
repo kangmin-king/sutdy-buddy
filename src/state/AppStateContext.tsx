@@ -136,7 +136,8 @@ interface AppStateActions {
   updatePlannerItem: (date: DateKey, id: string, patch: Partial<PlannerItem>) => Promise<void>;
   deletePlannerItem: (date: DateKey, id: string) => Promise<void>;
   carryOverPlannerItem: (date: DateKey, id: string) => Promise<void>;
-  linkByInviteCode: (code: string) => Promise<void>;
+  /** 연결에 성공했는지. 실패하면 입력한 초대코드를 지우지 말 것. */
+  linkByInviteCode: (code: string) => Promise<boolean>;
   createHomeworkAssignment: (
     studentId: string,
     assignment: Omit<HomeworkAssignment, 'id' | 'studentId' | 'createdBy' | 'updatedAt'>
@@ -147,26 +148,30 @@ interface AppStateActions {
   updateStudentLabel: (studentId: string, label: string) => Promise<void>;
   updateManagerLabel: (managerId: string, label: string) => Promise<void>;
   registerDeviceToken: (token: string) => Promise<void>;
+  /** 제안을 보냈는지. 실패하면 시트를 닫지 말 것 — 교재·범위를 다시 타이핑해야 한다. */
   createHomeworkProposal: (
     studentId: string,
     proposal: { date: DateKey; subjectId: SubjectId; material: string; pageRange: string }
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   respondToHomeworkProposal: (proposalId: string, accept: boolean) => Promise<void>;
   loadSentHomeworkProposals: (studentId: string) => Promise<void>;
-  createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string>;
+  /** 만들어진 시험 id. **실패하면 null** — 호출부는 폼을 닫기 전에 반드시 확인할 것. */
+  createExamRecord: (studentId: string, exam: { title: string; examDate: string; isMain: boolean }) => Promise<string | null>;
   deleteExamRecord: (studentId: string, examId: string) => Promise<void>;
   addExamSubject: (examId: string, subject: { subjectId: SubjectId; targetGrade: string; targetScore: string; targetRank: string }) => Promise<void>;
   deleteExamSubject: (studentId: string, examId: string, subjectId: string) => Promise<void>;
+  // 아래 셋은 **저장에 성공했는지**를 돌려준다. 시트를 닫거나 입력을 비우기 전에 확인할 것 —
+  // 실패했는데 닫아버리면 사용자가 방금 친 내용을 통째로 다시 입력해야 한다.
   registerHomeworkRange: (
     studentId: string,
     examSubjectId: string,
     params: { subjectId: SubjectId; material: string; selectedDates: DateKey[] } & HomeworkScope
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   updateHomeworkRange: (
     studentId: string,
     rangeId: string,
     params: { material: string; selectedDates: DateKey[] } & HomeworkScope
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   deleteExamRange: (studentId: string, rangeId: string) => Promise<void>;
   updateStudentPlannerItem: (studentId: string, date: DateKey, id: string, patch: Partial<PlannerItem>) => Promise<void>;
   updateHomeworkAmountForDate: (
@@ -749,17 +754,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           console.error('linkByInviteCode failed:', error.message);
           setState((s) => ({ ...s, error: notFound ? '초대코드를 찾을 수 없어요. 다시 확인해주세요.' : WRITE_FAILURE_MESSAGE }));
           track('Linked Account', { result: notFound ? 'code_not_found' : 'link_failed' });
-          return;
+          return false;
         }
         if (!studentId) {
           setState((s) => ({ ...s, error: '초대코드를 찾을 수 없어요. 다시 확인해주세요.' }));
           track('Linked Account', { result: 'code_not_found' });
-          return;
+          return false;
         }
         // 연결 직후 학생 목록을 다시 불러와야 관리자 화면에 바로 나타난다.
         const managedStudents = await fetchManagedStudents(userId);
         setState((s) => ({ ...s, managedStudents }));
         track('Linked Account', { result: 'success', managed_student_count: managedStudents.length });
+        return true;
       },
 
       async createHomeworkAssignment(studentId, assignment) {
@@ -1017,14 +1023,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             },
             error: WRITE_FAILURE_MESSAGE,
           }));
-        } else {
-          track('Sent Homework Proposal', {
-            subject_id: proposal.subjectId,
-            has_page_range: Boolean(proposal.pageRange),
-            day_offset: dayOffsetFromToday(proposal.date),
-          });
-          notifyUser(studentId, '숙제 제안이 왔어요', proposal.material ? `${proposal.material} 숙제를 제안했어요. 확인해보세요` : '새 숙제를 제안했어요');
+          return false;
         }
+
+        track('Sent Homework Proposal', {
+          subject_id: proposal.subjectId,
+          has_page_range: Boolean(proposal.pageRange),
+          day_offset: dayOffsetFromToday(proposal.date),
+        });
+        notifyUser(studentId, '숙제 제안이 왔어요', proposal.material ? `${proposal.material} 숙제를 제안했어요. 확인해보세요` : '새 숙제를 제안했어요');
+        return true;
       },
 
       async respondToHomeworkProposal(proposalId, accept) {
@@ -1104,11 +1112,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           is_main: exam.isMain,
         });
         if (error) {
+          // 되돌리지 않으면 DB에 없는 시험이 목록에 남고, 호출부가 그 id를 선택한다.
+          // 선생님이 그 시험 아래에 과목·교재 범위를 넣으면 전부 외래키 위반으로 실패한다 —
+          // "시험은 보이는데 아무것도 등록이 안 되는" 상태가 된다.
+          // null을 돌려줘서 호출부가 폼을 닫지 않고 다시 시도할 수 있게 한다.
           console.error('createExamRecord failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        } else {
-          track('Created Exam Record', { is_main: exam.isMain, days_until_exam: dayOffsetFromToday(exam.examDate) });
+          setState((s) => ({ ...s, examRecords: s.examRecords.filter((e) => e.id !== id), error: WRITE_FAILURE_MESSAGE }));
+          return null;
         }
+        track('Created Exam Record', { is_main: exam.isMain, days_until_exam: dayOffsetFromToday(exam.examDate) });
         return id;
       },
 
@@ -1223,7 +1235,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (rangeError) {
           console.error('registerHomeworkRange (range) failed:', rangeError.message);
           setState((s) => ({ ...s, examSubjectRanges: previousRanges, error: WRITE_FAILURE_MESSAGE }));
-          return;
+          return false;
         }
 
         // 학생 계정 이름으로 각 날짜에 숙제 항목을 즉시 생성한다(지연 생성 없음). 학생의 plannerItems가
@@ -1309,16 +1321,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             studentPlannerItems: { ...s.studentPlannerItems, [studentId]: previousStudentItems },
             error: WRITE_FAILURE_MESSAGE,
           }));
-        } else {
-          track('Registered Homework Range', {
-            subject_id: params.subjectId,
-            mode: params.mode,
-            date_count: selectedDates.length,
-            // 자유 입력 모드는 페이지 수를 알 수 없다 — 그때는 아예 안 붙인다.
-            page_count: params.mode === 'pages' ? params.endPage - params.startPage + 1 : undefined,
-          });
-          notifyUser(studentId, '숙제가 등록됐어요', params.material ? `${params.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
+          return false;
         }
+
+        track('Registered Homework Range', {
+          subject_id: params.subjectId,
+          mode: params.mode,
+          date_count: selectedDates.length,
+          // 자유 입력 모드는 페이지 수를 알 수 없다 — 그때는 아예 안 붙인다.
+          page_count: params.mode === 'pages' ? params.endPage - params.startPage + 1 : undefined,
+        });
+        notifyUser(studentId, '숙제가 등록됐어요', params.material ? `${params.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
+        return true;
       },
 
       async updateHomeworkRange(studentId, rangeId, params) {
@@ -1329,7 +1343,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         const linkedItems = Object.values(currentByDate)
           .flat()
           .filter((i) => i.examSubjectRangeId === rangeId);
-        if (linkedItems.length === 0) return;
+        // 고칠 항목이 하나도 없으면 할 일이 없다. 실패는 아니므로 폼은 닫아준다.
+        if (linkedItems.length === 0) return true;
         const subjectId = linkedItems[0].subjectId;
         const lockedDates = new Set(linkedItems.filter((i) => i.date < today || i.status === 'completed').map((i) => i.date));
         const removable = linkedItems.filter((i) => !lockedDates.has(i.date));
@@ -1354,7 +1369,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (rangeError) {
           console.error('updateHomeworkRange (range) failed:', rangeError.message);
           setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-          return;
+          return false;
         }
 
         const merged: Record<DateKey, PlannerItem[]> = { ...currentByDate };
@@ -1394,6 +1409,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: merged };
         setState((s) => ({ ...s, studentPlannerItems: { ...s.studentPlannerItems, [studentId]: merged } }));
 
+        // 아래 두 쓰기는 실패해도 계속 진행한다 — 범위 행은 이미 갱신됐고, 여기서 멈추면
+        // 날짜 목록과 숙제 항목이 더 크게 어긋난다. 다만 하나라도 실패하면 호출부에
+        // 실패를 알려서 수정 폼이 닫히지 않게 한다.
+        let allWritesOk = true;
+
         if (removable.length > 0) {
           const { error: deleteError } = await supabase
             .from('sb_planner_items')
@@ -1402,6 +1422,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           if (deleteError) {
             console.error('updateHomeworkRange (delete) failed:', deleteError.message);
             setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+            allWritesOk = false;
           }
         }
 
@@ -1435,9 +1456,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           if (itemsError) {
             console.error('updateHomeworkRange (items) failed:', itemsError.message);
             setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+            allWritesOk = false;
           }
         }
-        notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
+        // 알림은 실제로 뭔가 바뀐 경우에만 보낸다 — 전부 실패했는데 "숙제 내용이 바뀌었어요"가
+        // 가면 학생이 열어봐도 달라진 게 없다.
+        if (allWritesOk) {
+          notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
+        }
+        return allWritesOk;
       },
 
       async deleteExamRange(studentId, rangeId) {

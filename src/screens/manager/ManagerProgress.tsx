@@ -251,7 +251,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
     setSelectedDates((prev) => (prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date]));
   };
 
-  const submitRange = () => {
+  const submitRange = async () => {
     if (!rangeSubjectId) return;
     if (!material.trim()) {
       setRangeError('교재명을 입력해주세요.');
@@ -298,7 +298,7 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
         setRangeError('공부할 날짜를 하나 이상 골라주세요.');
         return;
       }
-      actions.updateHomeworkRange(studentId, editingRangeId, { material, selectedDates, ...scope });
+      if (!(await actions.updateHomeworkRange(studentId, editingRangeId, { material, selectedDates, ...scope }))) return;
     } else {
       if (selectedDates.length === 0) {
         setRangeError('공부할 날짜를 하나 이상 골라주세요.');
@@ -309,8 +309,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
         setRangeError('과목을 찾을 수 없어요. 화면을 다시 열어주세요.');
         return;
       }
-      actions.registerHomeworkRange(studentId, rangeSubjectId, { subjectId: subject.subjectId, material, selectedDates, ...scope });
+      if (!(await actions.registerHomeworkRange(studentId, rangeSubjectId, { subjectId: subject.subjectId, material, selectedDates, ...scope }))) return;
     }
+    // 저장에 성공했을 때만 폼을 닫는다. 예전에는 결과를 기다리지 않고 닫아서, 실패하면
+    // 교재명·페이지·고른 날짜를 전부 다시 입력해야 했다(날짜는 여러 개를 탭으로 고른 것이다).
     setRangeError(null);
     closeRangeForm();
   };
@@ -318,6 +320,10 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
   const submitExam = async () => {
     if (!examTitle.trim()) return;
     const id = await actions.createExamRecord(studentId, { title: examTitle, examDate, isMain: examIsMain });
+    // 실패하면 폼을 닫지 않는다. 예전에는 결과와 무관하게 닫고 입력값을 비웠는데, 저장이
+    // 실패했을 때 시험명을 다시 타이핑해야 했고 선택된 시험 id는 DB에 없는 값이 됐다.
+    // (액션이 전역 에러 배너를 이미 띄운다 — 여기서는 입력을 지키는 것이 할 일이다.)
+    if (!id) return;
     setExamTitle('');
     setExamIsMain(false);
     setShowExamForm(false);
