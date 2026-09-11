@@ -32,6 +32,11 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
   // 비운다 — 학습 타이머에서 겪었던 "일시정지 시 값이 튀는" 문제를 처음부터 피하기 위함이다.
   const [endAt, setEndAt] = React.useState<number | null>(null);
   const [remainingMsPaused, setRemainingMsPaused] = React.useState<number | null>(null);
+  // 어떻게 끝났는지를 **state로** 남긴다. 예전에는 done 화면이 `timeUp`을 직접 봤는데,
+  // timeUp은 `running && remainingMs <= 0`이고 종료 이펙트가 곧바로 setRunning(false)를 하므로
+  // 다음 렌더에서 반드시 false가 된다. 그래서 시간이 다 돼서 끝나도 화면은 언제나
+  // 🙌 "수고하셨어요!"였다 — ⏰ 분기는 도달할 수 없는 코드였다.
+  const [endedReason, setEndedReason] = React.useState<'time_up' | 'manual' | null>(null);
   const [now, setNow] = React.useState(Date.now());
 
   const preset = PRESETS.find((p) => p.id === presetId)!;
@@ -52,6 +57,7 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
       setRunning(false);
       setEndAt(null);
       setRemainingMsPaused(0);
+      setEndedReason('time_up');
       setPhase('done');
       track('Ended Mock Exam Timer', {
         preset_id: presetId,
@@ -93,6 +99,7 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
     setRemainingMsPaused(remaining);
     setRunning(false);
     setEndAt(null);
+    setEndedReason('manual');
     setPhase('done');
     track('Ended Mock Exam Timer', {
       preset_id: presetId,
@@ -106,6 +113,7 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
     setRunning(false);
     setEndAt(null);
     setRemainingMsPaused(null);
+    setEndedReason(null);
     setPhase('setup');
   };
 
@@ -153,8 +161,8 @@ export default function MockExamTimerScreen({ onClose }: { onClose: () => void }
 
       {phase === 'done' && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center">
-          <p className="text-5xl">{timeUp ? '⏰' : '🙌'}</p>
-          <p className="text-lg font-bold text-on-surface">{timeUp ? '시험 시간이 끝났어요' : '수고하셨어요!'}</p>
+          <p className="text-5xl">{endedReason === 'time_up' ? '⏰' : '🙌'}</p>
+          <p className="text-lg font-bold text-on-surface">{endedReason === 'time_up' ? '시험 시간이 끝났어요' : '수고하셨어요!'}</p>
           <Card className="text-center">
             <p className="text-xs text-on-surface-variant mb-1">사용한 시간</p>
             <p className="text-2xl font-mono font-extrabold text-primary">{formatTime(elapsedMs)}</p>
