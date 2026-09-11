@@ -258,11 +258,28 @@ export default function ManagerProgressScreen({ studentId }: { studentId: string
         setRangeError('시작 페이지와 끝 페이지를 모두 입력해주세요.');
         return;
       }
-      if (Number(startPage) > Number(endPage)) {
+      // `type="number"`는 화면 힌트일 뿐이고 상태는 문자열이다. Number()로 바로 비교하면
+      // `"abc"`가 NaN이 되는데 `NaN > x`는 항상 false라 검증을 그냥 통과했다. 그러면
+      // splitPagesAcrossDates가 빈 배열을 돌려줘 숙제가 하나도 안 생기고, 그런데도
+      // **`"NaN~40페이지"`라는 범위 이름이 DB에 저장된다.** `"1e3"`(1000쪽)이나 `"1.5"`처럼
+      // number 입력이 실제로 받아주는 값들도 걸러야 한다.
+      const parsePage = (value: string) => {
+        const trimmed = value.trim();
+        if (!/^\d+$/.test(trimmed)) return null;
+        const n = Number(trimmed);
+        return n >= 1 ? n : null;
+      };
+      const from = parsePage(startPage);
+      const to = parsePage(endPage);
+      if (from === null || to === null) {
+        setRangeError('페이지는 1 이상의 숫자로 입력해주세요.');
+        return;
+      }
+      if (from > to) {
         setRangeError('끝 페이지가 시작 페이지보다 커야 해요.');
         return;
       }
-      scope = { mode: 'pages', startPage: Number(startPage), endPage: Number(endPage) };
+      scope = { mode: 'pages', startPage: from, endPage: to };
     } else {
       if (!customLabel.trim()) {
         setRangeError('학습 내용을 입력해주세요.');

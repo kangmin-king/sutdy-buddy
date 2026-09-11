@@ -247,15 +247,24 @@ export function toMinutesOfDay(isoString: string): number {
 // 탭으로 고른 날짜들에 이 결과를 그대로 sb_planner_items로 즉시 일괄 생성한다(지연 생성 없음).
 export function splitPagesAcrossDates(startPage: number, endPage: number, selectedDates: DateKey[]): { date: DateKey; pageRange: string }[] {
   if (selectedDates.length === 0) return [];
+  // 뒤집힌 범위는 나눌 것이 없다. 예전에는 그대로 계산해서 음수 페이지가 나왔다.
+  if (endPage < startPage) return [];
+
   const sorted = [...selectedDates].sort();
   const totalPages = endPage - startPage + 1;
-  const base = Math.floor(totalPages / sorted.length);
-  const remainder = totalPages - base * sorted.length;
+
+  // **날짜가 페이지보다 많으면 앞에서부터 페이지 수만큼만 쓴다.** 예전에는 base가 0이 되어
+  // 마지막을 뺀 모든 날짜가 `1~0페이지`처럼 뒤집힌 범위를 받았다(1~3페이지를 5일에 나누면
+  // 네 날짜가 전부 `1~0페이지`). 학생에게 말이 안 되는 숙제가 그대로 저장됐다.
+  // 하루 한 페이지 아래로는 쪼갤 수 없으므로, 남는 날짜에는 숙제를 만들지 않는 것이 맞다.
+  const usableDates = sorted.slice(0, totalPages);
+  const base = Math.floor(totalPages / usableDates.length);
+  const remainder = totalPages - base * usableDates.length;
 
   const result: { date: DateKey; pageRange: string }[] = [];
   let cursor = startPage;
-  sorted.forEach((date, idx) => {
-    const isLast = idx === sorted.length - 1;
+  usableDates.forEach((date, idx) => {
+    const isLast = idx === usableDates.length - 1;
     const count = base + (isLast ? remainder : 0);
     const rangeStart = cursor;
     const rangeEnd = cursor + count - 1;

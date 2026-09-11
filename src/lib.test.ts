@@ -281,6 +281,31 @@ describe('splitPagesAcrossDates', () => {
   it('returns an empty array when no dates are selected', () => {
     expect(splitPagesAcrossDates(1, 40, [])).toEqual([]);
   });
+
+  // 날짜가 페이지보다 많으면 하루 한 페이지 아래로는 쪼갤 수 없다. 예전에는 base가 0이 되어
+  // 마지막을 뺀 모든 날짜가 `1~0페이지`라는 뒤집힌 범위를 받았고 그대로 저장됐다.
+  it('페이지보다 날짜가 많으면 앞에서부터 페이지 수만큼만 배정한다', () => {
+    const result = splitPagesAcrossDates(1, 3, ['2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10']);
+    expect(result).toEqual([
+      { date: '2026-08-06', pageRange: '1~1페이지' },
+      { date: '2026-08-07', pageRange: '2~2페이지' },
+      { date: '2026-08-08', pageRange: '3~3페이지' },
+    ]);
+  });
+
+  it('뒤집힌 범위는 아무것도 배정하지 않는다', () => {
+    expect(splitPagesAcrossDates(30, 10, ['2026-08-06', '2026-08-07'])).toEqual([]);
+  });
+
+  it('어떤 입력에도 뒤집힌 페이지 범위를 만들지 않는다', () => {
+    const dates = ['2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'];
+    for (let end = 1; end <= 6; end++) {
+      for (const result of splitPagesAcrossDates(1, end, dates)) {
+        const [from, to] = result.pageRange.replace('페이지', '').split('~').map(Number);
+        expect(to).toBeGreaterThanOrEqual(from);
+      }
+    }
+  });
 });
 
 function examSubjectRange(overrides: Partial<ExamSubjectRange>): ExamSubjectRange {
