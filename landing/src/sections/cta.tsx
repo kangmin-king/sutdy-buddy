@@ -1,6 +1,6 @@
 import { ArrowRightIcon, DownloadIcon } from 'lucide-react';
 
-import mascotFace from '@/assets/mascot-face-v2.webp';
+import mascotFace from '@/assets/mascot-buddy-v3.webp';
 import { Reveal } from '@/components/reveal';
 import { Button } from '@/components/ui/button';
 import { track, trackNavigation } from '@/analytics';

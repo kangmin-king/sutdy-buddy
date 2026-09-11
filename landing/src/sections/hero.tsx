@@ -2,7 +2,7 @@ import { ArrowRightIcon, CheckIcon } from 'lucide-react';
 
 import appCalendar from '@/assets/app_calendar.png';
 import appHome from '@/assets/app_home.png';
-import mascotFace from '@/assets/mascot-face-v2.webp';
+import mascotFace from '@/assets/mascot-buddy-v3.webp';
 import { PhoneFrame } from '@/components/phone-frame';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

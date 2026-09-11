@@ -7,7 +7,7 @@ import { Icon, ProgressRing, BottomSheet, TextField, Button, useConfirm } from '
 import { isNativePlatform } from '../../native/distractionStop';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import LinkedManagerChips from './LinkedManagerChips';
-import mascotFaceUrl from '../../assets/mascot-face-v2.webp';
+import mascotFaceUrl from '../../assets/mascot-buddy-v3.webp';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 

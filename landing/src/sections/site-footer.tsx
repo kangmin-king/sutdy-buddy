@@ -1,4 +1,4 @@
-import mascotFace from '@/assets/mascot-face-v2.webp';
+import mascotFace from '@/assets/mascot-buddy-v3.webp';
 import { track, trackNavigation } from '@/analytics';
 import { APK_URL, APP_URL, CONTACT_OPENCHAT_URL, NAV_LINKS } from '@/lib/site';
 

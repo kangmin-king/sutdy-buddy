@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from './state/AuthContext';
 import { useAppState } from './state/AppStateContext';
 import { useTheme, type Theme } from './state/ThemeContext';
-import mascotFaceUrl from './assets/mascot-face-v2.webp';
+import mascotFaceUrl from './assets/mascot-buddy-v3.webp';
 
 export function Icon({ name, className = '', filled = false }: { name: string; className?: string; filled?: boolean }) {
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
