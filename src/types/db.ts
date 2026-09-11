@@ -234,7 +234,16 @@ export interface Database {
     Functions: {
       // 초대코드로 학생 id를 찾는 security definer 함수 (0006 마이그레이션).
       // 관리자는 연결 전이라 학생 프로필 행을 RLS로 읽을 수 없으므로 직접 select 대신 이 RPC를 쓴다.
+      //
+      // ⚠ 링크 생성에는 쓰지 말 것 — 조회와 insert가 떨어져 있으면 코드 검증을 건너뛴 경로가
+      // 생긴다(실제로 그랬다). 연결은 아래 link_student_by_invite_code로 한다.
       find_student_by_invite_code: {
+        Args: { code: string };
+        Returns: string | null;
+      };
+      // 초대코드를 확인하고 **그 자리에서** 링크까지 만드는 security definer 함수 (0026 마이그레이션).
+      // 코드를 못 찾거나 호출자가 매니저가 아니면 예외를 던진다.
+      link_student_by_invite_code: {
         Args: { code: string };
         Returns: string | null;
       };

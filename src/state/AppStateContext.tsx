@@ -724,27 +724,24 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async linkByInviteCode(code) {
-        // 아직 링크가 없는 상태라 RLS상 학생 프로필 행을 직접 select할 수 없다.
-        // 정확한 코드를 아는 경우에만 id 하나를 돌려주는 security definer RPC를 쓴다(0006 마이그레이션).
-        const { data: studentId, error: lookupError } = await supabase.rpc('find_student_by_invite_code', {
+        // 조회와 링크 생성을 **한 RPC 안에서** 한다(0026 마이그레이션). 예전에는
+        // find_student_by_invite_code로 id를 받은 뒤 클라이언트가 직접 insert했는데, 그 insert
+        // 정책이 `auth.uid() = manager_id`만 봐서 **초대코드를 몰라도 학생 UUID만 알면 링크를
+        // 만들 수 있었다.** 코드 검증과 insert가 떨어져 있으면 검증을 건너뛴 경로가 생긴다.
+        const { data: studentId, error } = await supabase.rpc('link_student_by_invite_code', {
           code: code.trim().toUpperCase(),
         });
-        if (lookupError) {
-          console.error('linkByInviteCode (lookup) failed:', lookupError.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-          track('Linked Account', { result: 'lookup_failed' });
+        if (error) {
+          // RPC는 코드를 못 찾으면 예외를 던진다 — 네트워크 실패와 구별해서 보여준다.
+          const notFound = error.message.includes('초대코드를 찾을 수 없습니다');
+          console.error('linkByInviteCode failed:', error.message);
+          setState((s) => ({ ...s, error: notFound ? '초대코드를 찾을 수 없어요. 다시 확인해주세요.' : WRITE_FAILURE_MESSAGE }));
+          track('Linked Account', { result: notFound ? 'code_not_found' : 'link_failed' });
           return;
         }
         if (!studentId) {
           setState((s) => ({ ...s, error: '초대코드를 찾을 수 없어요. 다시 확인해주세요.' }));
           track('Linked Account', { result: 'code_not_found' });
-          return;
-        }
-        const { error } = await supabase.from('sb_student_manager_links').insert({ student_id: studentId, manager_id: userId });
-        if (error) {
-          console.error('linkByInviteCode failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-          track('Linked Account', { result: 'link_failed' });
           return;
         }
         // 연결 직후 학생 목록을 다시 불러와야 관리자 화면에 바로 나타난다.
