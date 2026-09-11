@@ -1,4 +1,4 @@
-import mascotFace from '@/assets/mascot-face.png';
+import mascotFace from '@/assets/mascot-face-v2.webp';
 import { Button } from '@/components/ui/button';
 import { trackNavigation } from '@/analytics';
 import { APP_URL, NAV_LINKS } from '@/lib/site';

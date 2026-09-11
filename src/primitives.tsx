@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from './state/AuthContext';
 import { useAppState } from './state/AppStateContext';
 import { useTheme, type Theme } from './state/ThemeContext';
-import mascotFaceUrl from './assets/mascot-face.png';
+import mascotFaceUrl from './assets/mascot-face-v2.webp';
 
 export function Icon({ name, className = '', filled = false }: { name: string; className?: string; filled?: boolean }) {
   return <span className={`material-symbols-outlined ${filled ? 'filled' : ''} ${className}`}>{name}</span>;
@@ -36,7 +36,10 @@ export function TopAppBar({
         aria-label="내 계정"
         className="-ml-1 flex min-h-11 items-center gap-2.5 rounded-full pl-1 pr-2.5 transition active:scale-[0.98]"
       >
-        <span className="w-9 h-9 rounded-full bg-primary overflow-hidden flex items-center justify-center shrink-0">
+        {/* 새 마스코트는 배경이 투명하다. 예전 PNG는 흰 배경이 구워져 있어서 뒤의 bg-primary가
+            완전히 가려져 죽은 스타일이었다 — 그걸 걷어내고, 대신 얇은 링으로 원의 윤곽만 잡는다.
+            투명한 자리로는 상단바 배경이 그대로 비친다(라이트·다크 양쪽에서 자연스럽다). */}
+        <span className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0 ring-1 ring-outline/40">
           <img src={mascotFaceUrl} alt="" className="w-full h-full object-cover" />
         </span>
         <span className="text-lg font-bold text-primary">{title}</span>

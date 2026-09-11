@@ -7,7 +7,7 @@ import { Icon, ProgressRing, BottomSheet, TextField, Button, useConfirm } from '
 import { isNativePlatform } from '../../native/distractionStop';
 import SchoolTimetableGrid from '../shared/SchoolTimetableGrid';
 import LinkedManagerChips from './LinkedManagerChips';
-import mascotFaceUrl from '../../assets/mascot-face.png';
+import mascotFaceUrl from '../../assets/mascot-face-v2.webp';
 
 const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -96,7 +96,8 @@ export default function MyPageScreen({
       <h1 className="text-2xl font-extrabold tracking-tight text-on-surface">나</h1>
 
       <section className="mt-4 rounded-2xl bg-surface-container-lowest p-5 text-center shadow-card">
-        <div className="mx-auto h-16 w-16 overflow-hidden rounded-full bg-primary">
+        {/* bg-primary는 새 마스코트가 투명해지면서 필요 없어졌다(상단바와 같은 이유). */}
+        <div className="mx-auto h-16 w-16 overflow-hidden rounded-full ring-1 ring-outline/40">
           <img src={mascotFaceUrl} alt="" className="h-full w-full object-cover" />
         </div>
         {/* 프로필에 이름 필드가 없다(Profile은 학년·목표만 갖는다) — 학년을 이름 자리에 둔다. */}

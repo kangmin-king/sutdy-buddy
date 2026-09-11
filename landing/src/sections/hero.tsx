@@ -2,7 +2,7 @@ import { ArrowRightIcon, CheckIcon } from 'lucide-react';
 
 import appCalendar from '@/assets/app_calendar.png';
 import appHome from '@/assets/app_home.png';
-import mascotBunny from '@/assets/mascot-bunny-color.png';
+import mascotFace from '@/assets/mascot-face-v2.webp';
 import { PhoneFrame } from '@/components/phone-frame';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,8 @@ export function Hero() {
       <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 py-16 lg:grid-cols-[1fr_auto] lg:gap-20 lg:py-24">
         <div className="max-w-xl">
           <Badge variant="secondary" className="mb-7 gap-2.5 rounded-lg py-2 pl-2 pr-4 text-base">
-            <img src={mascotBunny} alt="" className="size-7 shrink-0 object-contain" />
+            {/* 28px에서는 전신보다 얼굴 crop이 읽힌다 — 전신을 이 크기로 줄이면 귀와 몸이 뭉개진다. */}
+            <img src={mascotFace} alt="" className="size-7 shrink-0 object-contain" />
             과외쌤이라면 아는 그 장면
           </Badge>
 
