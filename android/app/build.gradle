@@ -21,7 +21,7 @@ android {
         // 인정한다. 1은 드라이브로 직접 배포한 APK가 이미 쓰고 있어서 2부터 시작한다 —
         // 그래야 그 APK를 쓰는 학생이 스토어 버전으로 넘어올 수 있다.
         // **스토어에 올릴 때마다 반드시 올릴 것.**
-        versionCode 11
+        versionCode 12
         // 사용자에게 보이는 버전. 1.1(학생 폰에 이미 깔려 있던 APK) 이후로 다크 모드,
         // 학생 탭 개편(플래너 → "나"), 매니저 화면 결함 수정, 회원 탈퇴 위치 변경이 들어갔다.
         // 1.2(versionCode 3)는 다크 대비 수정 전에 빌드해서 내 기기에만 설치됐다.
@@ -50,7 +50,10 @@ android {
         // **배포 시점(2026-09-11) 기준 사용자 4명 전원이 8월 빌드였다**(sb_device_tokens의
         // updated_at이 최초 등록 시각에 멈춰 있었다). 그래서 1.2.2~1.2.7은 아무도 설치하지
         // 않았고, 이 APK가 8월 이후 처음으로 실제 설치되는 버전이다.
-        versionName "1.2.8"
+        // 1.2.9(versionCode 12)는 마스코트를 앱 토큰에 맞는 저채도 토끼로 바꿨다(투명 배경,
+        // 당근 대신 체크 카드). 1.2.8은 배포만 하고 **아무도 설치하기 전에** 1.2.9가 나왔으므로
+        // 학생에게 요청할 설치는 여전히 한 번이다 — 1.2.8 대신 이걸 받으면 된다.
+        versionName "1.2.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
