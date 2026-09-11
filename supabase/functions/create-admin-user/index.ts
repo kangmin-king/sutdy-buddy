@@ -45,7 +45,18 @@ Deno.serve(async (req: Request) => {
     if (createError) throw createError;
 
     const { error: insertError } = await admin.from('sb_admin_users').insert({ id: created.user.id, role: 'operator' });
-    if (insertError) throw insertError;
+    if (insertError) {
+      // auth 계정은 만들어졌는데 운영자 행이 안 들어간 상태다. 그대로 두면 **운영자 목록에는
+      // 없는데 로그인은 되는 계정**이 남고, 호출자는 500을 받아 실패로 알기 때문에 아무도
+      // 정리하지 않는다. 게다가 같은 이메일로 다시 시도하면 createUser가 "이미 가입됨"으로
+      // 실패해서 그 이메일은 영구히 막힌다.
+      const { error: cleanupError } = await admin.auth.admin.deleteUser(created.user.id);
+      if (cleanupError) {
+        // 보상 삭제까지 실패하면 수동 정리가 필요하다 — 어떤 계정인지 로그로 남긴다.
+        console.error(`created admin auth cleanup failed for ${created.user.id}:`, cleanupError.message);
+      }
+      throw insertError;
+    }
 
     return new Response(JSON.stringify({ email, password }), { status: 200, headers: corsHeaders });
   } catch (err) {

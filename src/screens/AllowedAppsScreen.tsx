@@ -113,6 +113,7 @@ export default function AllowedAppsScreen({
                 <ToggleSwitch
                   checked={allowedApps.includes(app.packageName)}
                   onChange={(enabled) => toggle(app.packageName, enabled)}
+                  ariaLabel={`${app.label} 허용`}
                 />
               </div>
             ))}

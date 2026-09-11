@@ -409,17 +409,52 @@ export function ProgressBar({ percent, className = '' }: { percent: number; clas
   );
 }
 
-export function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+// 스위치는 진짜 버튼이어야 한다. 예전에는 `<span onClick>`이라 세 가지가 동시에 깨져 있었다:
+//  - 키보드 포커스가 안 가고 Space/Enter로 못 켠다(블루투스 키보드·스위치 접근성 사용자).
+//  - 스크린리더가 켜짐/꺼짐을 못 읽는다 — role도 상태도 없었다.
+//  - 바깥 `<label>`에 연결된 폼 컨트롤이 없어서 **라벨 글씨를 눌러도 아무 일이 없었다.**
+//    cursor-pointer만 있어서 눌리는 것처럼 보였다.
+// `<button>`으로 바꾸면 index.css의 전역 :focus-visible 규칙도 자동으로 적용된다.
+//
+// label이 없는 자리(허용앱 목록처럼 줄 안의 다른 글씨가 이름 역할을 하는 곳)는 ariaLabel로
+// 이름을 받는다 — 이름 없는 스위치는 스크린리더에서 "스위치"로만 읽혀 무엇을 켜는지 알 수 없다.
+export function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+  ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+  ariaLabel?: string;
+}) {
+  const labelId = React.useId();
   return (
-    <label className="flex items-center justify-between cursor-pointer">
-      {label && <span className="text-sm font-medium text-on-surface">{label}</span>}
-      <span
+    <div className="flex items-center justify-between">
+      {label && (
+        <span id={labelId} className="text-sm font-medium text-on-surface">
+          {label}
+        </span>
+      )}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby={label ? labelId : undefined}
+        aria-label={label ? undefined : ariaLabel}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked ? 'bg-primary' : 'bg-surface-container-high'}`}
+        // 보이는 트랙은 24px 그대로 두고 위아래 여백으로 터치 영역만 44px로 넓힌다
+        // (-my-2.5가 그 여백만큼 되돌려서 줄 간격은 예전과 같다).
+        className="-my-2.5 flex min-h-11 shrink-0 items-center py-2.5"
       >
-        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
-      </span>
-    </label>
+        <span
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked ? 'bg-primary' : 'bg-surface-container-high'}`}
+        >
+          <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -442,13 +477,25 @@ export function BottomSheet({ open, onClose, title, children }: { open: boolean;
 // 바텀시트가 뜨고, 사용자가 확인/취소를 누를 때 Promise가 resolve된다.
 export function useConfirm() {
   const [pending, setPending] = React.useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+  // 지금 열려 있는 확인을 setState 커밋을 기다리지 않고 읽기 위한 미러. 상태 갱신 함수 안에서
+  // resolve를 부르면 StrictMode가 갱신 함수를 두 번 돌리므로 그쪽은 쓰지 않는다.
+  const pendingRef = React.useRef<{ resolve: (v: boolean) => void } | null>(null);
 
   const confirm = React.useCallback((message: string) => {
-    return new Promise<boolean>((resolve) => setPending({ message, resolve }));
+    return new Promise<boolean>((resolve) => {
+      // **앞선 확인이 아직 열려 있으면 먼저 취소로 닫는다.** 예전에는 그냥 덮어써서 앞선
+      // Promise가 영원히 대기했고, 그걸 await하던 코드가 통째로 멈췄다(삭제 버튼을 빠르게
+      // 두 번 누르면 실제로 걸린다). 확인 다이얼로그의 안전한 기본값은 "취소"다.
+      pendingRef.current?.resolve(false);
+      const entry = { message, resolve };
+      pendingRef.current = entry;
+      setPending(entry);
+    });
   }, []);
 
   const settle = (value: boolean) => {
-    pending?.resolve(value);
+    pendingRef.current?.resolve(value);
+    pendingRef.current = null;
     setPending(null);
   };
 

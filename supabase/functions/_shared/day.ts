@@ -27,6 +27,15 @@ export const DAY_ROLLOVER_HOUR = 4;
  * 04:00 → 0, 21:00 → 1020, 00:01 → 1201, 03:59 → 1439.
  */
 export function minutesSinceDayStart(time: string): number {
-  const [hour, minute] = time.slice(0, 5).split(':').map(Number);
+  // 잘못된 문자열은 조용히 넘기지 않고 던진다. 예전에는 `''`·`'abc'`·`'25:99'`가 그대로
+  // NaN이 됐는데, 비교식이 `NaN < NaN`이면 false라 **"알림 시각 전" 판정이 통째로 무력화되어
+  // 설정한 시각과 무관하게 알림이 나갔다.** 조용한 오작동보다 터지는 쪽이 낫다 —
+  // 부르는 쪽에서 학생 단위로 잡아 그 학생만 건너뛴다.
+  const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(time);
+  if (!match) throw new Error(`Invalid time: ${time}`);
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) throw new Error(`Invalid time: ${time}`);
+
   return (hour * 60 + minute - DAY_ROLLOVER_HOUR * 60 + 24 * 60) % (24 * 60);
 }

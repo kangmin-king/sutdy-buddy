@@ -640,8 +640,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         const { error } = await supabase.from('sb_planner_items').update(dbPatch).eq('id', id);
         if (error) {
+          // 되돌리지 않으면 **학생이 완료 체크한 숙제가 화면에만 남고 DB에는 안 들어간다.**
+          // 이 앱에서 제일 중요한 기록이고, 학생은 다음에 앱을 열었을 때 체크가 사라진 것을 보고
+          // "했는데 없어졌다"고 겪는다. previousItem은 지금까지 추적 이벤트용으로만 쓰였다.
           console.error('updatePlannerItem failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => ({
+            ...s,
+            plannerItems: previousItem
+              ? { ...s.plannerItems, [date]: (s.plannerItems[date] ?? []).map((i) => (i.id === id ? previousItem : i)) }
+              : s.plannerItems,
+            error: WRITE_FAILURE_MESSAGE,
+          }));
         } else if (patch.status === 'completed' && previousItem && previousItem.status !== 'completed') {
           track('Completed Planner Item', {
             subject_id: previousItem.subjectId,
@@ -788,7 +797,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async updateHomeworkAssignment(id, patch) {
-        const studentId = state.homeworkAssignments.find((a) => a.id === id)?.studentId;
+        const previousAssignment = state.homeworkAssignments.find((a) => a.id === id);
+        const studentId = previousAssignment?.studentId;
         setState((s) => ({
           ...s,
           homeworkAssignments: s.homeworkAssignments.map((a) => (a.id === id ? { ...a, ...patch } : a)),
@@ -803,8 +813,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         const { error } = await supabase.from('sb_homework_assignments').update(dbPatch).eq('id', id);
         if (error) {
+          // 되돌리지 않으면 선생님 화면에는 고친 숙제가, DB에는 옛 숙제가 남는다.
+          // 선생님은 "10쪽으로 바꿨다"고 믿고 학생은 옛 내용을 본다.
           console.error('updateHomeworkAssignment failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => ({
+            ...s,
+            homeworkAssignments: previousAssignment ? s.homeworkAssignments.map((a) => (a.id === id ? previousAssignment : a)) : s.homeworkAssignments,
+            error: WRITE_FAILURE_MESSAGE,
+          }));
         } else if (studentId) {
           notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
         }
@@ -894,7 +910,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         setUserProperties({ last_study_session_at: endedAt });
       },
 
+      // 별칭 두 액션은 실패해도 되돌리지 않으면 화면에만 새 이름이 남는다. 다음에 앱을 열면
+      // 옛 이름으로 돌아가 있어서 "바꿨는데 안 바뀌었다"가 된다. 키가 없던 상태(기본 이름)와
+      // 값이 있던 상태를 구별해야 하므로, 없었으면 키를 지워서 되돌린다.
       async updateStudentLabel(studentId, label) {
+        const hadPrevious = studentId in state.studentLabels;
+        const previousLabel = state.studentLabels[studentId];
         setState((s) => ({ ...s, studentLabels: { ...s.studentLabels, [studentId]: label } }));
         const { error } = await supabase
           .from('sb_student_manager_links')
@@ -903,11 +924,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           .eq('manager_id', userId);
         if (error) {
           console.error('updateStudentLabel failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => {
+            const next = { ...s.studentLabels };
+            if (hadPrevious) next[studentId] = previousLabel;
+            else delete next[studentId];
+            return { ...s, studentLabels: next, error: WRITE_FAILURE_MESSAGE };
+          });
         }
       },
 
       async updateManagerLabel(managerId, label) {
+        const hadPrevious = managerId in state.managerLabels;
+        const previousLabel = state.managerLabels[managerId];
         setState((s) => ({ ...s, managerLabels: { ...s.managerLabels, [managerId]: label } }));
         const { error } = await supabase
           .from('sb_student_manager_links')
@@ -916,7 +944,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           .eq('student_id', userId);
         if (error) {
           console.error('updateManagerLabel failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => {
+            const next = { ...s.managerLabels };
+            if (hadPrevious) next[managerId] = previousLabel;
+            else delete next[managerId];
+            return { ...s, managerLabels: next, error: WRITE_FAILURE_MESSAGE };
+          });
         }
       },
 
@@ -1424,6 +1457,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async updateStudentPlannerItem(studentId, date, id, patch) {
+        // 되돌릴 기준점. ref와 state 둘 다 갱신하는 액션이라 실패 시 양쪽을 같이 복구해야 한다.
+        const previousForStudent = studentPlannerItemsRef.current[studentId] ?? {};
         setState((s) => {
           const list = s.studentPlannerItems[studentId]?.[date] ?? [];
           const updatedList = list.map((i) => (i.id === id ? { ...i, ...patch } : i));
@@ -1439,8 +1474,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
         const { error } = await supabase.from('sb_planner_items').update(dbPatch).eq('id', id);
         if (error) {
+          // 선생님이 학생 숙제를 고치는 경로다. 되돌리지 않으면 선생님 화면에만 바뀐 내용이
+          // 남고 학생은 옛 숙제를 본다 — 둘이 다른 숙제를 보고 있는 줄 아무도 모른다.
           console.error('updateStudentPlannerItem failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: previousForStudent };
+          setState((s) => ({
+            ...s,
+            studentPlannerItems: { ...s.studentPlannerItems, [studentId]: previousForStudent },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
         }
       },
 
@@ -1541,6 +1583,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       },
 
       async upsertTutoringSchedule(studentId, weekdays) {
+        const previousSchedules = state.tutoringSchedules;
         setState((s) => {
           const exists = s.tutoringSchedules.some((sch) => sch.studentId === studentId && sch.managerId === userId);
           const updated = exists
@@ -1555,8 +1598,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           .from('sb_tutoring_schedules')
           .upsert({ student_id: studentId, manager_id: userId, weekdays }, { onConflict: 'student_id,manager_id' });
         if (error) {
+          // 과외 요일은 캘린더 표시와 숙제 배정 날짜 계산에 함께 쓰인다. 화면에만 바뀐 요일이
+          // 남으면 선생님이 없는 요일에 숙제를 배정하게 된다.
           console.error('upsertTutoringSchedule failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => ({ ...s, tutoringSchedules: previousSchedules, error: WRITE_FAILURE_MESSAGE }));
         }
       },
 
@@ -1574,8 +1619,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           note: exception.note,
         });
         if (error) {
+          // 되돌리지 않으면 DB에 없는 보강 일정이 캘린더에 남는다. 선생님은 날짜를 옮겼다고
+          // 믿는데 학생 화면에는 원래 날짜가 그대로다.
           console.error('addTutoringException failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => ({ ...s, tutoringScheduleExceptions: s.tutoringScheduleExceptions.filter((e) => e.id !== id), error: WRITE_FAILURE_MESSAGE }));
         }
       },
 

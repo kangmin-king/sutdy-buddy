@@ -144,13 +144,39 @@ describe('selectReminderTargets', () => {
       startedItemIds: ['h3'],
     });
     expect(result.targets.map((t) => t.studentId)).toEqual(['target']);
-    expect(result.skipped).toEqual({ disabled: 1, beforeTime: 1, started: 1 });
+    expect(result.skipped).toEqual({ disabled: 1, beforeTime: 1, started: 1, invalidSetting: 0 });
   });
 
   it('대상이 있으면 건너뛴 이유는 모두 0이다', () => {
     const result = run({ now: '23:00', homeworkItems: [item({})] });
     expect(result.targets).toHaveLength(1);
-    expect(result.skipped).toEqual({ disabled: 0, beforeTime: 0, started: 0 });
+    expect(result.skipped).toEqual({ disabled: 0, beforeTime: 0, started: 0, invalidSetting: 0 });
+  });
+
+  // 상태가 planned가 아니면 학생이 이미 손을 댄 것이다. 특히 partial에 "아직 시작 안 했어요"는
+  // 명백히 틀린 알림이고, carried_over는 무시가 아니라 의도적으로 미룬 것이라 문구가 안 맞는다.
+  it.each(['completed', 'partial', 'carried_over'])('세션 기록이 없어도 status=%s면 대상이 아니다', (status) => {
+    const result = run({ now: '23:00', homeworkItems: [item({ status })] });
+    expect(result.targets).toEqual([]);
+    expect(result.skipped.started).toBe(1);
+  });
+
+  it('planned는 세션 기록이 없으면 대상이다', () => {
+    expect(select({ now: '23:00', homeworkItems: [item({ status: 'planned' })] })).toHaveLength(1);
+  });
+
+  // 한 학생의 설정이 깨졌다고 배치 전체가 죽으면 나머지 학생이 전부 알림을 못 받는다.
+  it('알림 시각 형식이 깨진 학생만 건너뛰고 나머지는 그대로 판정한다', () => {
+    const result = run({
+      now: '23:00',
+      homeworkItems: [item({ id: 'h1', studentId: 'broken' }), item({ id: 'h2', studentId: 'ok' })],
+      settings: {
+        broken: { remindAt: '25:99', enabled: true },
+        ok: { remindAt: '20:00', enabled: true },
+      },
+    });
+    expect(result.targets.map((t) => t.studentId)).toEqual(['ok']);
+    expect(result.skipped.invalidSetting).toBe(1);
   });
 
   it('한 학생이 시작했어도 다른 학생은 따로 판정한다', () => {

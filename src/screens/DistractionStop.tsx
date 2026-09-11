@@ -86,6 +86,7 @@ export default function DistractionStopScreen({ onClose }: { onClose?: () => voi
             <p className="text-xs text-on-surface-variant mt-0.5">공부하는 동안 허용앱 외에는 열리지 않아요</p>
           </div>
           <ToggleSwitch
+            ariaLabel="딴짓 멈춰 켜기"
             checked={state.featureEnabled}
             onChange={(enabled) => {
               setLocal((s) => s && { ...s, featureEnabled: enabled });

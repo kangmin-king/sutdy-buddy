@@ -66,7 +66,7 @@ Deno.serve(async (req: Request) => {
     if (itemsError) throw itemsError;
     if (!items || items.length === 0) {
       return new Response(
-        JSON.stringify({ today, now, checked: 0, notified: 0, sent: 0, alreadySent: 0, skipped: { disabled: 0, beforeTime: 0, started: 0 } }),
+        JSON.stringify({ today, now, checked: 0, notified: 0, sent: 0, alreadySent: 0, skipped: { disabled: 0, beforeTime: 0, started: 0, invalidSetting: 0 } }),
         { status: 200, headers: corsHeaders }
       );
     }
