@@ -667,9 +667,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           });
           if (previousItem.source === 'homework') incrementUserProperty('homework_completed_count');
 
+          // 배정한 사람에게 알린다. 자기계획(source: 'self')은 배정자가 없어서
+          // resolvePlannerItemManagerId가 null을 주므로, 연결된 매니저 전원에게 보낸다 —
+          // **추가할 때와 같은 규칙이다**(addPlannerItem 참고).
+          //
+          // 예전에는 추가할 때만 알리고 완료는 안 알렸다. 숙제와 자기계획을 한 목록에 합치고
+          // 배지로만 구분해 놓았으니 학생에게는 둘 다 "오늘 할 일"인데, 알림 정책이 갈리면
+          // 그 통합이 거짓말이 된다. 게다가 이 앱의 전제는 "했는지를 기록으로 증명한다"라
+          // 추가보다 완료가 더 중요한 사건이다.
           const managerId = resolvePlannerItemManagerId(previousItem, state);
           if (managerId) {
             notifyUser(managerId, '학생이 숙제를 완료했어요', previousItem.material ? `${previousItem.material} 학습을 완료했어요` : '배정한 학습을 완료했어요');
+          } else if (previousItem.source === 'self') {
+            for (const manager of state.linkedManagers) {
+              notifyUser(manager.id, '학생이 세운 계획을 완료했어요', previousItem.material ? `${previousItem.material} 학습을 완료했어요` : '스스로 세운 계획을 완료했어요');
+            }
           }
         }
       },

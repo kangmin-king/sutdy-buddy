@@ -42,9 +42,16 @@ export function TopAppBar({
         <span className="text-lg font-bold text-primary">{title}</span>
       </button>
       <div className="relative flex items-center gap-1">
-        <button onClick={onBell} aria-label="알림" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
-          <Icon name="notifications" />
-        </button>
+        {/* 벨은 **onBell을 실제로 넘겨줄 때만** 그린다. 지금 이 prop을 넘기는 화면이 하나도
+            없어서, 눌러도 아무 일이 없는 44px 버튼이 모든 화면 상단에 상시 떠 있었다.
+            동작 없는 버튼은 고장으로 읽힌다 — 기록을 믿게 하는 게 전부인 앱에서 특히 나쁘다.
+            인앱 알림함을 만들지 않은 것은 의도다: 푸시가 이미 가고 있고, 알림함이 담을
+            고유한 내용이 없어서 같은 사실을 두 곳에서 관리하게 될 뿐이다. */}
+        {onBell && (
+          <button onClick={onBell} aria-label="알림" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">
+            <Icon name="notifications" />
+          </button>
+        )}
         {!compact && (
           <>
             <button onClick={() => setSettingsOpen(true)} aria-label="설정" className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition hover:bg-surface-container active:scale-[0.96]">

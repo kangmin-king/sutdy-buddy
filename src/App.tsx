@@ -228,13 +228,21 @@ function BootstrapShell() {
   }
 
   if (view === 'load-failed') {
+    // 경고 아이콘을 일부러 안 넣는다. 이건 네트워크 실패지 데이터 손상이 아닌데, 큰 경고 표시가
+    // 있으면 "기록이 날아갔나"로 읽힌다 — 그게 이 앱에서 제일 무서운 오해다. 본문이 그 반대를
+    // 명시적으로 말해준다. 출구도 [다시 시도] 하나만 둔다(로그아웃·문의 같은 보조 출구를 넣으면
+    // 문제가 계정 문제인 것처럼 보인다).
     return (
-      <div id="app-shell" className="flex min-h-screen flex-col items-center justify-center gap-5 px-8 text-center">
-        <p className="text-base font-semibold text-on-surface">정보를 불러오지 못했어요</p>
-        <p className="text-sm leading-relaxed text-on-surface-variant">
-          인터넷 연결을 확인하고 다시 시도해주세요. 저장된 학습 기록은 그대로 있어요.
-        </p>
-        <Button onClick={() => actions.retryInitialLoad()}>다시 시도</Button>
+      <div id="app-shell" className="flex min-h-screen items-center justify-center px-5 py-10">
+        <div className="w-full rounded-3xl bg-surface-container-lowest p-6 text-center shadow-card">
+          <h1 className="text-lg font-bold text-on-surface">정보를 불러오지 못했어요</h1>
+          <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+            인터넷 연결을 확인하고 다시 시도해주세요. 저장된 학습 기록은 그대로 있어요.
+          </p>
+          <Button className="mt-5 w-full" onClick={() => actions.retryInitialLoad()}>
+            다시 시도
+          </Button>
+        </div>
       </div>
     );
   }

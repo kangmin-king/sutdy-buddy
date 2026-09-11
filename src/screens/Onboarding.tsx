@@ -10,11 +10,15 @@ import type { Grade, SubjectId, Role } from '../types';
  * 구글·카카오로 가입하면 이메일 회원가입 폼을 거치지 않아서 역할 정보가 없다. 예전처럼 그냥
  * 학생으로 처리하면 소셜로 가입한 과외쌤이 조용히 학생 계정이 되어버리므로, 그 경우에만 물어본다.
  */
+// 온보딩의 안내 카드는 앱의 다른 카드와 같은 표면을 쓴다(surface-container-lowest + shadow-card).
+// 예전에는 여기만 3단 그라데이션이었는데, 앱 어디에도 그라데이션이 없어서 혼자 튀었다.
+// 첫인상 화면이라는 이유로 다른 시각 언어를 쓰면, 정작 매일 보는 실제 화면이 덜 만들어진
+// 것처럼 느껴진다 — 이 앱은 감성형 소비 앱이 아니라 학습 기록을 증명하는 도구다.
 function RolePicker({ onPick }: { onPick: (role: Role) => void }) {
   return (
     <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>
-      <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
+      <div className="rounded-3xl bg-surface-container-lowest shadow-card p-6 mb-6 text-center">
         <div className="text-5xl mb-3">👋</div>
         <h2 className="text-2xl font-extrabold text-on-surface mb-1">어떻게 쓰실 건가요?</h2>
         <p className="text-sm text-on-surface-variant">선택에 따라 보이는 화면이 달라져요.</p>
@@ -110,7 +114,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
       <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
         <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>
 
-        <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
+        <div className="rounded-3xl bg-surface-container-lowest shadow-card p-6 mb-6 text-center">
           <div className="text-5xl mb-3">🤝📚</div>
           <h2 className="text-2xl font-extrabold text-on-surface mb-1">학생과 연결해볼게요</h2>
           <p className="text-sm text-on-surface-variant">학생에게 받은 초대코드를 입력하면 학습 현황을 함께 볼 수 있어요.</p>
@@ -131,7 +135,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
     <div className="px-5 pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <h1 className="text-center text-xl font-bold text-primary mb-6">스터디 벅스</h1>
 
-      <div className="rounded-3xl bg-gradient-to-br from-primary-container/30 via-secondary-container/20 to-tertiary-container/30 p-6 mb-6 text-center">
+      <div className="rounded-3xl bg-surface-container-lowest shadow-card p-6 mb-6 text-center">
         <div className="text-5xl mb-3">🤖📚</div>
         <h2 className="text-2xl font-extrabold text-on-surface mb-1">나를 가장 잘 아는 학습 파트너</h2>
         <p className="text-sm text-on-surface-variant">나에게 맞는 학습 루틴을 함께 만들어볼게요.</p>
