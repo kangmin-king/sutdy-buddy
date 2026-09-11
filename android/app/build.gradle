@@ -21,7 +21,7 @@ android {
         // 인정한다. 1은 드라이브로 직접 배포한 APK가 이미 쓰고 있어서 2부터 시작한다 —
         // 그래야 그 APK를 쓰는 학생이 스토어 버전으로 넘어올 수 있다.
         // **스토어에 올릴 때마다 반드시 올릴 것.**
-        versionCode 9
+        versionCode 10
         // 사용자에게 보이는 버전. 1.1(학생 폰에 이미 깔려 있던 APK) 이후로 다크 모드,
         // 학생 탭 개편(플래너 → "나"), 매니저 화면 결함 수정, 회원 탈퇴 위치 변경이 들어갔다.
         // 1.2(versionCode 3)는 다크 대비 수정 전에 빌드해서 내 기기에만 설치됐다.
@@ -35,7 +35,14 @@ android {
         // legacy를 끄는 순간 서버에 못 붙는다. 노출된 service_role을 무효화하려면 꺼야 한다.
         // 1.2.6(versionCode 9)은 거기에 기기 최근접속 시각 기록을 더했다 — 이게 있어야
         // "학생이 새 APK를 깔았는지"를 sb_device_tokens.updated_at으로 확인할 수 있다.
-        versionName "1.2.6"
+        // 1.2.7(versionCode 10)은 코덱스 전체 리뷰 결과를 담았다. 서버 쪽(푸시 스푸핑, 운영자
+        // 삭제 대상 검증, 제안 컬럼 제한, 초대코드 강제)은 이미 배포돼서 옛 APK에도 적용되지만,
+        // **클라이언트 수정은 이 APK가 있어야 적용된다**: 이월을 트랜잭션 RPC로 보내는 것,
+        // 쓰기 실패 시 화면 되돌리기(낙관적 update 7곳 + 이월 + 숙제 범위 등록),
+        // 초기 로드 실패를 온보딩과 구별하는 것, 모의고사 타이머 종료 사유, 타임라인의 허용앱 표시,
+        // 스위치 키보드 조작, 알림 벨 제거, 온보딩 그라데이션 제거.
+        // ⚠ **이월은 0027 마이그레이션이 먼저 들어가 있어야 동작한다**(2026-09-11 적용 완료).
+        versionName "1.2.7"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
