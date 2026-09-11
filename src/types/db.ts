@@ -247,6 +247,12 @@ export interface Database {
         Args: { code: string };
         Returns: string | null;
       };
+      // 이월(오늘 항목 닫기 + 내일로 사본 만들기)을 한 트랜잭션으로 하는 함수 (0027 마이그레이션).
+      // security invoker라 RLS가 그대로 적용된다 — 남의 항목은 못 옮긴다.
+      carry_over_planner_item: {
+        Args: { source_item_id: string; target_item_id: string; target_date: string; target_order: number };
+        Returns: void;
+      };
     };
   };
 }

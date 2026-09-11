@@ -574,8 +574,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           exam_subject_range_id: fullItem.examSubjectRangeId,
         });
         if (error) {
+          // **낙관적으로 넣은 항목을 ref와 state 양쪽에서 되돌린다.** 되돌리지 않으면 DB에는
+          // 없는 유령 항목이 화면에 남는데, 그 대가가 크다:
+          //  - 지연 숙제 생성 이펙트가 이 항목을 보고 "이미 만들었다"고 판단해 같은 세션에서
+          //    재시도를 막는다(그래서 실패가 조용히 굳는다).
+          //  - 학생이 그 항목을 완료 체크하면 update가 0행에 걸리는데 PostgREST는 이걸 오류로
+          //    주지 않는다. 화면은 완료로 바뀌고 **선생님에게 "숙제를 완료했어요" 알림까지 간다** —
+          //    존재하지 않는 숙제에 대해서.
           console.error('addPlannerItem failed:', error.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          plannerItemsRef.current = {
+            ...plannerItemsRef.current,
+            [date]: (plannerItemsRef.current[date] ?? []).filter((i) => i.id !== id),
+          };
+          setState((s) => ({
+            ...s,
+            plannerItems: { ...s.plannerItems, [date]: (s.plannerItems[date] ?? []).filter((i) => i.id !== id) },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
           return;
         }
 
@@ -681,10 +696,27 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           plannerItems: { ...s.plannerItems, [date]: updatedToday, [tomorrowKey]: [...tomorrowList, clone] },
         }));
 
-        const { error: updateError } = await supabase.from('sb_planner_items').update({ status: 'carried_over' }).eq('id', id);
-        if (updateError) {
-          console.error('carryOverPlannerItem (update) failed:', updateError.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+        // **한 트랜잭션으로 보낸다**(0027 마이그레이션). 예전에는 update와 insert를 따로 보냈고,
+        // update가 실패해도 멈추지 않고 insert를 이어서 보냈다. 그래서 한쪽만 성공하면
+        //   - update 실패 + insert 성공 → 숙제가 중복되고
+        //   - update 성공 + insert 실패 → **새로고침하면 숙제가 사라졌다**
+        // 두 번째는 학생이 숙제를 잃는데 선생님 화면에는 "이월함"으로 보여 아무도 못 알아챈다.
+        const { error } = await supabase.rpc('carry_over_planner_item', {
+          source_item_id: id,
+          target_item_id: cloneId,
+          target_date: tomorrowKey,
+          target_order: order,
+        });
+        if (error) {
+          // 실패하면 낙관적 반영을 되돌린다. 이월은 "오늘 것을 내일로 옮긴다"라 화면 두 곳이
+          // 함께 바뀌므로, 한 곳만 되돌리면 오늘과 내일이 어긋난 채 남는다.
+          console.error('carryOverPlannerItem failed:', error.message);
+          setState((s) => ({
+            ...s,
+            plannerItems: { ...s.plannerItems, [date]: todayList, [tomorrowKey]: tomorrowList },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
+          return;
         }
 
         track('Carried Over Planner Item', {
@@ -692,35 +724,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           source: source.source,
           day_offset: dayOffsetFromToday(date),
         });
-
-        const { error: insertError } = await supabase.from('sb_planner_items').insert({
-          id: cloneId,
-          user_id: userId,
-          date: tomorrowKey,
-          order,
-          subject_id: clone.subjectId,
-          start_time: clone.startTime,
-          study_type: clone.studyType,
-          material: clone.material,
-          unit: clone.unit,
-          page_range: clone.pageRange,
-          end_time: clone.endTime,
-          difficulty: clone.difficulty,
-          rest_pattern: clone.restPattern,
-          must_do: clone.mustDo,
-          status: clone.status,
-          actual_minutes: clone.actualMinutes,
-          understanding: clone.understanding,
-          partial_reason: null,
-          incomplete_reason: null,
-          source: clone.source,
-          homework_assignment_id: clone.homeworkAssignmentId,
-          exam_subject_range_id: clone.examSubjectRangeId,
-        });
-        if (insertError) {
-          console.error('carryOverPlannerItem (insert) failed:', insertError.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
-        }
       },
 
       async linkByInviteCode(code) {
@@ -1170,6 +1173,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           assignedDates: selectedDates,
           createdAt,
         };
+        // 실패했을 때 되돌릴 기준점. 이 액션은 서로 다른 두 테이블에 연달아 쓰기 때문에
+        // 중간에서 실패하면 화면과 DB가 갈라진다 — 아래 두 실패 경로에서 모두 여기로 되돌린다.
+        const previousRanges = state.examSubjectRanges;
+        const previousStudentItems = studentPlannerItemsRef.current[studentId] ?? {};
+
         setState((s) => ({ ...s, examSubjectRanges: [...s.examSubjectRanges, fullRange] }));
 
         const { error: rangeError } = await supabase.from('sb_exam_subject_ranges').insert({
@@ -1181,7 +1189,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         });
         if (rangeError) {
           console.error('registerHomeworkRange (range) failed:', rangeError.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          setState((s) => ({ ...s, examSubjectRanges: previousRanges, error: WRITE_FAILURE_MESSAGE }));
           return;
         }
 
@@ -1252,8 +1260,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           }))
         );
         if (itemsError) {
+          // 범위 행은 이미 들어갔는데 날짜별 숙제가 안 들어간 상태다. 그대로 두면 **선생님은
+          // "시험 범위를 배정했다"고 믿는데 학생 화면에는 숙제가 하나도 없다** — 갈라진 채로
+          // 아무도 모른다. 방금 만든 범위를 지워서 "배정 안 됨"으로 되돌린다.
           console.error('registerHomeworkRange (items) failed:', itemsError.message);
-          setState((s) => ({ ...s, error: WRITE_FAILURE_MESSAGE }));
+          const { error: cleanupError } = await supabase.from('sb_exam_subject_ranges').delete().eq('id', rangeId);
+          if (cleanupError) {
+            // 보상 삭제까지 실패하면 고아 범위가 남는다. 화면은 되돌리되 로그는 남겨 둔다.
+            console.error('registerHomeworkRange (range cleanup) failed:', cleanupError.message);
+          }
+          studentPlannerItemsRef.current = { ...studentPlannerItemsRef.current, [studentId]: previousStudentItems };
+          setState((s) => ({
+            ...s,
+            examSubjectRanges: previousRanges,
+            studentPlannerItems: { ...s.studentPlannerItems, [studentId]: previousStudentItems },
+            error: WRITE_FAILURE_MESSAGE,
+          }));
         } else {
           track('Registered Homework Range', {
             subject_id: params.subjectId,
