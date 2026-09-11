@@ -113,11 +113,27 @@ const EMPTY_STATE: AppState = {
 
 const WRITE_FAILURE_MESSAGE = '저장하지 못했어요. 다시 시도해주세요.';
 
+// 서버가 문구와 수신자를 정하는 알림 사건. 클라이언트는 **어떤 행에 대한 어떤 사건인지만**
+// 말한다 — 문구나 수신자를 보내지 않는다.
+//
+// 예전에는 `{ userId, title, body }`를 보냈다. 그러면 연결된 쌍 안에서 아무 문구나 만들 수 있어서,
+// 학생이 자기 선생님에게 가짜 "숙제를 완료했어요"를 보낼 수 있었다. 이 앱의 전제가
+// "했는지를 기록으로 증명한다"라 알림이 기록과 무관하게 만들어지면 전제가 무너진다.
+// 서버는 refId가 가리키는 행을 직접 읽어 사건이 사실인지 확인한 뒤에만 보낸다.
+type NotifyEvent =
+  | 'planner_item_created_self'
+  | 'planner_item_completed'
+  | 'homework_assigned'
+  | 'homework_updated'
+  | 'homework_proposed'
+  | 'exam_range_assigned'
+  | 'exam_range_updated';
+
 // 푸시알림은 이미 DB 저장이 끝난 뒤에 보내는 부가 동작이라, 실패해도 "저장 실패"처럼 보이는
 // WRITE_FAILURE_MESSAGE는 띄우지 않고 콘솔에만 남긴다.
-async function notifyUser(userId: string, title: string, body: string): Promise<void> {
+async function notify(event: NotifyEvent, refId: string): Promise<void> {
   try {
-    const { error } = await supabase.functions.invoke('send-push-notification', { body: { userId, title, body } });
+    const { error } = await supabase.functions.invoke('send-push-notification', { body: { event, refId } });
     if (error) console.error('send-push-notification failed:', error.message);
   } catch (err) {
     console.error('send-push-notification threw:', err);
@@ -608,11 +624,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         });
         incrementUserProperty('planner_items_created');
 
-        if (fullItem.source === 'self') {
-          for (const manager of state.linkedManagers) {
-            notifyUser(manager.id, '학생이 스스로 계획을 세웠어요', fullItem.material ? `${fullItem.material} 계획을 새로 추가했어요` : '새 계획을 추가했어요');
-          }
-        }
+        // 수신자(연결된 매니저 전원)도 서버가 정한다 — 여기서 고르지 않는다.
+        if (fullItem.source === 'self') notify('planner_item_created_self', id);
       },
 
       async updatePlannerItem(date, id, patch) {
@@ -667,22 +680,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           });
           if (previousItem.source === 'homework') incrementUserProperty('homework_completed_count');
 
-          // 배정한 사람에게 알린다. 자기계획(source: 'self')은 배정자가 없어서
-          // resolvePlannerItemManagerId가 null을 주므로, 연결된 매니저 전원에게 보낸다 —
-          // **추가할 때와 같은 규칙이다**(addPlannerItem 참고).
+          // **수신자도 문구도 서버가 정한다.** 서버가 이 항목을 직접 읽어 정말 completed인지
+          // 확인하고, 배정자가 있으면 그 사람에게·자기계획이면 연결된 매니저 전원에게 보낸다.
           //
-          // 예전에는 추가할 때만 알리고 완료는 안 알렸다. 숙제와 자기계획을 한 목록에 합치고
-          // 배지로만 구분해 놓았으니 학생에게는 둘 다 "오늘 할 일"인데, 알림 정책이 갈리면
-          // 그 통합이 거짓말이 된다. 게다가 이 앱의 전제는 "했는지를 기록으로 증명한다"라
-          // 추가보다 완료가 더 중요한 사건이다.
-          const managerId = resolvePlannerItemManagerId(previousItem, state);
-          if (managerId) {
-            notifyUser(managerId, '학생이 숙제를 완료했어요', previousItem.material ? `${previousItem.material} 학습을 완료했어요` : '배정한 학습을 완료했어요');
-          } else if (previousItem.source === 'self') {
-            for (const manager of state.linkedManagers) {
-              notifyUser(manager.id, '학생이 세운 계획을 완료했어요', previousItem.material ? `${previousItem.material} 학습을 완료했어요` : '스스로 세운 계획을 완료했어요');
-            }
-          }
+          // 자기계획 완료를 알리는 것은 2026-09-11 디자인 리뷰에서 정했다. 숙제와 자기계획을
+          // 한 목록에 합치고 배지로만 구분해 놓았으니 알림 정책이 갈리면 그 통합이 거짓말이 된다.
+          notify('planner_item_completed', id);
         }
       },
 
@@ -810,7 +813,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             span_days: daysBetween(assignment.startDate, assignment.endDate) + 1,
             starts_in_days: dayOffsetFromToday(assignment.startDate),
           });
-          notifyUser(studentId, '숙제가 등록됐어요', assignment.material ? `${assignment.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
+          notify('homework_assigned', id);
         }
       },
 
@@ -840,7 +843,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             error: WRITE_FAILURE_MESSAGE,
           }));
         } else if (studentId) {
-          notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
+          notify('homework_updated', id);
         }
       },
 
@@ -1043,7 +1046,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           has_page_range: Boolean(proposal.pageRange),
           day_offset: dayOffsetFromToday(proposal.date),
         });
-        notifyUser(studentId, '숙제 제안이 왔어요', proposal.material ? `${proposal.material} 숙제를 제안했어요. 확인해보세요` : '새 숙제를 제안했어요');
+        notify('homework_proposed', id);
         return true;
       },
 
@@ -1343,7 +1346,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           // 자유 입력 모드는 페이지 수를 알 수 없다 — 그때는 아예 안 붙인다.
           page_count: params.mode === 'pages' ? params.endPage - params.startPage + 1 : undefined,
         });
-        notifyUser(studentId, '숙제가 등록됐어요', params.material ? `${params.material} 숙제가 새로 등록됐어요` : '새 숙제가 등록됐어요');
+        notify('exam_range_assigned', rangeId);
         return true;
       },
 
@@ -1474,7 +1477,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // 알림은 실제로 뭔가 바뀐 경우에만 보낸다 — 전부 실패했는데 "숙제 내용이 바뀌었어요"가
         // 가면 학생이 열어봐도 달라진 게 없다.
         if (allWritesOk) {
-          notifyUser(studentId, '숙제 내용이 바뀌었어요', '숙제 내용이 수정됐어요. 확인해보세요');
+          notify('exam_range_updated', rangeId);
         }
         return allWritesOk;
       },

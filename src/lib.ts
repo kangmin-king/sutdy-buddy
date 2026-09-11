@@ -191,6 +191,10 @@ export function getPlannerProgress(items: PlannerItem[]) {
 // PlannerItem에는 관리자 컬럼이 없다. 숙제 체인(homeworkAssignmentId → createdBy) 또는 시험 체인
 // (examSubjectRangeId → examSubjectId → examId → examRecord.createdBy) 중 있는 쪽을 타고 이 항목을
 // 배정한 관리자의 id를 찾는다. 둘 다 없으면(source: 'self') null.
+//
+// **용도는 화면 라벨이다** — 학생 홈·캘린더에서 "누가 낸 숙제인지"를 보여준다.
+// 알림 수신자를 고르는 데는 더 이상 쓰지 않는다(2026-09-11부터 서버가 정한다). 서버는 같은
+// 체인을 외래키로 직접 타므로, 규칙을 바꾸면 **여기와 send-push-notification 둘 다** 고쳐야 한다.
 export function resolvePlannerItemManagerId(
   item: PlannerItem,
   slices: {
