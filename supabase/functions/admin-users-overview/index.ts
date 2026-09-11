@@ -61,13 +61,22 @@ Deno.serve(async (req: Request) => {
     }));
 
     const now = new Date();
-    const todayKey = now.toISOString().slice(0, 10);
+    // 엣지 함수는 UTC로 돈다. `toISOString().slice(0, 10)`은 **UTC 날짜**라, 한국 시간으로
+    // 오늘 새벽에 가입한 사람과 어제 저녁에 가입한 사람이 같은 칸에 들어간다(9시간 밀린 창).
+    // 이 화면을 보는 사람은 한국 날짜를 기대하므로 서울 기준으로 날짜 키를 만든다.
+    // (앱의 "하루는 새벽 4시" 규칙은 학생의 공부 하루를 위한 것이고, 가입 통계는
+    //  달력 날짜가 맞다 — 여기서 4시를 쓰면 관리자가 오히려 헷갈린다.)
+    const dateKeyInSeoul = (date: Date): string =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+
+    const todayKey = dateKeyInSeoul(now);
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const stats = {
       totalStudents: users.filter((u) => u.role === 'student').length,
       totalManagers: users.filter((u) => u.role === 'manager').length,
-      signupsToday: users.filter((u) => u.onboardedAt.slice(0, 10) === todayKey).length,
+      signupsToday: users.filter((u) => dateKeyInSeoul(new Date(u.onboardedAt)) === todayKey).length,
+      // 최근 7일은 "지금부터 168시간 전"이라 시간대와 무관하다 — 그대로 둔다.
       signupsThisWeek: users.filter((u) => u.onboardedAt >= weekAgo).length,
     };
 
